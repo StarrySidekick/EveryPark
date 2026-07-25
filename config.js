@@ -64,6 +64,14 @@ const CONFIG = {
     serviceUrl: "https://services6.arcgis.com/Do88DoK2xjTUCXd1/ArcGIS/rest/services/OSM_NA_Leisure/FeatureServer/0/query"
   },
 
+  // ---- ATTRIBUTE ENRICHMENT (sports, trails, water) ----------------
+  // Also pulled live from OpenStreetMap mirrors and cached in-browser.
+  enrichment: {
+    enabled: true,
+    trailsUrl: "https://services6.arcgis.com/Do88DoK2xjTUCXd1/ArcGIS/rest/services/OSM_NA_Trails/FeatureServer/0/query",
+    waterUrl: "https://services6.arcgis.com/Do88DoK2xjTUCXd1/ArcGIS/rest/services/OSM_NA_Water/FeatureServer/0/query"
+  },
+
   // Map start position (Connecticut)
   mapCenter: [41.55, -72.7],
   mapZoom: 9

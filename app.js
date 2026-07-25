@@ -120,12 +120,35 @@
     return "Town / City Park";
   }
 
+  function tagsHtml(p) {
+    if (!p.attrs) return "";
+    const t = [];
+    const A = p.attrs;
+    if (A.water) t.push(`🌊 ${A.waterName || "Waterfront"}`);
+    if (A.beach) t.push("🏖️ Beach");
+    if (A.trails) t.push("🥾 Trails");
+    if (A.sportList && A.sportList.length) t.push("🏀 " + A.sportList.slice(0, 5).join(", "));
+    if (A.playground) t.push("🛝 Playground");
+    if (A.dogpark) t.push("🐕 Dog park");
+    if (A.pool) t.push("🏊 Pool");
+    if (A.historic) t.push("🏛️ Historic");
+    if (!t.length) return "";
+    return `<div class="popup-tags">${t.map(x => `<span class="tag">${x}</span>`).join("")}</div>`;
+  }
+
+  function feeHtml(p) {
+    if (p.type === "state") return `<div class="popup-fee">🅿️ CT-registered vehicles park free (Passport to the Parks); out-of-state $7–22. Camping/special facilities extra.</div>`;
+    if (p.type === "national") return `<div class="popup-fee">🎟️ Free admission.</div>`;
+    return "";
+  }
+
   function popupHtml(p) {
     const acres = p.acres ? ` &middot; ${Number(p.acres).toLocaleString()} acres` : "";
     return `
       <span class="badge ${p.type}">${typeLabel(p)}</span>
       <div class="popup-name">${p.name}</div>
       <div class="popup-sub">${p.town || "Connecticut"}${acres}</div>
+      ${tagsHtml(p)}${feeHtml(p)}
       <div class="popup-links">${linksFor(p)}</div>`;
   }
 
@@ -138,8 +161,11 @@
   // ------------------------------------------------------------------
   // Filtering + list rendering
   // ------------------------------------------------------------------
+  const activeAttrs = new Set();   // feature filters (water, trails, …)
+
   function visible(p) {
     if (!activeTypes.has(p.type)) return false;
+    for (const a of activeAttrs) if (!p.attrs || !p.attrs[a]) return false;
     if (!searchTerm) return true;
     return (p.name + " " + (p.town || "")).toLowerCase().includes(searchTerm);
   }
@@ -274,7 +300,9 @@
           if (a.access && PRIVATE_ACCESS.has(String(a.access).toLowerCase())) continue;
           const p = { n: a.name, lat: +c.y.toFixed(5), lng: +c.x.toFixed(5) };
           if (a.Shape__Area) {
-            const acres = a.Shape__Area * 0.000247105;
+            // Web-Mercator areas are inflated by 1/cos^2(lat); correct it.
+            const k = Math.cos(c.y * Math.PI / 180);
+            const acres = a.Shape__Area * k * k * 0.000247105;
             if (acres >= 1) p.a = Math.round(acres);
           }
           if (a.website && /^https?:\/\//i.test(a.website)) p.w = a.website;
@@ -317,14 +345,233 @@
   }
 
   // ------------------------------------------------------------------
+  // Attribute enrichment: sports, trails, water, historic, beach
+  // Raw layers pulled once from OpenStreetMap mirrors, cached 7 days.
+  // ------------------------------------------------------------------
+  const CT_BBOX = "-73.75,40.95,-71.77,42.06";
+  const SHORE_TOWNS = new Set(["Greenwich","Stamford","Darien","Norwalk","Westport",
+    "Fairfield","Bridgeport","Stratford","Milford","West Haven","New Haven","East Haven",
+    "Branford","Guilford","Madison","Clinton","Westbrook","Old Saybrook","Old Lyme",
+    "East Lyme","Waterford","New London","Groton","Stonington"]);
+  const HISTORIC_RE = /\bfort\b|castle|battle|memorial|monument|historic|heritage|lighthouse|\bmill\b|homestead|birthplace|colonial|revolutionary|\bgreen\b$/i;
+  const SPORT_LABEL = {
+    soccer: "soccer", baseball: "baseball", softball: "softball", basketball: "basketball",
+    tennis: "tennis", pickleball: "pickleball", volleyball: "volleyball", football: "football",
+    american_football: "football", skateboard: "skate park", golf: "golf", disc_golf: "disc golf",
+    bocce: "bocce", cricket: "cricket", lacrosse: "lacrosse", hockey: "hockey",
+    ice_hockey: "ice hockey", equestrian: "equestrian", athletics: "track", running: "track",
+    multi: "multi-sport", swimming: "swimming", shuffleboard: "shuffleboard", badminton: "badminton",
+    horseshoes: "horseshoes", field_hockey: "field hockey", rugby: "rugby", handball: "handball",
+    beachvolleyball: "beach volleyball", table_tennis: "table tennis"
+  };
+
+  function distM(lat1, lng1, lat2, lng2) {
+    const kx = 111320 * Math.cos(lat1 * Math.PI / 180), ky = 110574;
+    const dx = (lng2 - lng1) * kx, dy = (lat2 - lat1) * ky;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  function makeGrid(cellDeg) {
+    const cells = new Map();
+    return {
+      add(lat, lng, item) {
+        const k = Math.floor(lat / cellDeg) + "," + Math.floor(lng / cellDeg);
+        let arr = cells.get(k);
+        if (!arr) { arr = []; cells.set(k, arr); }
+        arr.push([lat, lng, item]);
+      },
+      near(lat, lng, radiusM) {
+        const span = Math.ceil(radiusM / 111000 / cellDeg) + 1;
+        const ci = Math.floor(lat / cellDeg), cj = Math.floor(lng / cellDeg);
+        const out = [];
+        for (let i = ci - span; i <= ci + span; i++)
+          for (let j = cj - span; j <= cj + span; j++) {
+            const arr = cells.get(i + "," + j);
+            if (!arr) continue;
+            for (const [la, ln, item] of arr) {
+              const d = distM(lat, lng, la, ln);
+              if (d <= radiusM) out.push([d, item]);
+            }
+          }
+        return out;
+      }
+    };
+  }
+
+  function cachedDataset(key, days, fetcher) {
+    try {
+      const c = JSON.parse(localStorage.getItem(key));
+      if (c && Date.now() - c.time < days * 864e5) return Promise.resolve(c.data);
+    } catch (e) { /* ignore */ }
+    return fetcher().then(data => {
+      try { localStorage.setItem(key, JSON.stringify({ time: Date.now(), data })); } catch (e) {}
+      return data;
+    });
+  }
+
+  async function pagedQuery(url, extraParams, perFeature) {
+    let offset = 0;
+    for (let i = 0; i < 30; i++) {
+      const body = new URLSearchParams(Object.assign({
+        geometry: CT_BBOX, geometryType: "esriGeometryEnvelope",
+        inSR: "4326", outSR: "4326",
+        resultOffset: String(offset), resultRecordCount: "1000", f: "json"
+      }, extraParams));
+      const r = await fetch(url, { method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" }, body });
+      const j = await r.json();
+      if (j.error || !j.features || !j.features.length) break;
+      for (const f of j.features) perFeature(f);
+      if (!j.exceededTransferLimit && j.features.length < 1000) break;
+      offset += 1000;
+    }
+  }
+
+  function fetchFacilities() {
+    return cachedDataset("ctparks_fac_v1", CONFIG.municipal.cacheDays, async () => {
+      const out = [];
+      await pagedQuery(CONFIG.municipal.serviceUrl, {
+        where: "leisure IN ('pitch','track','swimming_pool','playground','dog_park'," +
+               "'sports_centre','fitness_station','beach_resort') AND " +
+               "(access IS NULL OR access NOT IN ('private','no'))",
+        outFields: "leisure,sport", returnGeometry: "false", returnCentroid: "true"
+      }, f => {
+        if (!f.centroid) return;
+        out.push([+f.centroid.y.toFixed(5), +f.centroid.x.toFixed(5),
+                  f.attributes.leisure || "", f.attributes.sport || ""]);
+      });
+      return out;
+    });
+  }
+
+  function fetchTrails() {
+    return cachedDataset("ctparks_trl_v1", CONFIG.municipal.cacheDays, async () => {
+      const pts = [];
+      await pagedQuery(CONFIG.enrichment.trailsUrl, {
+        where: "name IS NOT NULL", outFields: "OBJECTID",
+        returnGeometry: "true", maxAllowableOffset: "0.002", geometryPrecision: "4"
+      }, f => {
+        const paths = f.geometry && f.geometry.paths;
+        if (!paths) return;
+        for (const path of paths)
+          for (let i = 0; i < path.length; i += 2)   // every other vertex is plenty
+            pts.push([path[i][1], path[i][0]]);
+      });
+      return pts;
+    });
+  }
+
+  function fetchWater() {
+    return cachedDataset("ctparks_wtr_v1", CONFIG.municipal.cacheDays, async () => {
+      const out = [];
+      await pagedQuery(CONFIG.enrichment.waterUrl, {
+        where: "name IS NOT NULL", outFields: "name,Shape__Area",
+        returnGeometry: "false", returnCentroid: "true"
+      }, f => {
+        if (!f.centroid || !f.attributes.name) return;
+        const lat = +f.centroid.y.toFixed(5);
+        const k = Math.cos(lat * Math.PI / 180);
+        const area = (f.attributes.Shape__Area || 0) * k * k;   // true m²
+        if (area < 2000) return;                                // skip puddles
+        out.push([lat, +f.centroid.x.toFixed(5),
+                  f.attributes.name, Math.round(Math.sqrt(area / Math.PI))]);
+      });
+      return out;
+    });
+  }
+
+  function parkRadiusM(p) {
+    if (!p.acres) return 120;
+    return Math.min(2200, Math.max(90, Math.sqrt(p.acres * 4047 / Math.PI)));
+  }
+
+  async function enrich() {
+    if (!CONFIG.enrichment.enabled) return;
+    showStatus("Analyzing parks: sports, trails & water…");
+    try {
+      const [fac, trl, wtr, coast] = await Promise.all([
+        fetchFacilities(), fetchTrails(), fetchWater(),
+        fetch("data/coast.json").then(r => r.json()).catch(() => ({ pts: [] }))
+      ]);
+
+      const facGrid = makeGrid(0.01), trlGrid = makeGrid(0.01),
+            wtrGrid = makeGrid(0.02), cstGrid = makeGrid(0.01);
+      for (const [la, ln, leis, sp] of fac) facGrid.add(la, ln, [leis, sp]);
+      for (const [la, ln] of trl) trlGrid.add(la, ln, 1);
+      for (const [la, ln, nm, rad] of wtr) wtrGrid.add(la, ln, [nm, rad]);
+      for (const [ln, la] of coast.pts || []) cstGrid.add(la, ln, 1);
+
+      for (const p of allParks) {
+        const r = parkRadiusM(p);
+        const A = p.attrs = p.attrs || {};
+
+        // sports & amenities
+        const sports = new Set();
+        for (const [, [leis, sp]] of facGrid.near(p.lat, p.lng, r + 140)) {
+          if (leis === "playground") { A.playground = true; continue; }
+          if (leis === "dog_park") { A.dogpark = true; continue; }
+          if (leis === "swimming_pool") { A.pool = true; sports.add("swimming"); continue; }
+          if (leis === "beach_resort") { A.beach = true; continue; }
+          if (leis === "track") { sports.add("track"); continue; }
+          if (sp) for (const s of sp.split(";")) {
+            const lbl = SPORT_LABEL[s.trim()] || null;
+            if (lbl) sports.add(lbl);
+          }
+          else if (leis === "pitch") sports.add("ball field");
+        }
+        if (sports.size) { A.sports = true; A.sportList = [...sports]; }
+
+        // trails
+        if (trlGrid.near(p.lat, p.lng, r + 240).length) A.trails = true;
+
+        // inland water: nearest named waterbody whose edge comes close
+        let best = null;
+        for (const [d, [nm, rad]] of wtrGrid.near(p.lat, p.lng, r + 2400)) {
+          const edge = d - rad;
+          if (edge < r + 150 && (!best || edge < best[0])) best = [edge, nm];
+        }
+        if (best) { A.water = true; A.waterName = best[1]; }
+
+        // coast
+        if (SHORE_TOWNS.has(p.town) &&
+            cstGrid.near(p.lat, p.lng, Math.max(r + 250, 700)).length) {
+          A.water = true;
+          A.waterName = "Long Island Sound";
+        }
+        if (/beach/i.test(p.name)) A.beach = true;
+        if (A.beach) A.water = A.water || true;
+
+        // historic
+        if (HISTORIC_RE.test(p.name) || /Historic/i.test(p.subtype || "")) A.historic = true;
+
+        p.marker.setPopupContent(popupHtml(p));
+      }
+      hideStatus();
+      refresh();
+    } catch (err) {
+      console.warn("Enrichment failed:", err);
+      hideStatus();
+    }
+  }
+
+  // ------------------------------------------------------------------
   // UI wiring
   // ------------------------------------------------------------------
-  document.querySelectorAll(".chip").forEach(chip => {
+  document.querySelectorAll(".chip[data-type]").forEach(chip => {
     chip.style.setProperty("--dot", CONFIG.colors[chip.dataset.type]);
     chip.addEventListener("click", () => {
       const t = chip.dataset.type;
       if (activeTypes.has(t)) { activeTypes.delete(t); chip.classList.remove("active"); }
       else { activeTypes.add(t); chip.classList.add("active"); }
+      refresh();
+    });
+  });
+
+  document.querySelectorAll(".chip[data-attr]").forEach(chip => {
+    chip.addEventListener("click", () => {
+      const a = chip.dataset.attr;
+      if (activeAttrs.has(a)) { activeAttrs.delete(a); chip.classList.remove("active"); }
+      else { activeAttrs.add(a); chip.classList.add("active"); }
       refresh();
     });
   });
@@ -340,7 +587,7 @@
   });
 
   // ------------------------------------------------------------------
-  loadStatic().then(fetchMunicipal).catch(err => {
+  loadStatic().then(fetchMunicipal).then(enrich).catch(err => {
     console.error(err);
     showStatus("Something went wrong loading park data. Try refreshing.");
   });
