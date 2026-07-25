@@ -1,7 +1,18 @@
-{"source":"National Park Service, verified 2026-07-22","parks":[
-{"n":"Weir Farm National Historical Park","t":"National","town":"Wilton / Ridgefield","lat":41.2585,"lng":-73.4550,"url":"https://www.nps.gov/wefa/"},
-{"n":"Coltsville National Historical Park","t":"National","town":"Hartford","lat":41.7527,"lng":-72.6656,"url":"https://www.nps.gov/colt/"},
-{"n":"Appalachian National Scenic Trail (CT section)","t":"National","town":"Kent (Bulls Bridge access)","lat":41.6767,"lng":-73.5108,"url":"https://www.nps.gov/appa/","note":"~52 miles through CT's northwest corner"},
-{"n":"New England National Scenic Trail (CT section)","t":"National","town":"Meriden (Castle Craig area)","lat":41.5606,"lng":-72.8367,"url":"https://newenglandtrail.org/","note":"Runs from Long Island Sound in Guilford north through CT"},
-{"n":"Washington-Rochambeau Revolutionary Route NHT (CT)","t":"National","town":"Lebanon (encampment site)","lat":41.6365,"lng":-72.2131,"url":"https://www.nps.gov/waro/"}
+{"source":"National Park Service, US Fish & Wildlife Service, US Army Corps of Engineers. Coordinates cross-checked against OpenStreetMap. Verified 2026-07-25.",
+"note":"Linear-only federal designations (Appalachian NST, New England NST, Washington-Rochambeau NHT) are intentionally excluded: they are trail corridors, not areas. Falkner Island (McKinney NWR) is excluded because public access is closed year-round.",
+"parks":[
+
+{"n":"Weir Farm National Historical Park","t":"National Historical Park","town":"Wilton / Ridgefield","lat":41.2585,"lng":-73.4550,"url":"https://www.nps.gov/wefa/","fee":"Free admission","agency":"National Park Service"},
+{"n":"Coltsville National Historical Park","t":"National Historical Park","town":"Hartford","lat":41.7527,"lng":-72.6656,"url":"https://www.nps.gov/colt/","fee":"Free admission","agency":"National Park Service"},
+
+{"n":"McKinney NWR — Salt Meadow Unit","t":"National Wildlife Refuge","town":"Westbrook","lat":41.28554,"lng":-72.47228,"a":400,"url":"https://www.fws.gov/refuge/stewart-b-mckinney/visit-us","fee":"Free","agency":"US Fish & Wildlife Service","note":"Refuge headquarters. Interpretive trail through salt marsh, shrubland and meadow. Open daily, half hour before sunrise to half hour after sunset."},
+{"n":"McKinney NWR — Milford Point Unit","t":"National Wildlife Refuge","town":"Milford","lat":41.17303,"lng":-73.1078,"a":23,"url":"https://www.fws.gov/refuge/stewart-b-mckinney/visit-us","fee":"Free","agency":"US Fish & Wildlife Service","note":"Barrier beach; one of the best birdwatching spots in Connecticut. Observation deck at the entrance. Piping plover and least tern nesting habitat."},
+{"n":"McKinney NWR — Sheffield Island Unit","t":"National Wildlife Refuge","town":"Norwalk","lat":41.05216,"lng":-73.41581,"url":"https://www.fws.gov/refuge/stewart-b-mckinney/visit-us","fee":"Refuge free; ferry ticket extra","agency":"US Fish & Wildlife Service","note":"Nature trail, sandy beach and the 1868 Sheffield Island lighthouse. Reached by seasonal Norwalk Seaport Association ferry or private boat."},
+{"n":"McKinney NWR — Calf Island Unit","t":"National Wildlife Refuge","town":"Greenwich","lat":40.99233,"lng":-73.64015,"a":33,"url":"https://www.fws.gov/refuge/stewart-b-mckinney/visit-us","fee":"Free (boat launch fee at Byram Park)","agency":"US Fish & Wildlife Service","note":"Largest offshore island in Greenwich. Kayak or small boat access only; land on the crescent beach."},
+
+{"n":"Colebrook River Lake","t":"Army Corps Recreation Area","town":"Colebrook","lat":42.02628,"lng":-73.04754,"url":"https://www.nae.usace.army.mil/Missions/Recreation/Connecticut/","fee":"Free","agency":"US Army Corps of Engineers","note":"No fees. North end and boat launch open from the third Saturday in April to Dec 1 or the first significant snow."},
+{"n":"West Thompson Lake","t":"Army Corps Recreation Area","town":"Thompson","lat":41.95498,"lng":-71.90433,"url":"https://www.nae.usace.army.mil/Missions/Recreation/Connecticut/","fee":"Free day use; camping fee","agency":"US Army Corps of Engineers","note":"Campground, boat ramp, disc golf course and three picnic shelters."},
+{"n":"Hop Brook Lake","t":"Army Corps Recreation Area","town":"Middlebury","lat":41.51677,"lng":-73.07039,"url":"https://www.nae.usace.army.mil/Missions/Recreation/Connecticut/","agency":"US Army Corps of Engineers"},
+{"n":"Hancock Brook Lake","t":"Army Corps Recreation Area","town":"Plymouth","lat":41.6288,"lng":-73.0325,"url":"https://www.nae.usace.army.mil/Missions/Recreation/Connecticut/","agency":"US Army Corps of Engineers"},
+{"n":"Northfield Brook Lake","t":"Army Corps Recreation Area","town":"Thomaston","lat":41.68368,"lng":-73.09065,"url":"https://www.nae.usace.army.mil/Missions/Recreation/Connecticut/","agency":"US Army Corps of Engineers"}
 ]}

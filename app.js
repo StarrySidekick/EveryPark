@@ -121,7 +121,7 @@
 
   function typeLabel(p) {
     if (p.type === "state") return p.subtype || "State Park";
-    if (p.type === "national") return "National Park Site";
+    if (p.type === "national") return p.subtype || "Federal Land";
     if (p.type === "cemetery") return p.subtype || "Cemetery";
     return "Town / City Park";
   }
@@ -143,9 +143,15 @@
   }
 
   function feeHtml(p) {
-    if (p.type === "state") return `<div class="popup-fee">🅿️ CT-registered vehicles park free (Passport to the Parks); out-of-state $7–22. Camping/special facilities extra.</div>`;
-    if (p.type === "national") return `<div class="popup-fee">🎟️ Free admission.</div>`;
-    return "";
+    let out = "";
+    if (p.note) out += `<div class="popup-fee">${p.note}</div>`;
+    if (p.type === "state")
+      out += `<div class="popup-fee">🅿️ CT-registered vehicles park free (Passport to the Parks); out-of-state $7–22. Camping/special facilities extra.</div>`;
+    else if (p.fee)
+      out += `<div class="popup-fee">🎟️ ${p.fee}${p.agency ? " &middot; " + p.agency : ""}</div>`;
+    else if (p.agency)
+      out += `<div class="popup-fee">${p.agency}</div>`;
+    return out;
   }
 
   function popupHtml(p) {
@@ -235,7 +241,11 @@
       });
     }
     for (const n of natData.parks) {
-      addPark({ name: n.n, type: "national", lat: n.lat, lng: n.lng, town: n.town, url: n.url });
+      addPark({
+        name: n.n, type: "national", subtype: n.t, lat: n.lat, lng: n.lng,
+        town: n.town, url: n.url, acres: n.a || null,
+        fee: n.fee || null, agency: n.agency || null, note: n.note || null
+      });
     }
     refresh();
   }

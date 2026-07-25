@@ -1,4 +1,6 @@
-{"source":"CT DEEP Property (services1.arcgis.com FjPcSmEFuDYlIdKC Connecticut_DEEP_Property), fetched 2026-07-22","parks":[
+{"source":"CT DEEP Property (services1.arcgis.com FjPcSmEFuDYlIdKC Connecticut_DEEP_Property), fetched 2026-07-22",
+"note":"Linear-only properties (State Park Trails / rail trails such as Hop River) are excluded: they are corridors, not areas.",
+"parks":[
 {"n":"Bigelow Hollow State Park","t":"State Park","lat":42.00094,"lng":-72.13226,"a":515},
 {"n":"Black Rock State Park","t":"State Park","lat":41.65457,"lng":-73.10596,"a":479},
 {"n":"Bluff Point State Park","t":"State Park","lat":41.33696,"lng":-72.02998,"a":68},
@@ -63,7 +65,6 @@
 {"n":"Eagle Landing State Park","t":"State Park","lat":41.44873,"lng":-72.46547,"a":16},
 {"n":"Farm River State Park","t":"State Park","lat":41.25584,"lng":-72.85801,"a":61},
 {"n":"Fort Trumbull State Park","t":"State Park","lat":41.34348,"lng":-72.09339,"a":16},
-{"n":"Hop River State Park","t":"State Park","lat":41.77879,"lng":-72.43445,"a":44},
 {"n":"Ross Pond State Park","t":"State Park","lat":41.77318,"lng":-71.86959,"a":84},
 {"n":"Salem Campground","t":"State Park","lat":41.50027,"lng":-72.22530,"a":10},
 {"n":"Machimoodus State Park","t":"State Park","lat":41.49644,"lng":-72.47801,"a":300},
