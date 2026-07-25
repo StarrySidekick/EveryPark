@@ -209,7 +209,7 @@
   }
 
   // Municipal parks: live from OpenStreetMap via Esri's mirror, cached locally.
-  const CACHE_KEY = "ctparks_municipal_v1";
+  const CACHE_KEY = "ctparks_municipal_v2";
 
   function readCache() {
     try {
@@ -219,7 +219,16 @@
     return null;
   }
 
-  const EXCLUDE = /state (park|forest)|scenic reserve|national (park|historical|scenic)/i;
+  // Excluded from the municipal layer:
+  //  - state/national lands (shown via their own layers)
+  //  - members-only places: clubs, beach/lake associations, HOAs.
+  //    Rule of thumb: paid-but-open-to-anyone stays; exclusive-entry goes.
+  const EXCLUDE = new RegExp(
+    "state (park|forest)|scenic reserve|national (park|historical|scenic)|" +
+    "country club|golf club|yacht club|beach club|swim club|tennis club|" +
+    "racquet|athletic club|members only|homeowners|\\bhoa\\b|" +
+    "(beach|lake|shore|point|improvement) association", "i");
+  const PRIVATE_ACCESS = new Set(["private", "no", "members", "customers"]);
 
   async function fetchMunicipal() {
     const cached = readCache();
@@ -233,12 +242,12 @@
     try {
       for (let i = 0; i < 20; i++) {   // safety cap: 20k features
         const body = new URLSearchParams({
-          where: "leisure='park' AND name IS NOT NULL",
+          where: "leisure='park' AND name IS NOT NULL AND (access IS NULL OR access NOT IN ('private','no'))",
           geometry: "-73.75,40.95,-71.77,42.06",
           geometryType: "esriGeometryEnvelope",
           inSR: "4326",
           outSR: "4326",
-          outFields: "name",
+          outFields: "name,access,website,Shape__Area",
           returnGeometry: "false",
           returnCentroid: "true",
           resultOffset: String(offset),
@@ -253,11 +262,18 @@
         const j = await r.json();
         if (j.error || !j.features) break;
         for (const f of j.features) {
-          const name = f.attributes.name;
+          const a = f.attributes;
           const c = f.centroid;
-          if (!name || !c) continue;
-          if (EXCLUDE.test(name)) continue;
-          parks.push({ n: name, lat: +c.y.toFixed(5), lng: +c.x.toFixed(5) });
+          if (!a.name || !c) continue;
+          if (EXCLUDE.test(a.name)) continue;
+          if (a.access && PRIVATE_ACCESS.has(String(a.access).toLowerCase())) continue;
+          const p = { n: a.name, lat: +c.y.toFixed(5), lng: +c.x.toFixed(5) };
+          if (a.Shape__Area) {
+            const acres = a.Shape__Area * 0.000247105;
+            if (acres >= 1) p.a = Math.round(acres);
+          }
+          if (a.website && /^https?:\/\//i.test(a.website)) p.w = a.website;
+          parks.push(p);
         }
         if (!j.exceededTransferLimit && j.features.length < page) break;
         offset += page;
@@ -284,7 +300,8 @@
     for (const m of parks) {
       const town = findTown(m.lat, m.lng);
       if (!town) continue;               // discard points outside CT borders
-      addPark({ name: m.n, type: "town", lat: m.lat, lng: m.lng, town });
+      addPark({ name: m.n, type: "town", lat: m.lat, lng: m.lng, town,
+                acres: m.a || null, url: m.w || null });
     }
     refresh();
     hideStatus();
