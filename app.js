@@ -209,7 +209,7 @@
   }
 
   // Municipal parks: live from OpenStreetMap via Esri's mirror, cached locally.
-  const CACHE_KEY = "ctparks_municipal_v2";
+  const CACHE_KEY = "ctparks_municipal_v3";
 
   function readCache() {
     try {
@@ -225,9 +225,14 @@
   //    Rule of thumb: paid-but-open-to-anyone stays; exclusive-entry goes.
   const EXCLUDE = new RegExp(
     "state (park|forest)|scenic reserve|national (park|historical|scenic)|" +
-    "country club|golf club|yacht club|beach club|swim club|tennis club|" +
-    "racquet|athletic club|members only|homeowners|\\bhoa\\b|" +
+    "\\bclub\\b|racquet|members only|homeowners|\\bhoa\\b|" +
     "(beach|lake|shore|point|improvement) association", "i");
+  // Public parks that would wrongly trip the EXCLUDE rules (e.g. town-owned
+  // parks with "Club" in the name). Add lowercase names here to keep them.
+  const ALLOW = new Set([
+    "westport longshore club park",
+    "longshore club park"
+  ]);
   const PRIVATE_ACCESS = new Set(["private", "no", "members", "customers"]);
 
   async function fetchMunicipal() {
@@ -265,7 +270,7 @@
           const a = f.attributes;
           const c = f.centroid;
           if (!a.name || !c) continue;
-          if (EXCLUDE.test(a.name)) continue;
+          if (EXCLUDE.test(a.name) && !ALLOW.has(a.name.toLowerCase())) continue;
           if (a.access && PRIVATE_ACCESS.has(String(a.access).toLowerCase())) continue;
           const p = { n: a.name, lat: +c.y.toFixed(5), lng: +c.x.toFixed(5) };
           if (a.Shape__Area) {
