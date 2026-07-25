@@ -17,7 +17,8 @@ const CONFIG = {
   icons: {
     state:    { file: "icons/state.svg",    size: 30 },
     national: { file: "icons/national.svg", size: 32 },
-    town:     { file: "icons/town.svg",     size: 24 }
+    town:     { file: "icons/town.svg",     size: 24 },
+    cemetery: { file: "icons/cemetery.svg", size: 24 }
   },
 
   // ---- COLORS -------------------------------------------------------
@@ -26,6 +27,7 @@ const CONFIG = {
     state:    "#2e7d32",   // green
     national: "#8d5524",   // brown
     town:     "#1565c0",   // blue
+    cemetery: "#6b5b8e",   // purple
     accent:   "#0f4c3a",   // header / highlights
     clusterText: "#ffffff"
   },
@@ -71,6 +73,13 @@ const CONFIG = {
     enabled: true,
     cacheDays: 7,
     serviceUrl: "https://services6.arcgis.com/Do88DoK2xjTUCXd1/ArcGIS/rest/services/OSM_NA_Leisure/FeatureServer/0/query"
+  },
+
+  // ---- CEMETERIES & BURYING GROUNDS --------------------------------
+  // Public land that isn't a park. Loaded live from OpenStreetMap.
+  cemeteries: {
+    enabled: true,
+    serviceUrl: "https://services6.arcgis.com/Do88DoK2xjTUCXd1/ArcGIS/rest/services/OSM_NA_Landuse/FeatureServer/0/query"
   },
 
   // ---- ATTRIBUTE ENRICHMENT (sports, trails, water) ----------------

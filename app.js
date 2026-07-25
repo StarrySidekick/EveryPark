@@ -15,6 +15,7 @@
   rootStyle.setProperty("--state", CONFIG.colors.state);
   rootStyle.setProperty("--national", CONFIG.colors.national);
   rootStyle.setProperty("--town", CONFIG.colors.town);
+  rootStyle.setProperty("--cemetery", CONFIG.colors.cemetery);
   rootStyle.setProperty("--accent", CONFIG.colors.accent);
 
   const map = L.map("map", { zoomControl: true }).setView(CONFIG.mapCenter, CONFIG.mapZoom);
@@ -52,7 +53,7 @@
   // State
   // ------------------------------------------------------------------
   const allParks = [];          // {name, type, lat, lng, town, acres, url, marker}
-  const activeTypes = new Set(["state", "national", "town"]);
+  const activeTypes = new Set(["state", "national", "town"]);   // cemeteries off by default
   let searchTerm = "";
   let townIndex = null;         // for point-in-polygon town lookup
 
@@ -121,6 +122,7 @@
   function typeLabel(p) {
     if (p.type === "state") return p.subtype || "State Park";
     if (p.type === "national") return "National Park Site";
+    if (p.type === "cemetery") return p.subtype || "Cemetery";
     return "Town / City Park";
   }
 
@@ -345,6 +347,62 @@
     if (fresh) {
       showStatus(`Loaded ${parks.length.toLocaleString()} town & city parks`);
       setTimeout(hideStatus, 3500);
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Cemeteries & historic burying grounds (public land that isn't a park)
+  // ------------------------------------------------------------------
+  const CEM_CACHE = "ctparks_cem_v1";
+  // Colonial-era burying grounds are worth calling out separately.
+  const BURYING_RE = /burying|burial ground|old cemetery|ancient/i;
+
+  function fetchCemeteries() {
+    return cachedDataset(CEM_CACHE, CONFIG.municipal.cacheDays, async () => {
+      const out = [];
+      await pagedQuery(CONFIG.cemeteries.serviceUrl, {
+        where: "landuse='cemetery' AND name IS NOT NULL AND " +
+               "(access IS NULL OR access NOT IN ('private','no'))",
+        outFields: "name,website,Shape__Area",
+        returnGeometry: "false", returnCentroid: "true"
+      }, f => {
+        const a = f.attributes, c = f.centroid;
+        if (!a.name || !c) return;
+        const lat = +c.y.toFixed(5);
+        const rec = { n: a.name, lat, lng: +c.x.toFixed(5) };
+        if (a.Shape__Area) {
+          const k = Math.cos(lat * Math.PI / 180);
+          const acres = a.Shape__Area * k * k * 0.000247105;
+          if (acres >= 1) rec.a = Math.round(acres);
+        }
+        if (a.website && /^https?:\/\//i.test(a.website)) rec.w = a.website;
+        out.push(rec);
+      });
+      return out;
+    });
+  }
+
+  async function loadCemeteries() {
+    if (!CONFIG.cemeteries.enabled) return;
+    try {
+      const cems = await fetchCemeteries();
+      const seen = new Set();
+      for (const m of cems) {
+        const key = m.n.toLowerCase() + "|" + Math.round(m.lat * 500) + "|" + Math.round(m.lng * 500);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const town = findTown(m.lat, m.lng);
+        if (!town) continue;
+        addPark({
+          name: m.n, type: "cemetery", lat: m.lat, lng: m.lng, town,
+          acres: m.a || null, url: m.w || null,
+          subtype: BURYING_RE.test(m.n) ? "Historic Burying Ground" : "Cemetery",
+          attrs: { historic: BURYING_RE.test(m.n) }
+        });
+      }
+      refresh();
+    } catch (err) {
+      console.warn("Cemetery load failed:", err);
     }
   }
 
@@ -607,7 +665,7 @@
     const bbox = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()]
       .map(x => x.toFixed(4)).join(",");
     try {
-      const [stateGj, townGj] = await Promise.all([
+      const jobs = [
         fetchOverlayGeojson(CONFIG.overlays.stateUrl, {
           where: "AV_LEGEND IN ('State Park','State Forest','State Park Scenic Reserve','Historic Preserve','Natural Area Preserve')",
           geometry: bbox, outFields: "OBJECTID,PROPERTY,AV_LEGEND"
@@ -616,10 +674,18 @@
           where: "leisure='park' AND (access IS NULL OR access NOT IN ('private','no'))",
           geometry: bbox, outFields: "OBJECTID,name"
         })
-      ]);
+      ];
+      if (activeTypes.has("cemetery")) {
+        jobs.push(fetchOverlayGeojson(CONFIG.cemeteries.serviceUrl, {
+          where: "landuse='cemetery' AND (access IS NULL OR access NOT IN ('private','no'))",
+          geometry: bbox, outFields: "OBJECTID,name"
+        }));
+      }
+      const [stateGj, townGj, cemGj] = await Promise.all(jobs);
       addOverlayFeatures(stateGj, "state", "PROPERTY",
         f => f.properties.AV_LEGEND || "State land");
       addOverlayFeatures(townGj, "town", "name", () => "Town / City Park");
+      if (cemGj) addOverlayFeatures(cemGj, "cemetery", "name", () => "Cemetery");
     } catch (err) {
       console.warn("Overlay load failed:", err);
     }
@@ -640,6 +706,7 @@
       if (activeTypes.has(t)) { activeTypes.delete(t); chip.classList.remove("active"); }
       else { activeTypes.add(t); chip.classList.add("active"); }
       refresh();
+      if (t === "cemetery") { loadedOverlayIds.clear(); overlayLayer.clearLayers(); refreshOverlays(); }
     });
   });
 
@@ -663,7 +730,7 @@
   });
 
   // ------------------------------------------------------------------
-  loadStatic().then(fetchMunicipal).then(enrich).catch(err => {
+  loadStatic().then(fetchMunicipal).then(loadCemeteries).then(enrich).then(refreshOverlays).catch(err => {
     console.error(err);
     showStatus("Something went wrong loading park data. Try refreshing.");
   });
