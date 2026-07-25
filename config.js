@@ -30,29 +30,38 @@ const CONFIG = {
     clusterText: "#ffffff"
   },
 
-  // ---- BASEMAP ------------------------------------------------------
-  // Swap the map background by changing `url`. Free options:
-  //  Carto Voyager (default):
-  //    https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png
-  //  Carto Positron (minimal light):
-  //    https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png
-  //  Carto Dark:
-  //    https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png
-  //  OpenStreetMap classic:
-  //    https://tile.openstreetmap.org/{z}/{x}/{y}.png
-  //  OpenTopoMap (terrain):
-  //    https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png
-  basemap: {
-    url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>'
-  },
+  // ---- BASEMAPS ------------------------------------------------------
+  // First entry is the default. A switcher control lets visitors flip.
+  // labelsUrl (optional) draws place names on top of imagery.
+  basemaps: [
+    {
+      label: "Satellite",
+      url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      attribution: "Imagery &copy; Esri, Maxar, Earthstar Geographics",
+      labelsUrl: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
+    },
+    {
+      label: "Street map",
+      url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>'
+    }
+  ],
 
   // ---- TOWN BORDER STYLE -------------------------------------------
   townBorders: {
     show: true,
-    color: "#9aa5a0",
+    color: "#ffffff",
     weight: 1,
-    opacity: 0.5
+    opacity: 0.45
+  },
+
+  // ---- PARK BOUNDARY OVERLAYS ---------------------------------------
+  // Actual park shapes appear when zoomed in to `minZoom` or closer.
+  overlays: {
+    enabled: true,
+    minZoom: 12,
+    fillOpacity: 0.28,
+    stateUrl: "https://services1.arcgis.com/FjPcSmEFuDYlIdKC/arcgis/rest/services/Connecticut_DEEP_Property/FeatureServer/0/query"
   },
 
   // ---- MUNICIPAL PARKS LIVE DATA -----------------------------------

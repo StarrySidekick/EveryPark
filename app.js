@@ -18,10 +18,14 @@
   rootStyle.setProperty("--accent", CONFIG.colors.accent);
 
   const map = L.map("map", { zoomControl: true }).setView(CONFIG.mapCenter, CONFIG.mapZoom);
-  L.tileLayer(CONFIG.basemap.url, {
-    attribution: CONFIG.basemap.attribution,
-    maxZoom: 19
-  }).addTo(map);
+  const baseLayers = {};
+  CONFIG.basemaps.forEach((b, i) => {
+    const parts = [L.tileLayer(b.url, { attribution: b.attribution, maxZoom: 19 })];
+    if (b.labelsUrl) parts.push(L.tileLayer(b.labelsUrl, { maxZoom: 19 }));
+    baseLayers[b.label] = L.layerGroup(parts);
+    if (i === 0) baseLayers[b.label].addTo(map);
+  });
+  L.control.layers(baseLayers, null, { position: "bottomright" }).addTo(map);
 
   const icons = {};
   for (const [key, def] of Object.entries(CONFIG.icons)) {
@@ -553,6 +557,78 @@
       hideStatus();
     }
   }
+
+  // ------------------------------------------------------------------
+  // Park boundary overlays (actual shapes) — load per viewport when
+  // zoomed in, so the map stays fast. State + town, color-coded.
+  // ------------------------------------------------------------------
+  const overlayLayer = L.layerGroup().addTo(map);
+  const loadedOverlayIds = new Set();
+  let overlayTimer = null;
+
+  function overlayStyle(kind) {
+    const color = CONFIG.colors[kind];
+    return { color, weight: 1.6, opacity: 0.9,
+             fillColor: color, fillOpacity: CONFIG.overlays.fillOpacity };
+  }
+
+  async function fetchOverlayGeojson(url, params) {
+    const body = new URLSearchParams(Object.assign({
+      geometryType: "esriGeometryEnvelope", inSR: "4326", outSR: "4326",
+      maxAllowableOffset: "0.00008", resultRecordCount: "800", f: "geojson"
+    }, params));
+    const r = await fetch(url, { method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" }, body });
+    return r.json();
+  }
+
+  function addOverlayFeatures(gj, kind, nameProp, labelFn) {
+    if (!gj || !gj.features) return;
+    for (const f of gj.features) {
+      const id = kind + ":" + (f.id || (f.properties && (f.properties.OBJECTID || f.properties.name)) || JSON.stringify(f.properties));
+      if (loadedOverlayIds.has(id)) continue;
+      const nm = f.properties ? f.properties[nameProp] : null;
+      if (kind === "town" && nm && EXCLUDE.test(nm) && !ALLOW.has(nm.toLowerCase())) continue;
+      loadedOverlayIds.add(id);
+      const lyr = L.geoJSON(f, { style: () => overlayStyle(kind) });
+      if (nm) lyr.bindPopup(`<span class="badge ${kind}">${labelFn(f)}</span><div class="popup-name">${nm}</div>`);
+      overlayLayer.addLayer(lyr);
+    }
+  }
+
+  async function refreshOverlays() {
+    if (!CONFIG.overlays.enabled) return;
+    if (map.getZoom() < CONFIG.overlays.minZoom) {
+      overlayLayer.clearLayers();
+      loadedOverlayIds.clear();
+      return;
+    }
+    const b = map.getBounds();
+    const bbox = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()]
+      .map(x => x.toFixed(4)).join(",");
+    try {
+      const [stateGj, townGj] = await Promise.all([
+        fetchOverlayGeojson(CONFIG.overlays.stateUrl, {
+          where: "AV_LEGEND IN ('State Park','State Forest','State Park Scenic Reserve','Historic Preserve','Natural Area Preserve')",
+          geometry: bbox, outFields: "OBJECTID,PROPERTY,AV_LEGEND"
+        }),
+        fetchOverlayGeojson(CONFIG.municipal.serviceUrl, {
+          where: "leisure='park' AND (access IS NULL OR access NOT IN ('private','no'))",
+          geometry: bbox, outFields: "OBJECTID,name"
+        })
+      ]);
+      addOverlayFeatures(stateGj, "state", "PROPERTY",
+        f => f.properties.AV_LEGEND || "State land");
+      addOverlayFeatures(townGj, "town", "name", () => "Town / City Park");
+    } catch (err) {
+      console.warn("Overlay load failed:", err);
+    }
+  }
+
+  map.on("moveend zoomend", () => {
+    clearTimeout(overlayTimer);
+    overlayTimer = setTimeout(refreshOverlays, 350);
+  });
 
   // ------------------------------------------------------------------
   // UI wiring
