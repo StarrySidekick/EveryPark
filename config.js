@@ -68,6 +68,18 @@ const CONFIG = {
     stateUrl: "https://services1.arcgis.com/FjPcSmEFuDYlIdKC/arcgis/rest/services/Connecticut_DEEP_Property/FeatureServer/0/query"
   },
 
+  // ---- TRAIL LINES ---------------------------------------------------
+  // Actual walking routes drawn under the park shapes. Loaded for the
+  // current view only, so detail stays high without slowing the map.
+  trailLines: {
+    enabled: true,
+    minZoom: 13,
+    color: "#ffd24a",      // warm yellow reads well on satellite
+    weight: 2,
+    opacity: 0.9,
+    dashArray: "5,4"
+  },
+
   // ---- MUNICIPAL PARKS LIVE DATA -----------------------------------
   // Town parks are pulled live from OpenStreetMap (via Esri's mirror)
   // and cached in the visitor's browser for `cacheDays` days.

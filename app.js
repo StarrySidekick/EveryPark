@@ -867,6 +867,13 @@
   // Park boundary overlays (actual shapes) — load per viewport when
   // zoomed in, so the map stays fast. State + town, color-coded.
   // ------------------------------------------------------------------
+  // Trails sit in their own pane below the park polygons so the shapes
+  // stay readable while the routes show through.
+  map.createPane("trailPane");
+  map.getPane("trailPane").style.zIndex = 390;
+  const trailLayer = L.layerGroup().addTo(map);
+  const loadedTrailIds = new Set();
+
   const overlayLayer = L.layerGroup().addTo(map);
   const loadedOverlayIds = new Set();
   let overlayTimer = null;
@@ -958,9 +965,47 @@
     }
   }
 
+  // --- Visible trail lines -------------------------------------------
+  async function refreshTrailLines() {
+    const T = CONFIG.trailLines;
+    if (!T.enabled) return;
+    if (map.getZoom() < T.minZoom) {
+      trailLayer.clearLayers();
+      loadedTrailIds.clear();
+      return;
+    }
+    const b = map.getBounds();
+    const bbox = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()]
+      .map(x => x.toFixed(4)).join(",");
+    try {
+      const body = new URLSearchParams({
+        where: TRAIL_WHERE, geometry: bbox, geometryType: "esriGeometryEnvelope",
+        inSR: "4326", outSR: "4326", outFields: "OBJECTID,name,highway",
+        returnGeometry: "true", geometryPrecision: "6",
+        resultRecordCount: "1200", f: "geojson"
+      });
+      const gj = await fetch(CONFIG.enrichment.trailsUrl, { method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" }, body }).then(r => r.json());
+      for (const f of (gj.features || [])) {
+        const id = (f.properties && f.properties.OBJECTID) || f.id;
+        if (id == null || loadedTrailIds.has(id)) continue;
+        loadedTrailIds.add(id);
+        const nm = f.properties && f.properties.name;
+        const line = L.geoJSON(f, {
+          pane: "trailPane",
+          style: { color: T.color, weight: T.weight, opacity: T.opacity, dashArray: T.dashArray }
+        });
+        if (nm) line.bindTooltip(nm, { sticky: true });
+        trailLayer.addLayer(line);
+      }
+    } catch (err) {
+      console.warn("Trail lines failed:", err);
+    }
+  }
+
   map.on("moveend zoomend", () => {
     clearTimeout(overlayTimer);
-    overlayTimer = setTimeout(refreshOverlays, 350);
+    overlayTimer = setTimeout(() => { refreshOverlays(); refreshTrailLines(); }, 350);
   });
 
   // ------------------------------------------------------------------
@@ -998,7 +1043,7 @@
 
   // ------------------------------------------------------------------
   loadStatic().then(fetchMunicipal).then(loadPreserves).then(loadCemeteries)
-              .then(enrich).then(refreshOverlays).catch(err => {
+              .then(enrich).then(refreshOverlays).then(refreshTrailLines).catch(err => {
     console.error(err);
     showStatus("Something went wrong loading park data. Try refreshing.");
   });
