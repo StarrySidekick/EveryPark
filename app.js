@@ -667,20 +667,48 @@
     return Math.floor(lat / TRAIL_CELL) * 1000000 + (Math.floor(lng / TRAIL_CELL) + 500000);
   }
 
+  const TRAIL_WHERE = "highway IN ('path','track','bridleway')";
+
+  async function countQuery(url, where) {
+    const body = new URLSearchParams({
+      where, geometry: CT_BBOX, geometryType: "esriGeometryEnvelope",
+      inSR: "4326", returnCountOnly: "true", f: "json"
+    });
+    const j = await fetch(url, { method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" }, body }).then(r => r.json());
+    return j.count || 0;
+  }
+
+  // Connecticut has ~30,000 trail segments. Requesting full geometry for
+  // all of them locks up the browser, so we ask the server to simplify
+  // heavily (maxAllowableOffset) and fetch pages several at a time.
   function fetchTrailCells() {
-    return cachedDataset("ctparks_trailgrid_v1", CONFIG.municipal.cacheDays, async () => {
+    return cachedDataset("ctparks_trailgrid_v2", CONFIG.municipal.cacheDays, async () => {
       const cells = new Set();
-      // path/track/bridleway = real trails. Footways are mostly sidewalks
-      // and building approaches, which would produce false positives.
-      await pagedQuery(CONFIG.enrichment.trailsUrl, {
-        where: "highway IN ('path','track','bridleway')", outFields: "OBJECTID",
-        returnGeometry: "true", maxAllowableOffset: "0.0008", geometryPrecision: "5"
-      }, f => {
-        const paths = f.geometry && f.geometry.paths;
-        if (!paths) return;
-        for (const path of paths)
-          for (const pt of path) cells.add(cellKey(pt[1], pt[0]));
-      });
+      const PAGE = 2000, CONCURRENCY = 4;
+      const total = await countQuery(CONFIG.enrichment.trailsUrl, TRAIL_WHERE);
+      if (!total) return [];
+      const offsets = [];
+      for (let o = 0; o < total; o += PAGE) offsets.push(o);
+
+      async function grab(offset) {
+        const body = new URLSearchParams({
+          where: TRAIL_WHERE, geometry: CT_BBOX, geometryType: "esriGeometryEnvelope",
+          inSR: "4326", outSR: "4326", outFields: "",
+          returnGeometry: "true", maxAllowableOffset: "0.004", geometryPrecision: "4",
+          resultOffset: String(offset), resultRecordCount: String(PAGE), f: "json"
+        });
+        try {
+          const j = await fetch(CONFIG.enrichment.trailsUrl, { method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" }, body }).then(r => r.json());
+          for (const f of j.features || [])
+            for (const path of (f.geometry && f.geometry.paths) || [])
+              for (const pt of path) cells.add(cellKey(pt[1], pt[0]));
+        } catch (e) { /* skip this page */ }
+      }
+
+      for (let i = 0; i < offsets.length; i += CONCURRENCY)
+        await Promise.all(offsets.slice(i, i + CONCURRENCY).map(grab));
       return [...cells];
     });
   }
@@ -736,12 +764,11 @@
     if (!CONFIG.enrichment.enabled) return;
     showStatus("Analyzing parks: sports, trails & water…");
     try {
-      const [fac, trlCells, park, wtr, coast] = await Promise.all([
-        fetchFacilities(), fetchTrailCells(), fetchParking(), fetchWater(),
+      const [fac, park, wtr, coast] = await Promise.all([
+        fetchFacilities(), fetchParking(), fetchWater(),
         fetch("data/coast.json").then(r => r.json()).catch(() => ({ pts: [] }))
       ]);
 
-      const trailSet = new Set(trlCells);
       const facGrid = makeGrid(0.01), parkGrid = makeGrid(0.01),
             wtrGrid = makeGrid(0.02), cstGrid = makeGrid(0.01);
       for (const [la, ln, leis, sp] of fac) facGrid.add(la, ln, [leis, sp]);
@@ -769,19 +796,11 @@
         }
         if (sports.size) { A.sports = true; A.sportList = [...sports]; }
 
-        // --- Can you actually get in? ---
-        // A mapped trail is the strongest evidence a place is walkable;
-        // public parking means you can at least reach and enter it.
-        if (trailNear(p.lat, p.lng, r + 150, trailSet)) A.trails = true;
+        // Public parking means you can at least reach and enter.
+        // (Trails are added afterwards — see applyTrailAccess.)
         if (parkGrid.near(p.lat, p.lng, Math.max(r, CONFIG.access.parkingRadiusM)).length)
           A.parking = true;
-        A.visitable = !!(A.trails || A.parking || A.sports || A.playground || A.beach);
-        // Built facilities imply access even without a mapped trail; a bare
-        // preserve with none of the above is flagged as unverified.
-        A.accessNote = A.trails ? "Trails mapped"
-                     : A.parking ? "Parking nearby, no mapped trail"
-                     : A.visitable ? "Facilities on site"
-                     : "No mapped trail or parking";
+        scoreAccess(p);
 
         // inland water: nearest named waterbody whose edge comes close
         let best = null;
@@ -807,8 +826,39 @@
       }
       hideStatus();
       refresh();
+      applyTrailAccess();     // slower; fills in behind the scenes
     } catch (err) {
       console.warn("Enrichment failed:", err);
+      hideStatus();
+    }
+  }
+
+  // A mapped trail is the strongest evidence a place is actually walkable.
+  function scoreAccess(p) {
+    const A = p.attrs || (p.attrs = {});
+    A.visitable = !!(A.trails || A.parking || A.sports || A.playground || A.beach || A.pool);
+    A.accessNote = A.trails ? "Trails mapped"
+                 : A.parking ? "Parking nearby, no mapped trail"
+                 : A.visitable ? "Facilities on site"
+                 : "No mapped trail or parking — access unverified";
+  }
+
+  async function applyTrailAccess() {
+    try {
+      showStatus("Checking trail access…");
+      const cells = await fetchTrailCells();
+      const trailSet = new Set(cells);
+      if (!trailSet.size) { hideStatus(); return; }
+      for (const p of allParks) {
+        const A = p.attrs || (p.attrs = {});
+        if (trailNear(p.lat, p.lng, parkRadiusM(p) + 150, trailSet)) A.trails = true;
+        scoreAccess(p);
+        p.marker.setPopupContent(popupHtml(p));
+      }
+      hideStatus();
+      refresh();
+    } catch (e) {
+      console.warn("Trail access check failed:", e);
       hideStatus();
     }
   }
