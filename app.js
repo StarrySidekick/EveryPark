@@ -107,6 +107,7 @@
   // ------------------------------------------------------------------
   const allParks = [];          // {name, type, lat, lng, town, acres, url, marker}
   const activeTypes = new Set(["state", "national", "town", "preserve"]);   // cemeteries off by default
+  let tilesActive = false;      // true once vector tiles take over the geometry
   let searchTerm = "";
   let townIndex = null;         // for point-in-polygon town lookup
 
@@ -326,6 +327,7 @@
   }
 
   function refresh() {
+    if (tilesActive) EveryParkTiles.refresh(activeTypes);
     const shown = [];
     cluster.clearLayers();
     const batch = [];
@@ -1305,6 +1307,7 @@
   let padusOn = false, padusBase = null;
 
   async function refreshPadusLayer() {
+    if (tilesActive) return;          // PAD-US comes from the tile archive
     const P = CONFIG.padus;
     if (!padusOn || map.getZoom() < P.minZoom) return;
     const base = await ensurePadusBase();
@@ -1799,6 +1802,7 @@
   }
 
   async function refreshOverlays() {
+    if (tilesActive) return;          // boundaries come from the tile archive
     if (!CONFIG.overlays.enabled) return;
     if (map.getZoom() < CONFIG.overlays.minZoom) {
       overlayLayer.clearLayers();
@@ -1942,6 +1946,7 @@
   let parcelsOn = false;
 
   async function refreshParcels() {
+    if (tilesActive) return;          // parcels come from the tile archive
     const P = CONFIG.protectedParcels;
     if (!P.enabled || !parcelsOn) return;
     if (map.getZoom() < P.minZoom) return;
@@ -1984,6 +1989,7 @@
   let bbLoaded = false;
 
   async function loadBlueBlazed() {
+    if (tilesActive) return;          // Blue-Blazed comes from the tile archive
     if (bbLoaded || !CONFIG.blueBlazed.enabled) return;
     const B = CONFIG.blueBlazed;
     showStatus("Loading Blue-Blazed trails…");
@@ -2017,6 +2023,7 @@
 
   // --- Visible trail lines -------------------------------------------
   async function refreshTrailLines() {
+    if (tilesActive) return;          // trails come from the tile archive
     const T = CONFIG.trailLines;
     if (!T.enabled) return;
     if (map.getZoom() < T.minZoom) {
@@ -2254,7 +2261,14 @@
   // ------------------------------------------------------------------
   // Baked data first if it's there, then public land — the thing the map
   // is actually for — then everything else.
-  loadBaked().then(loadPublicLand);
+  // Boundaries and trails come from the tile archive when it's there.
+  // If it's missing or the renderer failed to load, everything falls
+  // back to fetching per viewport exactly as it did before.
+  loadBaked().then(() => {
+    if (CONFIG.vectorTiles && CONFIG.vectorTiles.enabled)
+      tilesActive = EveryParkTiles.init(map, activeTypes);
+    if (!tilesActive) loadPublicLand();
+  });
 
   document.querySelector("#legend .legend-title").addEventListener("click", () => {
     document.getElementById("legend").classList.toggle("collapsed");

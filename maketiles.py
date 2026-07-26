@@ -2,7 +2,15 @@
 """
 Build a PMTiles archive from the GeoJSON files that tiles.html downloads.
 
-    python3 maketiles.py ep-*.geojson -o data/everypark.pmtiles
+Two phases, so a big build can be done in pieces rather than one long run:
+
+    # encode one or more zoom levels into a stage file
+    python3 maketiles.py stage ep-*.geojson --zooms 6 7 8 9 10 11
+    python3 maketiles.py stage ep-*.geojson --zooms 12 13
+    python3 maketiles.py stage ep-*.geojson --zooms 14
+
+    # merge the stages into the finished archive
+    python3 maketiles.py pack -o data/everypark.pmtiles
 
 Each input file becomes one named layer inside the tiles, so the map can
 style and toggle them independently. Geometry is simplified per zoom
@@ -12,14 +20,16 @@ makes restyling possible without refetching anything.
 """
 
 import argparse
+import glob
 import gzip
 import json
 import os
+import pickle
 import sys
 from collections import defaultdict
 
 import mercantile
-from shapely.geometry import shape, box, mapping
+from shapely.geometry import shape, box
 from shapely.ops import transform as shp_transform
 import mapbox_vector_tile
 from pmtiles.writer import Writer
@@ -28,6 +38,17 @@ from pmtiles.tile import Compression, TileType, zxy_to_tileid
 EXTENT = 4096          # MVT coordinate space per tile
 BUFFER = 128           # draw past the tile edge so lines don't seam
 
+# Connecticut, with a small margin. Everything is clipped to this before
+# tiling. Without it a single PAD-US record for the Appalachian Trail
+# corridor — which runs through fourteen states — claims a bounding box
+# spanning half the country and lands in thousands of tiles.
+CT_CLIP = box(-73.80, 40.90, -71.72, 42.11)
+
+# OSM tags worth drawing. footway and cycleway are overwhelmingly town
+# sidewalks and road-side bike lanes: they quadruple the feature count
+# and clutter the map without telling you anything about a park.
+TRAIL_KEEP = {"path", "track", "bridleway"}
+
 # Which zooms each layer appears at. Detail layers stay out of the low
 # zooms entirely — that's most of the size saving, and at z9 a trail
 # network is an unreadable smudge anyway.
@@ -35,18 +56,20 @@ LAYER_ZOOM = {
     "stateland":  (6, 14),
     "padus":      (8, 14),
     "preserves":  (9, 14),
+    "blueblazed": (9, 14),
     "townparks":  (10, 14),
     "landuse":    (10, 14),
     "cemeteries": (11, 14),
     "parcels":    (12, 14),
     "trails":     (12, 14),
-    "blueblazed": (9, 14),
 }
 DEFAULT_ZOOM = (10, 14)
 
-# Drop features too small to see at a given zoom. Values are in square
-# degrees, scaled by zoom; polygons under roughly a quarter-pixel go.
+STAGE_DIR = "_stage"
+
+
 def min_area_for(z):
+    """Polygons under about a quarter-pixel aren't worth shipping."""
     tile_deg = 360.0 / (2 ** z)
     px_deg = tile_deg / 512.0
     return (px_deg ** 2) * 0.25
@@ -82,13 +105,15 @@ def clean_props(props):
     return out
 
 
-def load_layer(path):
+def layer_name(path):
     name = os.path.basename(path)
-    for prefix in ("ep-",):
-        if name.startswith(prefix):
-            name = name[len(prefix):]
-    name = name.split(".")[0]
+    if name.startswith("ep-"):
+        name = name[3:]
+    return name.split(".")[0]
 
+
+def load_layer(path):
+    name = layer_name(path)
     with open(path) as fh:
         gj = json.load(fh)
 
@@ -97,6 +122,10 @@ def load_layer(path):
     for f in gj.get("features") or []:
         g = f.get("geometry")
         if not g:
+            skipped += 1
+            continue
+        props = f.get("properties") or {}
+        if name == "trails" and props.get("highway") not in TRAIL_KEEP:
             skipped += 1
             continue
         try:
@@ -109,16 +138,24 @@ def load_layer(path):
                 if geom.is_empty:
                     skipped += 1
                     continue
+            # Clip to Connecticut. Cheap containment test first — most
+            # features are entirely inside and need no clipping at all.
+            if not CT_CLIP.contains(geom):
+                geom = geom.intersection(CT_CLIP)
+                if geom.is_empty:
+                    skipped += 1
+                    continue
         except Exception:
             skipped += 1
             continue
-        feats.append((geom, clean_props(f.get("properties"))))
+        feats.append((geom, clean_props(props)))
     return name, feats, skipped
 
 
-def tile_bounds(t):
+def tile_clip(t, z):
     b = mercantile.bounds(t)
-    return box(b.west, b.south, b.east, b.north)
+    pad = (b.east - b.west) * (BUFFER / EXTENT)
+    return box(b.west - pad, b.south - pad, b.east + pad, b.north + pad)
 
 
 def to_tile_coords(geom, t):
@@ -136,26 +173,25 @@ def to_tile_coords(geom, t):
     return shp_transform(fn, geom)
 
 
-def build(inputs, out_path, minzoom, maxzoom):
+def stage(inputs, zooms):
+    os.makedirs(STAGE_DIR, exist_ok=True)
     layers = {}
     for path in inputs:
         name, feats, skipped = load_layer(path)
         layers[name] = feats
-        note = f" ({skipped} skipped)" if skipped else ""
+        note = f" ({skipped:,} filtered/clipped out)" if skipped else ""
         print(f"  {name}: {len(feats):,} features{note}", flush=True)
 
-    # Index each layer's features by the tiles they touch, per zoom.
-    # Doing it zoom by zoom keeps memory flat rather than holding every
-    # tile's contents at once.
-    tiles = defaultdict(lambda: defaultdict(list))
+    with open(os.path.join(STAGE_DIR, "layers.json"), "w") as fh:
+        json.dump(sorted(layers), fh)
 
-    for name, feats in layers.items():
-        lo, hi = LAYER_ZOOM.get(name, DEFAULT_ZOOM)
-        lo, hi = max(lo, minzoom), min(hi, maxzoom)
-        if lo > hi:
-            continue
-        for z in range(lo, hi + 1):
-            min_a = min_area_for(z)
+    for z in zooms:
+        buckets = defaultdict(lambda: defaultdict(list))
+        min_a = min_area_for(z)
+        for name, feats in layers.items():
+            lo, hi = LAYER_ZOOM.get(name, DEFAULT_ZOOM)
+            if not (lo <= z <= hi):
+                continue
             kept = 0
             for geom, props in feats:
                 if geom.geom_type in ("Polygon", "MultiPolygon") and geom.area < min_a:
@@ -163,43 +199,65 @@ def build(inputs, out_path, minzoom, maxzoom):
                 sg = simplify_for(geom, z)
                 w, s, e, n = sg.bounds
                 for t in mercantile.tiles(w, s, e, n, [z]):
-                    tiles[(z, t.x, t.y)][name].append((sg, props))
+                    buckets[(t.x, t.y)][name].append((sg, props))
                 kept += 1
-            print(f"    {name} z{z}: {kept:,} features", flush=True)
+            print(f"    z{z} {name}: {kept:,}", flush=True)
 
-    print(f"  {len(tiles):,} tiles to write", flush=True)
-
-    written = 0
-    with open(out_path, "wb") as fh:
-        writer = Writer(fh)
-        for (z, x, y) in sorted(tiles.keys()):
+        out = {}
+        for (x, y), by_layer in buckets.items():
             t = mercantile.Tile(x, y, z)
-            clip = tile_bounds(t).buffer((360.0 / (2 ** z)) * (BUFFER / EXTENT))
+            clip = tile_clip(t, z)
             mvt_layers = []
-            for name, items in tiles[(z, x, y)].items():
-                out_feats = []
+            for name, items in by_layer.items():
+                feats_out = []
                 for geom, props in items:
                     try:
-                        g = geom.intersection(clip)
+                        g = geom if clip.contains(geom) else geom.intersection(clip)
                         if g.is_empty:
                             continue
-                        g = to_tile_coords(g, t)
-                        out_feats.append({"geometry": g, "properties": props})
+                        feats_out.append(
+                            {"geometry": to_tile_coords(g, t), "properties": props})
                     except Exception:
                         continue
-                if out_feats:
-                    mvt_layers.append({"name": name, "features": out_feats})
+                if feats_out:
+                    mvt_layers.append({"name": name, "features": feats_out})
             if not mvt_layers:
                 continue
-            buf = mapbox_vector_tile.encode(
-                mvt_layers, default_options={"extents": EXTENT})
-            if not buf:
+            try:
+                buf = mapbox_vector_tile.encode(
+                    mvt_layers, default_options={"extents": EXTENT})
+            except Exception:
                 continue
-            writer.write_tile(zxy_to_tileid(z, x, y), gzip.compress(buf, 6))
-            written += 1
-            if written % 500 == 0:
-                print(f"    wrote {written:,} tiles", flush=True)
+            if buf:
+                out[zxy_to_tileid(z, x, y)] = gzip.compress(buf, 6)
 
+        path = os.path.join(STAGE_DIR, f"z{z}.pkl")
+        with open(path, "wb") as fh:
+            pickle.dump(out, fh, protocol=4)
+        size = sum(len(v) for v in out.values())
+        print(f"  z{z}: {len(out):,} tiles, {size/1024/1024:.1f} MB -> {path}",
+              flush=True)
+
+
+def pack(out_path, minzoom, maxzoom):
+    stages = sorted(glob.glob(os.path.join(STAGE_DIR, "z*.pkl")))
+    if not stages:
+        sys.exit("no stage files — run `stage` first")
+
+    tiles = {}
+    for p in stages:
+        with open(p, "rb") as fh:
+            tiles.update(pickle.load(fh))
+        print(f"  loaded {p}", flush=True)
+
+    with open(os.path.join(STAGE_DIR, "layers.json")) as fh:
+        names = json.load(fh)
+
+    os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
+    with open(out_path, "wb") as fh:
+        writer = Writer(fh)
+        for tid in sorted(tiles):
+            writer.write_tile(tid, tiles[tid])
         writer.finalize(
             {
                 "tile_type": TileType.MVT,
@@ -221,29 +279,35 @@ def build(inputs, out_path, minzoom, maxzoom):
                     {"id": n,
                      "minzoom": max(LAYER_ZOOM.get(n, DEFAULT_ZOOM)[0], minzoom),
                      "maxzoom": min(LAYER_ZOOM.get(n, DEFAULT_ZOOM)[1], maxzoom)}
-                    for n in layers
+                    for n in names
                 ],
             },
         )
-
     size = os.path.getsize(out_path)
-    print(f"\n  {written:,} tiles -> {out_path} ({size/1024/1024:.1f} MB)")
+    print(f"\n  {len(tiles):,} tiles -> {out_path} ({size/1024/1024:.1f} MB)")
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("inputs", nargs="+", help="ep-*.geojson files")
-    ap.add_argument("-o", "--out", default="data/everypark.pmtiles")
-    ap.add_argument("--minzoom", type=int, default=6)
-    ap.add_argument("--maxzoom", type=int, default=14)
+    sub = ap.add_subparsers(dest="cmd", required=True)
+
+    s = sub.add_parser("stage", help="encode zoom levels into stage files")
+    s.add_argument("inputs", nargs="+")
+    s.add_argument("--zooms", nargs="+", type=int, required=True)
+
+    p = sub.add_parser("pack", help="merge stage files into a PMTiles archive")
+    p.add_argument("-o", "--out", default="data/everypark.pmtiles")
+    p.add_argument("--minzoom", type=int, default=6)
+    p.add_argument("--maxzoom", type=int, default=14)
+
     args = ap.parse_args()
-
-    missing = [p for p in args.inputs if not os.path.exists(p)]
-    if missing:
-        sys.exit("missing: " + ", ".join(missing))
-
-    os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
-    build(args.inputs, args.out, args.minzoom, args.maxzoom)
+    if args.cmd == "stage":
+        missing = [q for q in args.inputs if not os.path.exists(q)]
+        if missing:
+            sys.exit("missing: " + ", ".join(missing))
+        stage(args.inputs, sorted(args.zooms))
+    else:
+        pack(args.out, args.minzoom, args.maxzoom)
 
 
 if __name__ == "__main__":

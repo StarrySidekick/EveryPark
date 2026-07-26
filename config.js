@@ -82,6 +82,24 @@ const CONFIG = {
     opacity: 0.45
   },
 
+  // ---- VECTOR TILES --------------------------------------------------
+  // Every boundary and trail, pre-cut into map tiles and packed into one
+  // file. The map reads only the tiles for what's on screen, using HTTP
+  // range requests, so nothing is fetched from a live service as you pan.
+  //
+  // Regenerate after changing the source data:
+  //   1. open tiles.html and download the ep-*.geojson files
+  //   2. python3 maketiles.py stage ep-*.geojson --zooms 6 7 8 9 10 11
+  //      python3 maketiles.py stage ep-*.geojson --zooms 12 13
+  //      python3 maketiles.py stage ep-*.geojson --zooms 14
+  //   3. python3 maketiles.py pack -o data/everypark.pmtiles
+  //
+  // Set enabled:false to fall back to the old live per-viewport fetching.
+  vectorTiles: {
+    enabled: true,
+    url: "data/everypark.pmtiles"
+  },
+
   // ---- PUBLIC LAND — THE MAIN EVENT -----------------------------------
   // The whole point of the map: at a glance, what's public and what isn't.
   // All 491 state-owned parcels load in one request and stay visible at
