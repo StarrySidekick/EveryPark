@@ -72,46 +72,26 @@ const EveryParkTiles = (() => {
 
   function landRule(dataLayer, extraFilter) {
     const V = CONFIG.visual;
+    const H = CONFIG.hover || {};
     const border = OWNER[dataLayer];
     return {
       dataLayer,
       filter: (z, f) => visible(dataLayer, f) && (!extraFilter || extraFilter(f)),
+      // The highlight is done inside this one symbolizer rather than as
+      // extra paint rules: adding rules for the same dataLayer stopped the
+      // layer loading tiles at all.
       symbolizer: new protomapsL.PolygonSymbolizer({
-        fill: V.publicFill,
-        opacity: V.fillOpen,
-        stroke: border,
-        width: V.borderWeight      // the hover highlight is its own pass
+        fill: (z, f) => keyOf(dataLayer, f) === hoverKey
+                      ? (H.fill || "#c8f5cf") : V.publicFill,
+        opacity: (z, f) => keyOf(dataLayer, f) === hoverKey
+                         ? (H.fillOpacity != null ? H.fillOpacity : 0.62)
+                         : V.fillOpen,
+        stroke: (z, f) => keyOf(dataLayer, f) === hoverKey
+                        ? (H.stroke || "#ffffff") : border,
+        width: (z, f) => keyOf(dataLayer, f) === hoverKey
+                       ? (H.width || 6) : V.borderWeight
       })
     };
-  }
-
-  // The hovered shape is redrawn on top of everything: a white casing, the
-  // owner's colour over it, and a brighter fill. Thickening the existing
-  // border was too subtle to read against satellite imagery.
-  function hoverRules() {
-    const V = CONFIG.visual;
-    const H = CONFIG.hover || {};
-    const isHot = dl => (z, f) => keyOf(dl, f) === hoverKey;
-    const rules = [];
-    for (const dl of Object.keys(OWNER)) {
-      rules.push({
-        dataLayer: dl, filter: isHot(dl),
-        symbolizer: new protomapsL.PolygonSymbolizer({
-          fill: H.fill || "#ffffff",
-          opacity: H.fillOpacity != null ? H.fillOpacity : 0.22,
-          stroke: H.casing || "#ffffff",
-          width: H.casingWidth || 7
-        })
-      });
-      rules.push({
-        dataLayer: dl, filter: isHot(dl),
-        symbolizer: new protomapsL.PolygonSymbolizer({
-          fill: V.publicFill, opacity: H.tint != null ? H.tint : 0.30,
-          stroke: OWNER[dl], width: H.width || 3.5
-        })
-      });
-    }
-    return rules;
   }
 
   function paintRules() {
@@ -136,7 +116,6 @@ const EveryParkTiles = (() => {
           color: B.color, width: B.weight, opacity: B.opacity
         })
       },
-      ...hoverRules()          // last, so the highlight sits on top
     ];
   }
 

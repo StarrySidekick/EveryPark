@@ -38,12 +38,10 @@ const CONFIG = {
   // owner's colour over it, and a brighter fill. Turn the numbers up for a
   // heavier effect, down for a subtler one.
   hover: {
-    casing: "#ffffff",     // outer halo colour
-    casingWidth: 7,        // halo thickness
-    fill: "#ffffff",       // brightening wash under the tint
-    fillOpacity: 0.22,
-    tint: 0.30,            // extra green on top of the normal fill
-    width: 3.5             // the owner-coloured border while hovered
+    fill: "#c8f5cf",       // the shape brightens to this while hovered
+    fillOpacity: 0.62,     // vs 0.32 normally — a clear, obvious change
+    stroke: "#ffffff",     // white outline reads against any imagery
+    width: 6               // vs ~1.9 normally
   },
 
   // ---- MARKER ICONS -------------------------------------------------
