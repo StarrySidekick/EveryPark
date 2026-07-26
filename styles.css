@@ -422,3 +422,9 @@ a.badge:hover { filter: brightness(1.15); text-decoration: underline; }
 @media (max-width: 760px) {
   #guide { padding: 24px 20px 28px; max-height: 90vh; }
 }
+
+/* Leaflet styles all anchors inside the map blue; the category badge is a
+   link into the Guide, so it needs its white text back. */
+.leaflet-container a.badge,
+.leaflet-popup-content a.badge { color: #fff; }
+.leaflet-container a.badge:hover { color: #fff; }
