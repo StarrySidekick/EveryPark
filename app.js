@@ -1307,6 +1307,9 @@
     if (!base) { console.info("PAD-US unavailable — skipping official access ratings."); return; }
     padusBase = base;
     document.getElementById("padusToggle").removeAttribute("disabled");
+    // Now that PAD-US is confirmed reachable, redraw so land-trust
+    // boundaries appear for the view we're already looking at.
+    refreshOverlays();
     try {
       showStatus("Applying official PAD-US access ratings…");
       const areas = [];
@@ -1582,6 +1585,35 @@
     }
   }
 
+  // Land-trust and private-conservation boundaries from PAD-US, drawn in
+  // the same visual language as everything else: green fill, owner-colour
+  // border, dashed because access is by permission.
+  function addPadusBoundaries(gj) {
+    for (const f of (gj.features || [])) {
+      const pr = f.properties || {};
+      const id = "pad:" + (pr.OBJECTID || "");
+      if (loadedOverlayIds.has(id)) continue;
+      const nm = pr.Unit_Nm;
+      if (!nm || nm === "Unknown") continue;
+      if (GENERIC_NAME.test(nm) || TRIBAL_EXCLUDE.test(nm)) continue;
+      if (EXCLUDE.test(nm) && !ALLOW.has(nm.toLowerCase())) continue;
+      loadedOverlayIds.add(id);
+      const open = pr.Pub_Access === "OA";
+      const lyr = L.geoJSON(f, { style: landStyle("preserve", !open) });
+      lyr.bindPopup(
+        `<span class="badge preserve">${DESIG_WORD[pr.Des_Tp] || "Protected land"}</span>
+         <div class="popup-name">${nm}</div>
+         <div class="popup-sub">${OWNER_WORD[pr.Own_Name] || "Private / non-profit"}</div>
+         <div class="pblock ${open ? "acc-open" : "acc-permission"}">
+           <div class="pb-head">${open ? "✅ Open to all" : "🤝 Open by permission"}</div>
+           <div class="pb-body">${open
+             ? "Officially open (USGS PAD-US)."
+             : "Privately held but customarily open. You're here by the owner's permission rather than by legal right. Respect posted signs."}</div>
+         </div>`);
+      overlayLayer.addLayer(lyr);
+    }
+  }
+
   async function refreshOverlays() {
     if (!CONFIG.overlays.enabled) return;
     if (map.getZoom() < CONFIG.overlays.minZoom) {
@@ -1614,7 +1646,18 @@
             geometry: bbox, outFields: "OBJECTID,name"
           })
         : Promise.resolve(null));
-      const [, townGj, presGj, cemGj] = await Promise.all(jobs);
+      // PAD-US supplies boundaries for NON-government land only. State
+      // land already comes from DEEP and town land from OSM, so limiting
+      // it this way fills the land-trust gap without stacking duplicate
+      // parcels on top of each other.
+      jobs.push(padusBase && activeTypes.has("preserve")
+        ? fetchOverlayGeojson(padusBase + "/query", {
+            where: "Unit_Nm<>'Unknown' AND Pub_Access<>'XA' AND " +
+                   "Own_Name IN ('NGO','PVT','JNT','OTHR','UNK')",
+            geometry: bbox, outFields: "OBJECTID,Unit_Nm,Own_Name,Pub_Access,Des_Tp"
+          })
+        : Promise.resolve(null));
+      const [, townGj, presGj, cemGj, padGj] = await Promise.all(jobs);
       addOverlayFeatures(townGj, "town", "name", () => "Town / City Park");
       if (presGj) {
         // Re-use the same operator rules so colors match the pins.
@@ -1631,6 +1674,7 @@
         }
       }
       if (cemGj) addOverlayFeatures(cemGj, "cemetery", "name", () => "Cemetery");
+      if (padGj) addPadusBoundaries(padGj);
     } catch (err) {
       console.warn("Overlay load failed:", err);
     }
