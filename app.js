@@ -329,7 +329,22 @@
   const EXCLUDE = new RegExp(
     "state (park|forest)|scenic reserve|national (park|historical|scenic)|" +
     "\\bclub\\b|racquet|members only|homeowners|\\bhoa\\b|" +
-    "(beach|lake|shore|point|improvement) association", "i");
+    "(beach|lake|shore|point|improvement) association|" +
+    // Scout reservations and camps are members-only, not public land.
+    "\\bscout\\b|scout reservation", "i");
+
+  // Tribal burial grounds are excluded outright. Connecticut's five
+  // state-recognised reservations are sovereign land — under CGS
+  // ch. 824 nobody may go on a reservation without the tribe's written
+  // permission — and burial grounds are not visitor destinations.
+  // (Careful: "Indian Hill Cemetery" and "Indian River Cemetery" are
+  // ordinary municipal cemeteries named for local landmarks, so we
+  // match on burial-specific wording rather than the word alone.)
+  const TRIBAL_EXCLUDE = new RegExp(
+    "tribal burial|indian burial|burial site|" +
+    "\\b(schaghticoke|paugussett|pequot|mohegan|montaukett|niantic|nipmuc|" +
+    "mashantucket|golden hill)\\b.*(burial|reservation)|" +
+    "\\breservation\\b.*(indian|tribal)", "i");
   // Public parks that would wrongly trip the EXCLUDE rules (e.g. town-owned
   // parks with "Club" in the name). Add lowercase names here to keep them.
   const ALLOW = new Set([
@@ -525,7 +540,7 @@
   //   state run                             -> skipped (already mapped)
   //   water-supply watershed                -> skipped (permit-only)
   // ------------------------------------------------------------------
-  const PRES_CACHE = "ctparks_pres_v4";
+  const PRES_CACHE = "ctparks_pres_v5";
   const OP_STATE = /Department of Energy and Environmental|State of Connecticut|\bDEEP\b|Connecticut DEP/i;
   // Federal land held as parcels — in Connecticut this is overwhelmingly
   // the Appalachian Trail protective corridor, which the NPS owns
@@ -621,7 +636,7 @@
   // ------------------------------------------------------------------
   // Cemeteries & historic burying grounds (public land that isn't a park)
   // ------------------------------------------------------------------
-  const CEM_CACHE = "ctparks_cem_v1";
+  const CEM_CACHE = "ctparks_cem_v2";
   // Colonial-era burying grounds are worth calling out separately.
   const BURYING_RE = /burying|burial ground|old cemetery|ancient/i;
 
@@ -636,6 +651,7 @@
       }, f => {
         const a = f.attributes, c = f.centroid;
         if (!a.name || !c) return;
+        if (TRIBAL_EXCLUDE.test(a.name)) return;
         const lat = +c.y.toFixed(5);
         const rec = { n: a.name, lat, lng: +c.x.toFixed(5) };
         if (a.Shape__Area) {
@@ -748,7 +764,7 @@
   // Drop cache entries from older versions of the site so they don't
   // sit in localStorage forever.
   (function pruneOldCaches() {
-    const keep = new Set(["ctparks_municipal_v3", "ctparks_cem_v1", "ctparks_pres_v4",
+    const keep = new Set(["ctparks_municipal_v3", "ctparks_cem_v2", "ctparks_pres_v5",
                           "ctparks_fac_v1", "ctparks_trl_v1", "ctparks_wtr_v1"]);
     try {
       for (const k of Object.keys(localStorage))
