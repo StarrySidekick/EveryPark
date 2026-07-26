@@ -2308,7 +2308,10 @@
   async function loadPrecomputedInner() {
     let data;
     try {
-      const r = await fetch("data/places.json", { cache: "force-cache" });
+      // Plain fetch, not force-cache: force-cache happily returns a stale
+      // 404 from before this file existed, which silently drops the whole
+      // map back to the slow live path. Normal HTTP caching is enough.
+      const r = await fetch("data/places.json");
       if (!r.ok) return false;
       data = await r.json();
     } catch (e) { return false; }
