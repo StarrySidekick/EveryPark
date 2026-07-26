@@ -122,31 +122,35 @@ const EveryParkTiles = (() => {
 
   // What's under the cursor, best guess: the smallest thing wins, so
   // a pocket park inside a state forest is what you get.
+  // What's under the cursor. The method really is called
+  // queryTileFeaturesDebug — it takes (lng, lat) and returns a Map whose
+  // keys are paint-rule ids, so the tile layer a feature came from has to
+  // be read off each picked feature's own layerName, not the Map key.
   function pick(latlng) {
-    if (!layer || !layer.queryFeatures) return null;
+    if (!layer || typeof layer.queryTileFeaturesDebug !== "function") return null;
     let hits;
     try {
-      hits = layer.queryFeatures(latlng.lng, latlng.lat, map.getZoom(), 8);
+      hits = layer.queryTileFeaturesDebug(latlng.lng, latlng.lat);
     } catch (e) { return null; }
     if (!hits) return null;
 
     let best = null;
-    const consider = (dataLayer, f) => {
-      if (dataLayer === "trails" || dataLayer === "blueblazed") return;
+    const consider = pf => {
+      const f = pf.feature || pf;
+      const dataLayer = pf.layerName || f.layerName;
+      if (!dataLayer || dataLayer === "trails" || dataLayer === "blueblazed") return;
       if (!visible(dataLayer, f)) return;
       if (dataLayer === "padus" && !padusOk(f)) return;
       if (!nameOf(f)) return;
       const p = f.props || {};
+      // Smallest thing wins, so a pocket park inside a state forest is
+      // what you get rather than the forest around it.
       const size = p.ACRE_GIS || p.GIS_Acres || p.ACRES || 1e9;
       if (!best || size < best.size) best = { dataLayer, f, size };
     };
 
-    if (typeof hits.forEach === "function" && hits instanceof Map) {
-      hits.forEach((arr, dataLayer) => (arr || []).forEach(pf => consider(dataLayer, pf.feature || pf)));
-    } else {
-      for (const k of Object.keys(hits))
-        (hits[k] || []).forEach(pf => consider(k, pf.feature || pf));
-    }
+    const groups = hits instanceof Map ? [...hits.values()] : Object.values(hits);
+    for (const arr of groups) (arr || []).forEach(consider);
     return best;
   }
 
