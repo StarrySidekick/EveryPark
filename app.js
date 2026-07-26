@@ -1132,7 +1132,10 @@
   }
 
   function trailNear(lat, lng, radiusM, cellSet) {
-    const span = Math.min(6, Math.ceil(radiusM / 111000 / TRAIL_CELL));
+    // Must cover the park's own radius — capped at 6 this reached only
+    // 999 m, so large forests were judged by a kilometre around their
+    // centroid and came out with no trails.
+    const span = Math.min(16, Math.ceil(radiusM / 111000 / TRAIL_CELL));
     const i0 = Math.floor(lat / TRAIL_CELL), j0 = Math.floor(lng / TRAIL_CELL);
     for (let i = i0 - span; i <= i0 + span; i++)
       for (let j = j0 - span; j <= j0 + span; j++)
@@ -2268,14 +2271,11 @@
   // ------------------------------------------------------------------
   // Baked data first if it's there, then public land — the thing the map
   // is actually for — then everything else.
-  // Boundaries and trails come from the tile archive when it's there.
-  // If it's missing or the renderer failed to load, everything falls
-  // back to fetching per viewport exactly as it did before.
-  loadBaked().then(() => {
-    if (CONFIG.vectorTiles && CONFIG.vectorTiles.enabled)
-      tilesActive = EveryParkTiles.init(map, activeTypes);
-    if (!tilesActive) loadPublicLand();
-  });
+  // Boundaries and trails come from the tile archive. If it's missing or
+  // the renderer failed to load, everything falls back to fetching per
+  // viewport exactly as it did before.
+  if (CONFIG.vectorTiles && CONFIG.vectorTiles.enabled)
+    tilesActive = EveryParkTiles.init(map, activeTypes);
 
   document.querySelector("#legend .legend-title").addEventListener("click", () => {
     document.getElementById("legend").classList.toggle("collapsed");
@@ -2311,7 +2311,19 @@
       }).addTo(map);
     }
 
-    for (const p of data.places) { p._pre = true; addPark(p); }
+    // The file stores source facts only. Access, its label and wording,
+    // steward and kind are derived here by the same rules the build uses,
+    // which keeps ~2.9 MB out of the download and means the wording can
+    // change without regenerating the dataset.
+    const PADUS_NOTE = "Listed by USGS as restricted, which for land-trust and " +
+      "private conservation land usually means open by the owner's permission " +
+      "rather than by legal right. Check the owner's website or posted signs.";
+    for (const p of data.places) {
+      if (p.attrs && p.attrs.byPermission && !p.note) p.note = PADUS_NOTE;
+      scoreAccess(p);          // sets visitable + accessNote, then classifies
+      p._pre = true;           // so addPark doesn't classify a second time
+      addPark(p);
+    }
     refresh();
     console.info(`Loaded ${data.places.length.toLocaleString()} precomputed places ` +
                  `(built ${data.built}). No live fetching.`);
@@ -2350,8 +2362,16 @@
   const wantDump = new URLSearchParams(location.search).has("dump");
 
   loadPrecomputed().then(done => {
-    if (done && !wantDump) return;      // nothing else to do
-    return loadStatic().then(loadStateExtra).then(loadBoatLaunches).then(fetchMunicipal)
+    if (done && !wantDump) {
+      // Everything is already resolved. Nothing is fetched, nothing is
+      // recomputed, and baked.json is never touched.
+      if (!tilesActive) loadPublicLand();
+      return;
+    }
+    // Fallback: no precomputed file, so rebuild it all from source.
+    return loadBaked()
+      .then(() => { if (!tilesActive) loadPublicLand(); })
+      .then(loadStatic).then(loadStateExtra).then(loadBoatLaunches).then(fetchMunicipal)
                 .then(loadExtraLanduse).then(loadMuseums)
                 .then(loadPreserves).then(loadCemeteries)
                 .then(enrich).then(refreshOverlays).then(refreshTrailLines)
