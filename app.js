@@ -251,7 +251,10 @@
   }
 
   function addPark(p) {
-    classify(p);
+    // Precomputed records already carry access, steward and kind, worked
+    // out at build time. Re-running classify would overwrite the PAD-US
+    // ratings that were applied after it.
+    if (!p._pre) classify(p);
     for (const al of ALIASES) {
       if (al.match && al.match.toLowerCase() === String(p.name).toLowerCase()) {
         p.aka = al.aka || [];
@@ -2274,10 +2277,75 @@
     document.getElementById("legend").classList.toggle("collapsed");
   });
 
-  loadStatic().then(loadStateExtra).then(loadBoatLaunches).then(fetchMunicipal)
-              .then(loadExtraLanduse).then(loadMuseums)
-              .then(loadPreserves).then(loadCemeteries)
-              .then(enrich).then(refreshOverlays).then(refreshTrailLines).catch(err => {
+  // ------------------------------------------------------------------
+  // Precomputed places. Everything above — fetching, classifying,
+  // enriching, deduping — exists to turn raw sources into this one list.
+  // The answer is identical on every visit, so when data/places.json is
+  // present we load it and skip the entire pipeline.
+  // ------------------------------------------------------------------
+  const PLACE_FIELDS = ["name", "lat", "lng", "type", "t", "town", "a", "url",
+                        "fee", "why", "access", "accessLabel", "accessWhy",
+                        "steward", "kind", "attrs", "un", "op"];
+
+  async function loadPrecomputed() {
+    let data;
+    try {
+      const r = await fetch("data/places.json", { cache: "force-cache" });
+      if (!r.ok) return false;
+      data = await r.json();
+    } catch (e) { return false; }
+    if (!data || !Array.isArray(data.places) || !data.places.length) return false;
+
+    const towns = await fetch("data/towns.geojson").then(r => r.json());
+    buildTownIndex(towns);
+    if (CONFIG.townBorders.show) {
+      L.geoJSON(towns, {
+        style: { color: CONFIG.townBorders.color, weight: CONFIG.townBorders.weight,
+                 opacity: CONFIG.townBorders.opacity, fill: false, interactive: false }
+      }).addTo(map);
+    }
+
+    for (const p of data.places) { p._pre = true; addPark(p); }
+    refresh();
+    console.info(`Loaded ${data.places.length.toLocaleString()} precomputed places ` +
+                 `(built ${data.built}). No live fetching.`);
+    return true;
+  }
+
+  // Serialise the finished list so it can be baked. Open the site with
+  // ?dump=1 to run the full pipeline once and download the result.
+  function dumpPlaces() {
+    const out = allParks.map(p => {
+      const rec = {};
+      for (const k of PLACE_FIELDS)
+        if (p[k] !== undefined && p[k] !== null && p[k] !== "") rec[k] = p[k];
+      rec.lat = +p.lat.toFixed(5);
+      rec.lng = +p.lng.toFixed(5);
+      if (rec.attrs) {
+        const a = {};
+        for (const [k, v] of Object.entries(rec.attrs))
+          if (v !== undefined && v !== null && v !== false && v !== "") a[k] = v;
+        if (Object.keys(a).length) rec.attrs = a; else delete rec.attrs;
+      }
+      return rec;
+    });
+    const json = JSON.stringify({ built: new Date().toISOString(), places: out });
+    const url = URL.createObjectURL(new Blob([json], { type: "application/json" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = "places.json"; a.click();
+    showStatus(`Dumped ${out.length.toLocaleString()} places (${(json.length/1024/1024).toFixed(2)} MB)`);
+  }
+
+  const wantDump = new URLSearchParams(location.search).has("dump");
+
+  loadPrecomputed().then(done => {
+    if (done && !wantDump) return;      // nothing else to do
+    return loadStatic().then(loadStateExtra).then(loadBoatLaunches).then(fetchMunicipal)
+                .then(loadExtraLanduse).then(loadMuseums)
+                .then(loadPreserves).then(loadCemeteries)
+                .then(enrich).then(refreshOverlays).then(refreshTrailLines)
+                .then(() => { if (wantDump) dumpPlaces(); });
+  }).catch(err => {
     console.error(err);
     showStatus("Something went wrong loading park data. Try refreshing.");
   });

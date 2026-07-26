@@ -26,12 +26,14 @@ import json
 import math
 import os
 import pickle
+import re
 import sys
 from collections import defaultdict
 
 import mercantile
 from shapely.geometry import shape, box
 from shapely.ops import transform as shp_transform
+from shapely.strtree import STRtree
 import mapbox_vector_tile
 from pmtiles.writer import Writer
 from pmtiles.tile import Compression, TileType, zxy_to_tileid
@@ -190,6 +192,88 @@ def to_tile_coords(geom, t):
     return shp_transform(fn, geom)
 
 
+# How much of a PAD-US shape must already be covered by a DEEP or OSM
+# shape before it counts as a duplicate.
+DUP_OVERLAP = 0.55
+
+
+# Most authoritative geometry first. Anything substantially covered by a
+# layer above it is a duplicate and gets dropped, so each piece of ground
+# is drawn exactly once, by whichever source describes it best.
+#
+#   stateland  DEEP's own parcels — definitive for state land
+#   townparks  OSM, the usual source for municipal parks
+#   cemeteries specific and rarely overlapping
+#   landuse    town greens and rec grounds
+#   preserves  OSM nature_reserve, which also tags state forests and parks
+#   padus      national coverage, so it restates almost everything above
+DEDUP_ORDER = ["stateland", "townparks", "cemeteries", "landuse", "preserves", "padus"]
+
+
+def norm_name(props):
+    n = props.get("PROPERTY") or props.get("Unit_Nm") or props.get("name") or ""
+    return re.sub(r"[^a-z0-9]+", " ", str(n).lower()).strip()
+
+
+def dedupe_layers(layers):
+    kept_geoms = []
+    kept_names = {}          # normalised name -> [geom, ...]
+
+    def remember(geom, props):
+        if geom.geom_type in ("Polygon", "MultiPolygon"):
+            kept_geoms.append(geom)
+            nm = norm_name(props)
+            if nm:
+                kept_names.setdefault(nm, []).append(geom)
+
+    for name in DEDUP_ORDER:
+        feats = layers.get(name)
+        if not feats:
+            continue
+        if not kept_geoms:                      # first layer keeps everything
+            for geom, props in feats:
+                remember(geom, props)
+            continue
+
+        tree = STRtree(kept_geoms)
+        kept = []
+        by_area = by_name = 0
+        for geom, props in feats:
+            if geom.geom_type not in ("Polygon", "MultiPolygon") or geom.area <= 0:
+                kept.append((geom, props))
+                continue
+
+            # Same name, same ground, different source. This catches the
+            # cases area overlap misses — a single sprawling PAD-US unit
+            # against the many small DEEP parcels that make it up, where
+            # no one parcel covers enough of it to look like a duplicate.
+            nm = norm_name(props)
+            if nm and nm in kept_names:
+                if any(geom.intersects(g) for g in kept_names[nm]):
+                    by_name += 1
+                    continue
+
+            covered = 0.0
+            for idx in tree.query(geom):
+                try:
+                    covered += geom.intersection(kept_geoms[idx]).area
+                except Exception:
+                    continue
+                if covered / geom.area >= DUP_OVERLAP:
+                    break
+            if covered / geom.area >= DUP_OVERLAP:
+                by_area += 1
+            else:
+                kept.append((geom, props))
+
+        layers[name] = kept
+        if by_area or by_name:
+            print(f"  {name}: dropped {by_area:,} by overlap + {by_name:,} by name, "
+                  f"{len(kept):,} remain", flush=True)
+        for geom, props in kept:
+            remember(geom, props)
+
+
 def stage(inputs, zooms):
     os.makedirs(STAGE_DIR, exist_ok=True)
     layers = {}
@@ -198,6 +282,8 @@ def stage(inputs, zooms):
         layers[name] = feats
         note = f" ({skipped:,} filtered/clipped out)" if skipped else ""
         print(f"  {name}: {len(feats):,} features{note}", flush=True)
+
+    dedupe_layers(layers)
 
     with open(os.path.join(STAGE_DIR, "layers.json"), "w") as fh:
         json.dump(sorted(layers), fh)
