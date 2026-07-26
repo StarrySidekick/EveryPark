@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>EveryPark — fetch geometry for tiling</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+         max-width: 780px; margin: 40px auto; padding: 0 20px; color: #1c2321; line-height: 1.55; }
+  h1 { font-size: 1.4rem; margin-bottom: 4px; }
+  .note { background:#eef4f0; border-radius:10px; padding:14px; font-size:.9rem; margin:16px 0 22px; }
+  table { width:100%; border-collapse:collapse; font-size:.9rem; }
+  th { text-align:left; font-size:.7rem; text-transform:uppercase; letter-spacing:.07em;
+       color:#66716c; padding:6px 8px; border-bottom:1px solid #e2e6e3; }
+  td { padding:8px; border-bottom:1px solid #f0f2f0; vertical-align:middle; }
+  td.st { font-size:.82rem; color:#66716c; width:44%; }
+  button { background:#0f4c3a; color:#fff; border:none; border-radius:18px;
+           padding:7px 16px; font-size:.85rem; font-weight:600; cursor:pointer; }
+  button:disabled { opacity:.45; cursor:default; }
+  button.done { background:#1d6b3f; }
+  #all { padding:11px 26px; font-size:1rem; border-radius:22px; }
+  .ok { color:#1d6b3f; } .err { color:#a3352a; }
+  .sz { font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+
+<h1>Fetch geometry for vector tiles</h1>
+<p class="note">Each row downloads one layer as a <code>.geojson</code> file. Run them one at a
+time (or hit <strong>Fetch all</strong> and leave it). Send me the files as they finish — order
+doesn't matter, and a layer that fails can be retried on its own without redoing the others.
+Trails and PAD-US are the big ones and will take a few minutes each.</p>
+
+<p><button id="all">Fetch all</button></p>
+
+<table>
+  <thead><tr><th>Layer</th><th>Status</th><th></th></tr></thead>
+  <tbody id="rows"></tbody>
+</table>
+
+<script src="config.js"></script>
+<script>
+const CT_BBOX = "-73.75,40.95,-71.77,42.06";
+const OSM6 = "https://services6.arcgis.com/Do88DoK2xjTUCXd1/ArcGIS/rest/services/";
+
+// ~2 m of simplification. At zoom 14 one tile unit is about half a metre,
+// so finer detail than this is invisible and just makes the files bigger.
+const OFFSET = "0.00002";
+
+const LAYERS = [
+  { id: "stateland", label: "State land (DEEP)", page: 400,
+    url: CONFIG.publicLand.url,
+    where: "1=1", fields: "AV_LEGEND,PROPERTY,ACRE_GIS" },
+
+  { id: "townparks", label: "Town parks", page: 500,
+    url: OSM6 + "OSM_NA_Leisure/FeatureServer/0/query",
+    where: "leisure='park' AND (access IS NULL OR access NOT IN ('private','no'))",
+    fields: "name,operator,access" },
+
+  { id: "preserves", label: "Preserves & open space", page: 500,
+    url: OSM6 + "OSM_NA_Leisure/FeatureServer/0/query",
+    where: "leisure='nature_reserve' AND (access IS NULL OR access NOT IN ('private','no'))",
+    fields: "name,operator,access" },
+
+  { id: "cemeteries", label: "Cemeteries", page: 500,
+    url: OSM6 + "OSM_NA_Landuse/FeatureServer/0/query",
+    where: "landuse='cemetery' AND (access IS NULL OR access NOT IN ('private','no'))",
+    fields: "name,operator" },
+
+  { id: "landuse", label: "Greens & recreation grounds", page: 500,
+    url: OSM6 + "OSM_NA_Landuse/FeatureServer/0/query",
+    where: "landuse IN ('recreation_ground','village_green','forest') AND " +
+           "(access IS NULL OR access NOT IN ('private','no'))",
+    fields: "name,landuse,operator" },
+
+  { id: "padus", label: "PAD-US protected areas", page: 400,
+    url: CONFIG.padus.endpoints[0] + "/query",
+    where: "1=1", fields: "Unit_Nm,Own_Name,Mang_Name,Pub_Access,Des_Tp,GIS_Acres" },
+
+  { id: "parcels", label: "Protected open space parcels", page: 500,
+    url: CONFIG.protectedParcels.url,
+    where: "1=1", fields: "TOWN,ACRES" },
+
+  { id: "trails", label: "Trails (the slow one)", page: 800,
+    url: OSM6 + "OSM_NA_Trails/FeatureServer/0/query",
+    where: "highway IN ('path','track','bridleway','footway','cycleway')",
+    fields: "name,highway,surface,access" },
+
+  { id: "blueblazed", label: "Blue-Blazed trails", page: 400,
+    url: CONFIG.blueBlazed.url,
+    where: "1=1", fields: "TrailName,Blaze,Length" }
+];
+
+const rows = document.getElementById("rows");
+const state = {};
+
+for (const L of LAYERS) {
+  const tr = document.createElement("tr");
+  tr.innerHTML = `<td>${L.label}</td><td class="st" id="st-${L.id}">—</td>
+                  <td style="text-align:right"><button id="btn-${L.id}">Fetch</button></td>`;
+  rows.appendChild(tr);
+  state[L.id] = { btn: null, st: null };
+}
+for (const L of LAYERS) {
+  state[L.id].btn = document.getElementById("btn-" + L.id);
+  state[L.id].st  = document.getElementById("st-" + L.id);
+  state[L.id].btn.addEventListener("click", () => runOne(L));
+}
+
+const setStatus = (id, msg, cls) => {
+  const el = state[id].st;
+  el.textContent = msg;
+  el.className = "st " + (cls || "");
+};
+
+async function post(url, params) {
+  const r = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams(params)
+  });
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  return r.json();
+}
+
+async function countOf(L) {
+  const j = await post(L.url, { where: L.where, geometry: CT_BBOX,
+    geometryType: "esriGeometryEnvelope", inSR: "4326",
+    returnCountOnly: "true", f: "json" });
+  return j.count || 0;
+}
+
+async function fetchLayer(L, onProgress) {
+  const total = await countOf(L);
+  if (!total) throw new Error("service returned 0 features");
+  const feats = [];
+  const PAGE = L.page;
+
+  // Three pages in flight. More than that and the service starts
+  // throttling, which shows up as empty pages rather than errors.
+  const offsets = [];
+  for (let o = 0; o < total; o += PAGE) offsets.push(o);
+
+  const grab = async (o) => {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const j = await post(L.url, {
+          where: L.where, geometry: CT_BBOX, geometryType: "esriGeometryEnvelope",
+          inSR: "4326", outSR: "4326", outFields: L.fields,
+          returnGeometry: "true", maxAllowableOffset: OFFSET,
+          geometryPrecision: "6", resultOffset: String(o),
+          resultRecordCount: String(PAGE), f: "geojson"
+        });
+        if (j.error) throw new Error(j.error.message || "service error");
+        for (const f of (j.features || [])) {
+          delete f.id;
+          feats.push(f);
+        }
+        return;
+      } catch (e) {
+        if (attempt === 2) throw e;
+        await new Promise(r => setTimeout(r, 1200 * (attempt + 1)));
+      }
+    }
+  };
+
+  for (let i = 0; i < offsets.length; i += 3) {
+    await Promise.all(offsets.slice(i, i + 3).map(grab));
+    onProgress(Math.min(feats.length, total), total);
+  }
+  return { type: "FeatureCollection", features: feats };
+}
+
+function download(name, text) {
+  const url = URL.createObjectURL(new Blob([text], { type: "application/geo+json" }));
+  const a = document.createElement("a");
+  a.href = url; a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+async function runOne(L) {
+  const s = state[L.id];
+  s.btn.disabled = true;
+  setStatus(L.id, "counting…");
+  try {
+    const gj = await fetchLayer(L, (n, total) =>
+      setStatus(L.id, `${n.toLocaleString()} / ${total.toLocaleString()}`));
+    const text = JSON.stringify(gj);
+    const mb = (text.length / 1024 / 1024).toFixed(1);
+    download(`ep-${L.id}.geojson`, text);
+    setStatus(L.id, `${gj.features.length.toLocaleString()} features · ${mb} MB — downloaded`, "ok");
+    s.btn.textContent = "Re-fetch";
+    s.btn.className = "done";
+  } catch (e) {
+    setStatus(L.id, "failed: " + e.message, "err");
+  }
+  s.btn.disabled = false;
+}
+
+document.getElementById("all").addEventListener("click", async (e) => {
+  e.target.disabled = true;
+  for (const L of LAYERS) await runOne(L);
+  e.target.disabled = false;
+});
+</script>
+</body>
+</html>
