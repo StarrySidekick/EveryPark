@@ -148,8 +148,14 @@
 
   function accessHtml(p) {
     if (!p.attrs || !p.attrs.accessNote) return "";
-    const ok = p.attrs.visitable;
-    return `<div class="popup-access ${ok ? "ok" : "warn"}">${ok ? "✅" : "⚠️"} ${p.attrs.accessNote}</div>`;
+    const A = p.attrs;
+    const ok = A.visitable;
+    let cls = ok ? "ok" : "warn";
+    if (A.officialAccess === "Closed") cls = "warn";
+    let html = `<div class="popup-access ${cls}">${ok ? "✅" : "⚠️"} ${A.accessNote}</div>`;
+    if (A.officialOwner)
+      html += `<div class="popup-fee">Owner of record: ${A.officialOwner}</div>`;
+    return html;
   }
 
   function feeHtml(p) {
@@ -1098,11 +1104,82 @@
       }
       hideStatus();
       refresh();
-      applyTrailAccess();     // slower; fills in behind the scenes
+      applyTrailAccess()      // slower; fills in behind the scenes
+        .then(loadPadus);     // official ratings last — they override ours
     } catch (err) {
       console.warn("Enrichment failed:", err);
       hideStatus();
     }
+  }
+
+  // ------------------------------------------------------------------
+  // PAD-US — official Public Access rating from USGS.
+  // Dormant while USGS's service is down; probes and self-activates.
+  // ------------------------------------------------------------------
+  async function probePadus() {
+    for (const base of CONFIG.padus.endpoints) {
+      try {
+        const meta = await fetch(base + "?f=json").then(r => r.json());
+        if (meta.error) continue;
+        const body = new URLSearchParams({
+          where: "1=1", geometry: CT_BBOX, geometryType: "esriGeometryEnvelope",
+          inSR: "4326", returnCountOnly: "true", f: "json"
+        });
+        const c = await fetch(base + "/query", { method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" }, body }).then(r => r.json());
+        if (c.count > 0) return base;      // has Connecticut coverage
+      } catch (e) { /* try the next one */ }
+    }
+    return null;
+  }
+
+  const ACCESS_WORD = { OA: "Open", RA: "Restricted", XA: "Closed", UK: "Unknown",
+                        "Open Access": "Open", "Restricted Access": "Restricted",
+                        "Closed Access": "Closed", "Unknown": "Unknown" };
+
+  async function loadPadus() {
+    if (!CONFIG.padus.enabled) return;
+    let base = null;
+    try { base = await probePadus(); } catch (e) { return; }
+    if (!base) { console.info("PAD-US unavailable — skipping official access ratings."); return; }
+    try {
+      showStatus("Applying official PAD-US access ratings…");
+      const areas = [];
+      await pagedQuery(base + "/query", {
+        where: "1=1", outFields: "Unit_Nm,Loc_Nm,Pub_Access,Own_Name,Mang_Name,Des_Tp,GIS_Acres",
+        returnGeometry: "false", returnCentroid: "true"
+      }, f => {
+        const a = f.attributes, c = f.centroid;
+        if (!c) return;
+        areas.push({ n: a.Unit_Nm || a.Loc_Nm || "", acc: a.Pub_Access || "",
+                     own: a.Own_Name || "", mang: a.Mang_Name || "",
+                     lat: c.y, lng: c.x });
+      });
+      if (!areas.length) { hideStatus(); return; }
+
+      const grid = makeGrid(0.01);
+      for (const a of areas) grid.add(a.lat, a.lng, a);
+      let tagged = 0;
+      for (const p of allParks) {
+        const near = grid.near(p.lat, p.lng, CONFIG.padus.matchRadiusM);
+        if (!near.length) continue;
+        near.sort((x, y) => x[0] - y[0]);
+        const best = near[0][1];
+        const word = ACCESS_WORD[best.acc] || best.acc;
+        if (!word) continue;
+        const A = p.attrs || (p.attrs = {});
+        A.officialAccess = word;
+        if (best.own) A.officialOwner = best.own;
+        if (word === "Open") { A.visitable = true; A.accessNote = "Open to the public (USGS PAD-US)"; }
+        else if (word === "Closed") { A.visitable = false; A.accessNote = "Closed to public access (USGS PAD-US)"; }
+        else if (word === "Restricted") { A.accessNote = "Restricted access (USGS PAD-US) — check before visiting"; }
+        p.marker.setPopupContent(popupHtml(p));
+        tagged++;
+      }
+      hideStatus();
+      refresh();
+      if (tagged) { showStatus(`PAD-US: official access applied to ${tagged.toLocaleString()} places`); setTimeout(hideStatus, 4000); }
+    } catch (e) { console.warn("PAD-US enrichment failed:", e); hideStatus(); }
   }
 
   // A mapped trail is the strongest evidence a place is actually walkable.

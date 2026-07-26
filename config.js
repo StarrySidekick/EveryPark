@@ -96,6 +96,26 @@ const CONFIG = {
     serviceUrl: "https://services6.arcgis.com/Do88DoK2xjTUCXd1/ArcGIS/rest/services/OSM_NA_Landuse/FeatureServer/0/query"
   },
 
+  // ---- PAD-US (USGS Protected Areas Database) ------------------------
+  // The national inventory of protected land. Public domain. Carries an
+  // official Public Access rating (Open / Restricted / Closed) plus owner
+  // and manager names — the authoritative answer to "can I go here?".
+  //
+  // As of July 2026 USGS's own service is returning SITE_NOT_INITIALIZED
+  // and Esri's hosted copy needs a token, so this is DORMANT: it probes
+  // each endpoint on load, uses the first that returns Connecticut data,
+  // and silently does nothing if none respond. Add endpoints here as
+  // they appear — no other code changes needed.
+  padus: {
+    enabled: true,
+    endpoints: [
+      "https://gis1.usgs.gov/arcgis/rest/services/padus4/Public_Access/MapServer/0",
+      "https://gis1.usgs.gov/arcgis/rest/services/padus3/Public_Access/MapServer/0",
+      "https://gis1.usgs.gov/arcgis/rest/services/padus4/Manager_Name/MapServer/0"
+    ],
+    matchRadiusM: 500
+  },
+
   // ---- PROTECTED OPEN SPACE PARCELS ----------------------------------
   // CT DEEP's parcel-level map of protected land. It has no owner names,
   // so it can't create places on its own — but it shows the true extent
