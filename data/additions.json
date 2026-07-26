@@ -1,0 +1,21 @@
+{
+  "_readme": "Places that are real and public but missing from OpenStreetMap. Add entries here and they appear on the map immediately. Fields: n=name, t=subtype label, type=state|national|town|preserve|cemetery, lat/lng, town, a=acres, url, fee, agency, note, trails=true if it has a trail system.",
+  "_source": "Verified against each organization's official site.",
+  "places": [
+    {
+      "n": "Deer Pond Farm",
+      "type": "preserve",
+      "t": "Audubon Sanctuary",
+      "town": "Sherman",
+      "lat": 41.55352,
+      "lng": -73.52329,
+      "a": 850,
+      "url": "https://ctaudubon.org/locations/deer-pond-farm/",
+      "fee": "Free admission",
+      "agency": "Connecticut Audubon Society",
+      "note": "15 miles of trails, 850 acres (half in Sherman CT, half in Pawling NY). Trails open dawn to dusk year round; visitor center and parking at 57 Wakeman Hill Road. No dogs, bikes or horses.",
+      "trails": true,
+      "parking": true
+    }
+  ]
+}

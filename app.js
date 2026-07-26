@@ -288,6 +288,19 @@
         acres: s.a || null, town: findTown(s.lat, s.lng)
       });
     }
+    // Hand-added places that OpenStreetMap is missing entirely.
+    try {
+      const add = await fetch("data/additions.json").then(r => r.json());
+      for (const a of (add.places || [])) {
+        addPark({
+          name: a.n, type: a.type || "preserve", subtype: a.t, lat: a.lat, lng: a.lng,
+          town: a.town || findTown(a.lat, a.lng), acres: a.a || null, url: a.url || null,
+          fee: a.fee || null, agency: a.agency || null, note: a.note || null,
+          attrs: { trails: !!a.trails, parking: !!a.parking, manual: true }
+        });
+      }
+    } catch (e) { /* additions are optional */ }
+
     for (const n of natData.parks) {
       addPark({
         name: n.n, type: "national", subtype: n.t, lat: n.lat, lng: n.lng,
@@ -415,7 +428,7 @@
   //   state run                             -> skipped (already mapped)
   //   water-supply watershed                -> skipped (permit-only)
   // ------------------------------------------------------------------
-  const PRES_CACHE = "ctparks_pres_v1";
+  const PRES_CACHE = "ctparks_pres_v2";
   const OP_STATE = /Department of Energy and Environmental|State of Connecticut|\bDEEP\b|Connecticut DEP|U\.?S\.? Fish|National Park Service|Army Corps/i;
   const OP_WATER = /Water Supply|Water Authority|Water Company|Bureau of Water|Aquarion|Regional Water/i;
   const OP_TOWN  = /^(Town|City|Borough|Village) of\b|^City\b|Parks (and|&) Recreation/i;
@@ -433,18 +446,30 @@
   function fetchPreserves() {
     return cachedDataset(PRES_CACHE, CONFIG.municipal.cacheDays, async () => {
       const out = [];
+      // Unnamed parcels are included too: a lot of land trust and open
+      // space land has no name in OSM, and dropping it hid real places.
+      // Unnamed ones are labelled by their operator instead.
       await pagedQuery(CONFIG.preserves.serviceUrl, {
-        where: "leisure='nature_reserve' AND name IS NOT NULL AND " +
-               "(access IS NULL OR access NOT IN ('private','no'))",
+        where: "leisure='nature_reserve' AND (access IS NULL OR access NOT IN ('private','no'))",
         outFields: "name,operator,website,Shape__Area",
         returnGeometry: "false", returnCentroid: "true"
       }, f => {
         const a = f.attributes, c = f.centroid;
-        if (!a.name || !c) return;
+        if (!c) return;
         const cls = preserveClass(a.operator);
         if (!cls) return;
         const lat = +c.y.toFixed(5);
-        const rec = { n: a.name, lat, lng: +c.x.toFixed(5), k: cls.kind, l: cls.label };
+        let nm = a.name;
+        if (!nm) {
+          // Skip nameless scraps with no steward — they're usually
+          // fragments of a larger parcel and just add noise.
+          if (!a.operator) return;
+          const areaM = (a.Shape__Area || 0) * Math.pow(Math.cos(lat * Math.PI / 180), 2);
+          if (areaM < 8000) return;                 // under ~2 acres
+          nm = a.operator.replace(/,?\s*Inc\.?$/i, "") + " preserve";
+        }
+        const rec = { n: nm, lat, lng: +c.x.toFixed(5), k: cls.kind, l: cls.label };
+        if (!a.name) rec.un = 1;
         if (a.operator) rec.op = a.operator;
         if (a.Shape__Area) {
           const k = Math.cos(lat * Math.PI / 180);
@@ -615,7 +640,7 @@
   // Drop cache entries from older versions of the site so they don't
   // sit in localStorage forever.
   (function pruneOldCaches() {
-    const keep = new Set(["ctparks_municipal_v3", "ctparks_cem_v1", "ctparks_pres_v1",
+    const keep = new Set(["ctparks_municipal_v3", "ctparks_cem_v1", "ctparks_pres_v2",
                           "ctparks_fac_v1", "ctparks_trl_v1", "ctparks_wtr_v1"]);
     try {
       for (const k of Object.keys(localStorage))
@@ -1009,6 +1034,74 @@
   });
 
   // ------------------------------------------------------------------
+  // Gap finder — trails that don't belong to any mapped place.
+  // Inverts the access check: cells that have a trail but no park
+  // nearby are probably somewhere we're missing.
+  // ------------------------------------------------------------------
+  const gapLayer = L.layerGroup();
+  let gapsBuilt = false;
+
+  async function buildGaps() {
+    if (gapsBuilt) return;
+    showStatus("Looking for unmapped trail areas…");
+    const cells = await fetchTrailCells();
+    // Cell centres that have no park within ~500 m.
+    const parkGrid = makeGrid(0.01);
+    for (const p of allParks) parkGrid.add(p.lat, p.lng, 1);
+    const orphan = new Set();
+    for (const key of cells) {
+      const i = Math.floor(key / 1000000), j = (key % 1000000) - 500000;
+      const lat = (i + 0.5) * TRAIL_CELL, lng = (j + 0.5) * TRAIL_CELL;
+      if (!findTown(lat, lng)) continue;                 // outside Connecticut
+      if (parkGrid.near(lat, lng, 500).length) continue; // already covered
+      orphan.add(i + "," + j);
+    }
+    // Group touching cells so one trail network = one pin, not fifty.
+    const seen = new Set(), clusters = [];
+    for (const k of orphan) {
+      if (seen.has(k)) continue;
+      const queue = [k], members = [];
+      seen.add(k);
+      while (queue.length) {
+        const cur = queue.pop();
+        members.push(cur);
+        const [ci, cj] = cur.split(",").map(Number);
+        for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) {
+          const nk = (ci + di) + "," + (cj + dj);
+          if (orphan.has(nk) && !seen.has(nk)) { seen.add(nk); queue.push(nk); }
+        }
+      }
+      if (members.length < 4) continue;   // ignore stray driveway-sized bits
+      let si = 0, sj = 0;
+      for (const m of members) { const [a, b] = m.split(",").map(Number); si += a; sj += b; }
+      clusters.push({
+        lat: (si / members.length + 0.5) * TRAIL_CELL,
+        lng: (sj / members.length + 0.5) * TRAIL_CELL,
+        size: members.length
+      });
+    }
+    clusters.sort((a, b) => b.size - a.size);
+    for (const c of clusters.slice(0, 400)) {
+      const town = findTown(c.lat, c.lng) || "Connecticut";
+      const approxAcres = Math.round(c.size * 6.7);   // ~165 m cell
+      L.circleMarker([c.lat, c.lng], {
+        radius: Math.min(16, 5 + Math.sqrt(c.size)),
+        color: "#ff5252", weight: 2, fillColor: "#ff5252", fillOpacity: 0.35
+      }).bindPopup(
+        `<span class="badge" style="background:#ff5252">Unmapped trail area</span>
+         <div class="popup-name">Trails with no listed place</div>
+         <div class="popup-sub">${town} &middot; roughly ${approxAcres.toLocaleString()} acres of trail coverage</div>
+         <div class="popup-fee">Something is here but nothing in our data claims it. Worth checking whether it's a preserve we're missing, or private land.</div>
+         <div class="popup-links"><a href="https://www.google.com/maps/search/?api=1&query=${c.lat},${c.lng}" target="_blank" rel="noopener">Look at it</a></div>`
+      ).addTo(gapLayer);
+    }
+    gapsBuilt = true;
+    hideStatus();
+    showStatus(`Found ${clusters.length} unmapped trail areas`);
+    setTimeout(hideStatus, 4000);
+  }
+
+  // ------------------------------------------------------------------
   // UI wiring
   // ------------------------------------------------------------------
   document.querySelectorAll(".chip[data-type]").forEach(chip => {
@@ -1035,6 +1128,18 @@
   document.getElementById("search").addEventListener("input", (e) => {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => { searchTerm = e.target.value.trim().toLowerCase(); refresh(); }, 180);
+  });
+
+  document.getElementById("gapToggle").addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
+    if (map.hasLayer(gapLayer)) {
+      map.removeLayer(gapLayer);
+      btn.classList.remove("active");
+    } else {
+      btn.classList.add("active");
+      await buildGaps();
+      gapLayer.addTo(map);
+    }
   });
 
   document.getElementById("listToggle").addEventListener("click", () => {
