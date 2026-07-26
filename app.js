@@ -525,17 +525,24 @@
   //   state run                             -> skipped (already mapped)
   //   water-supply watershed                -> skipped (permit-only)
   // ------------------------------------------------------------------
-  const PRES_CACHE = "ctparks_pres_v2";
-  const OP_STATE = /Department of Energy and Environmental|State of Connecticut|\bDEEP\b|Connecticut DEP|U\.?S\.? Fish|National Park Service|Army Corps/i;
+  const PRES_CACHE = "ctparks_pres_v3";
+  const OP_STATE = /Department of Energy and Environmental|State of Connecticut|\bDEEP\b|Connecticut DEP/i;
+  // Federal land held as parcels — in Connecticut this is overwhelmingly
+  // the Appalachian Trail protective corridor, which the NPS owns
+  // outright. It's real walkable public land, not just a line.
+  const OP_FED   = /National Park Service|United States of America|U\.?S\.? Fish|Fish and Wildlife|Army Corps/i;
   const OP_WATER = /Water Supply|Water Authority|Water Company|Bureau of Water|Aquarion|Regional Water/i;
   const OP_TOWN  = /^(Town|City|Borough|Village) of\b|^City\b|Parks (and|&) Recreation/i;
+  const OP_UNI   = /University|College|Yale|UConn|Academy/i;
   const OP_TRUST = /Land Trust|Conservancy|Conservation Trust|Land Conservation|Audubon|Nature Center|Nature Conservancy|Preservation|\bTrust\b/i;
 
   function preserveClass(op) {
     if (!op) return { kind: "preserve", label: "Nature Preserve" };
-    if (OP_STATE.test(op)) return null;                 // duplicate of state/federal layers
+    if (OP_FED.test(op))   return { kind: "national", label: "National Park Service Land" };
+    if (OP_STATE.test(op)) return null;                 // duplicate of the DEEP layer
     if (OP_WATER.test(op)) return null;                 // permit-only watershed land
     if (OP_TOWN.test(op))  return { kind: "town", label: "Town Open Space" };
+    if (OP_UNI.test(op))   return { kind: "preserve", label: "University Land" };
     if (OP_TRUST.test(op)) return { kind: "preserve", label: "Land Trust Preserve" };
     return { kind: "preserve", label: "Nature Preserve" };
   }
@@ -563,7 +570,9 @@
           if (!a.operator) return;
           const areaM = (a.Shape__Area || 0) * Math.pow(Math.cos(lat * Math.PI / 180), 2);
           if (areaM < 8000) return;                 // under ~2 acres
-          nm = a.operator.replace(/,?\s*Inc\.?$/i, "") + " preserve";
+          nm = cls.kind === "national"
+             ? "Appalachian Trail Corridor"
+             : a.operator.replace(/,?\s*Inc\.?$/i, "") + " preserve";
         }
         const rec = { n: nm, lat, lng: +c.x.toFixed(5), k: cls.kind, l: cls.label };
         if (!a.name) rec.un = 1;
@@ -598,7 +607,10 @@
         addPark({
           name: m.n, type: m.k, subtype: m.l, lat: m.lat, lng: m.lng, town,
           acres: m.a || null, url: m.w || null,
-          agency: m.op || null, fee: m.k === "preserve" ? "Free" : null
+          agency: m.op || null, fee: m.k === "preserve" ? "Free" : "Free",
+          note: m.k === "national"
+            ? "Federally owned parcel. In Connecticut these are almost entirely the Appalachian Trail protective corridor — the land itself is public, though it may be a narrow strip with private property either side."
+            : null
         });
       }
       refresh();
@@ -737,7 +749,7 @@
   // Drop cache entries from older versions of the site so they don't
   // sit in localStorage forever.
   (function pruneOldCaches() {
-    const keep = new Set(["ctparks_municipal_v3", "ctparks_cem_v1", "ctparks_pres_v2",
+    const keep = new Set(["ctparks_municipal_v3", "ctparks_cem_v1", "ctparks_pres_v3",
                           "ctparks_fac_v1", "ctparks_trl_v1", "ctparks_wtr_v1"]);
     try {
       for (const k of Object.keys(localStorage))
