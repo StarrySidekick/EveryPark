@@ -112,7 +112,9 @@ const CONFIG = {
   // ---- BOAT LAUNCHES & WATER ACCESS ----------------------------------
   boatLaunches: {
     enabled: true,
-    url: "https://services1.arcgis.com/FjPcSmEFuDYlIdKC/ArcGIS/rest/services/DEEP_State_Trailered_Boat_Launches/FeatureServer/0/query"
+    url: "https://services1.arcgis.com/FjPcSmEFuDYlIdKC/ArcGIS/rest/services/DEEP_State_Trailered_Boat_Launches/FeatureServer/0/query",
+    // Canoe/kayak-only access points are a separate DEEP dataset.
+    cartopUrl: "https://services1.arcgis.com/FjPcSmEFuDYlIdKC/ArcGIS/rest/services/DEEP_State_Cartop_Boat_Launches/FeatureServer/0/query"
   },
 
   // ---- MUSEUM & HISTORIC SITE GROUNDS --------------------------------

@@ -1,6 +1,16 @@
 {
   "_readme": "Places that are real and public but missing from OpenStreetMap. Add entries here and they appear on the map immediately. Fields: n=name, t=subtype label, type=state|national|town|preserve|cemetery, lat/lng, town, a=acres, url, fee, agency, note, trails=true if it has a trail system.",
   "_source": "Verified against each organization's official site.",
+
+  "_aliases_readme": "Local names for places whose official name is different. People know land by the road, farm or access point it's reached from, not the name on the deed. Each entry makes the alias findable in search.",
+  "aliases": [
+    {
+      "match": "Towner Hill Preserve",
+      "aka": ["Upland Pastures", "Upland Pastures Farm", "Upland Pastures Road"],
+      "why": "Reached from Upland Pastures Road in Sherman; locally known by the farm/road name rather than the preserve name."
+    }
+  ],
+
   "places": [
     {
       "n": "Deer Pond Farm",

@@ -154,6 +154,8 @@
 
   function feeHtml(p) {
     let out = "";
+    if (p.aka && p.aka.length)
+      out += `<div class="popup-fee">Also known locally as <strong>${p.aka[0]}</strong>${p.akaNote ? " — " + p.akaNote : ""}</div>`;
     if (p.note) out += `<div class="popup-fee">${p.note}</div>`;
     if (p.type === "state")
       out += `<div class="popup-fee">🅿️ CT-registered vehicles park free (Passport to the Parks); out-of-state $7–22. Camping/special facilities extra.</div>`;
@@ -175,6 +177,12 @@
   }
 
   function addPark(p) {
+    for (const al of ALIASES) {
+      if (al.match && al.match.toLowerCase() === String(p.name).toLowerCase()) {
+        p.aka = al.aka || [];
+        if (al.why) p.akaNote = al.why;
+      }
+    }
     p.marker = L.marker([p.lat, p.lng], { icon: icons[p.type], title: p.name })
       .bindPopup(popupHtml(p));
     p.marker.on("popupopen", () => loadTerrain(p));
@@ -223,11 +231,19 @@
   // ------------------------------------------------------------------
   const activeAttrs = new Set();   // feature filters (water, trails, …)
 
+  // Local names for places whose official name differs — loaded from
+  // data/additions.json. People search for the road or farm they know.
+  let ALIASES = [];
+
   function visible(p) {
     if (!activeTypes.has(p.type)) return false;
     for (const a of activeAttrs) if (!p.attrs || !p.attrs[a]) return false;
     if (!searchTerm) return true;
-    return (p.name + " " + (p.town || "")).toLowerCase().includes(searchTerm);
+    // Match on everything a person might reasonably type: the name, the
+    // town, what kind of place it is, who runs it, and any local alias.
+    if (!p._hay) p._hay = [p.name, p.town, p.subtype, p.agency, (p.aka || []).join(" ")]
+      .filter(Boolean).join(" ").toLowerCase();
+    return p._hay.includes(searchTerm);
   }
 
   function refresh() {
@@ -291,6 +307,7 @@
     // Hand-added places that OpenStreetMap is missing entirely.
     try {
       const add = await fetch("data/additions.json").then(r => r.json());
+      ALIASES = add.aliases || [];
       for (const a of (add.places || [])) {
         addPark({
           name: a.n, type: a.type || "preserve", subtype: a.t, lat: a.lat, lng: a.lng,
@@ -441,19 +458,34 @@
   // from its property layer.
   // ------------------------------------------------------------------
   function fetchBoatLaunches() {
-    return cachedDataset("ctparks_boat_v1", CONFIG.municipal.cacheDays, async () => {
-      const body = new URLSearchParams({
-        where: "1=1", outFields: "ACCSS_NAME,PROPERTY,ACCSS_TOWN,WATERBODY,TRAILER,CARRY_IN,HANDICAP,LINK",
-        outSR: "4326", returnGeometry: "true", resultRecordCount: "200", f: "json"
-      });
-      const j = await fetch(CONFIG.boatLaunches.url, { method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" }, body }).then(r => r.json());
-      return (j.features || []).filter(f => f.geometry).map(f => {
-        const a = f.attributes;
-        return { n: a.ACCSS_NAME || a.PROPERTY, town: a.ACCSS_TOWN || "",
-                 w: a.WATERBODY || "", trailer: a.TRAILER, carry: a.CARRY_IN,
-                 hc: a.HANDICAP, url: a.LINK || null,
-                 lat: +f.geometry.y.toFixed(5), lng: +f.geometry.x.toFixed(5) };
+    return cachedDataset("ctparks_boat_v2", CONFIG.municipal.cacheDays, async () => {
+      const urls = [CONFIG.boatLaunches.url, CONFIG.boatLaunches.cartopUrl].filter(Boolean);
+      const out = [];
+      for (const url of urls) {
+        try {
+          const body = new URLSearchParams({
+            where: "1=1", outFields: "ACCSS_NAME,PROPERTY,ACCSS_TOWN,WATERBODY,TRAILER,CARRY_IN,HANDICAP,LINK",
+            outSR: "4326", returnGeometry: "true", resultRecordCount: "300", f: "json"
+          });
+          const j = await fetch(url, { method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" }, body }).then(r => r.json());
+          for (const f of (j.features || [])) {
+            if (!f.geometry) continue;
+            const a = f.attributes;
+            out.push({ n: a.ACCSS_NAME || a.PROPERTY, town: a.ACCSS_TOWN || "",
+                       w: a.WATERBODY || "", trailer: a.TRAILER, carry: a.CARRY_IN,
+                       hc: a.HANDICAP, url: a.LINK || null,
+                       lat: +f.geometry.y.toFixed(5), lng: +f.geometry.x.toFixed(5) });
+          }
+        } catch (e) { /* one dataset failing shouldn't lose the other */ }
+      }
+      // Same launch can appear in both datasets.
+      const seen = new Set();
+      return out.filter(b => {
+        const k = String(b.n).toLowerCase() + "|" + Math.round(b.lat * 2000) + "|" + Math.round(b.lng * 2000);
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
       });
     });
   }
