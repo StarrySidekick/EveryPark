@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>EveryPark — build the data file</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+         max-width: 720px; margin: 40px auto; padding: 0 20px; color: #1c2321; line-height: 1.55; }
+  h1 { font-size: 1.4rem; }
+  button { background:#0f4c3a; color:#fff; border:none; border-radius:22px;
+           padding:12px 26px; font-size:1rem; font-weight:600; cursor:pointer; }
+  button:disabled { opacity:.5; cursor:default; }
+  #log { margin-top:22px; font-size:.85rem; font-family: ui-monospace, Menlo, monospace;
+         background:#f5f6f4; border-radius:10px; padding:14px; max-height:420px; overflow:auto; }
+  .ok { color:#1d6b3f; } .warn { color:#8a5a1b; } .err { color:#a3352a; }
+  .note { background:#eef4f0; border-radius:10px; padding:14px; font-size:.9rem; }
+</style>
+</head>
+<body>
+<h1>Build the EveryPark data file</h1>
+
+<p class="note">This fetches everything the map needs and saves it as a single
+<code>baked.json</code>. Put that file in the <code>data/</code> folder and the map
+will load from it instead of calling a dozen services on every first visit.
+Re-run this whenever you want to refresh the data.</p>
+
+<p><button id="go">Build baked.json</button></p>
+<div id="log">Ready.</div>
+
+<script src="config.js"></script>
+<script>
+const log = (m, cls) => {
+  const d = document.createElement("div");
+  if (cls) d.className = cls;
+  d.textContent = m;
+  document.getElementById("log").appendChild(d);
+  d.scrollIntoView({ block: "nearest" });
+};
+
+const CT_BBOX = "-73.75,40.95,-71.77,42.06";
+
+async function post(url, params) {
+  const body = new URLSearchParams(Object.assign({ f: "json" }, params));
+  const r = await fetch(url, { method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" }, body });
+  return r.json();
+}
+
+// Page through a service the same way the map does.
+async function paged(url, extra, perFeature, cap = 40) {
+  let offset = 0;
+  for (let i = 0; i < cap; i++) {
+    const j = await post(url, Object.assign({
+      geometry: CT_BBOX, geometryType: "esriGeometryEnvelope",
+      inSR: "4326", outSR: "4326",
+      resultOffset: String(offset), resultRecordCount: "1000"
+    }, extra));
+    if (j.error || !j.features || !j.features.length) break;
+    for (const f of j.features) perFeature(f);
+    if (!j.exceededTransferLimit && j.features.length < 1000) break;
+    offset += 1000;
+  }
+}
+
+const OSM = {
+  leisure: "https://services6.arcgis.com/Do88DoK2xjTUCXd1/ArcGIS/rest/services/OSM_NA_Leisure/FeatureServer/0/query",
+  landuse: "https://services6.arcgis.com/Do88DoK2xjTUCXd1/ArcGIS/rest/services/OSM_NA_Landuse/FeatureServer/0/query",
+  trails:  "https://services6.arcgis.com/Do88DoK2xjTUCXd1/ArcGIS/rest/services/OSM_NA_Trails/FeatureServer/0/query",
+  water:   "https://services6.arcgis.com/Do88DoK2xjTUCXd1/ArcGIS/rest/services/OSM_NA_Water/FeatureServer/0/query",
+  pois:    "https://services6.arcgis.com/Do88DoK2xjTUCXd1/ArcGIS/rest/services/OSM_NA_POIs/FeatureServer/0/query"
+};
+const acresOf = (area, lat) => {
+  const k = Math.cos(lat * Math.PI / 180);
+  return Math.round((area || 0) * k * k * 0.000247105);
+};
+
+async function build() {
+  const out = { built: new Date().toISOString(), cache: {} };
+
+  // 1. State land polygons — the map's primary visual.
+  log("State land polygons…");
+  const sl = await post(CONFIG.publicLand.url, {
+    where: "1=1", outFields: "AV_LEGEND,PROPERTY,ACRE_GIS", outSR: "4326",
+    returnGeometry: "true", maxAllowableOffset: "0.0004",
+    geometryPrecision: "5", resultRecordCount: "1000", f: "geojson"
+  });
+  for (const f of (sl.features || [])) {
+    const p = f.properties || {};
+    f.properties = { AV_LEGEND: p.AV_LEGEND || "", PROPERTY: p.PROPERTY || "",
+                     ACRE_GIS: Math.round(p.ACRE_GIS || 0) };
+    delete f.id;
+  }
+  out.stateLand = sl.features || [];
+  log(`  ${out.stateLand.length} state parcels`, "ok");
+
+  // 2. Other DEEP land — wildlife areas, flood control, hatcheries.
+  log("Wildlife areas & other state land…");
+  const best = {};
+  await paged(CONFIG.stateExtra.url, {
+    where: "AV_LEGEND IN (" + CONFIG.stateExtra.legends.map(l => `'${l}'`).join(",") + ")",
+    outFields: "PROPERTY,AV_LEGEND,ACRE_GIS", returnGeometry: "false", returnCentroid: "true"
+  }, f => {
+    const a = f.attributes, c = f.centroid;
+    if (!a.PROPERTY || !c) return;
+    const ac = Math.round(a.ACRE_GIS || 0);
+    if (!best[a.PROPERTY] || ac > best[a.PROPERTY].a)
+      best[a.PROPERTY] = { n: a.PROPERTY, t: a.AV_LEGEND, a: ac,
+                           lat: +c.y.toFixed(5), lng: +c.x.toFixed(5) };
+  });
+  out.cache["ctparks_stateextra_v1"] = Object.values(best).filter(x => x.a >= CONFIG.stateExtra.minAcres);
+  log(`  ${out.cache["ctparks_stateextra_v1"].length} properties`, "ok");
+
+  // 3. Boat launches.
+  log("Boat launches…");
+  const boats = [];
+  for (const url of [CONFIG.boatLaunches.url, CONFIG.boatLaunches.cartopUrl]) {
+    try {
+      const j = await post(url, { where: "1=1",
+        outFields: "ACCSS_NAME,PROPERTY,ACCSS_TOWN,WATERBODY,TRAILER,CARRY_IN,HANDICAP,LINK",
+        outSR: "4326", returnGeometry: "true", resultRecordCount: "300" });
+      for (const f of (j.features || [])) {
+        if (!f.geometry) continue;
+        const a = f.attributes;
+        boats.push({ n: a.ACCSS_NAME || a.PROPERTY, town: a.ACCSS_TOWN || "",
+          w: a.WATERBODY || "", trailer: a.TRAILER, carry: a.CARRY_IN, hc: a.HANDICAP,
+          url: a.LINK || null, lat: +f.geometry.y.toFixed(5), lng: +f.geometry.x.toFixed(5) });
+      }
+    } catch (e) { log("  one launch dataset failed", "warn"); }
+  }
+  const bseen = new Set();
+  out.cache["ctparks_boat_v2"] = boats.filter(b => {
+    const k = String(b.n).toLowerCase() + Math.round(b.lat * 2000) + Math.round(b.lng * 2000);
+    if (bseen.has(k)) return false; bseen.add(k); return true;
+  });
+  log(`  ${out.cache["ctparks_boat_v2"].length} launches`, "ok");
+
+  // 4. Town parks.
+  log("Town parks…");
+  const muni = [];
+  await paged(OSM.leisure, {
+    where: "leisure='park' AND name IS NOT NULL AND (access IS NULL OR access NOT IN ('private','no'))",
+    outFields: "name,access,website,Shape__Area", returnGeometry: "false", returnCentroid: "true"
+  }, f => {
+    const a = f.attributes, c = f.centroid;
+    if (!a.name || !c) return;
+    const lat = +c.y.toFixed(5);
+    const rec = { n: a.name, lat, lng: +c.x.toFixed(5) };
+    const ac = acresOf(a.Shape__Area, lat); if (ac >= 1) rec.a = ac;
+    if (a.website && /^https?:/i.test(a.website)) rec.w = a.website;
+    muni.push(rec);
+  });
+  out.cache["ctparks_municipal_v3"] = muni;
+  log(`  ${muni.length} town parks`, "ok");
+
+  // 5. Town greens, recreation grounds, forests.
+  log("Greens & recreation areas…");
+  const lu = [];
+  await paged(OSM.landuse, {
+    where: "landuse IN (" + CONFIG.extraLanduse.kinds.map(k => `'${k}'`).join(",") +
+           ") AND name IS NOT NULL AND (access IS NULL OR access NOT IN ('private','no'))",
+    outFields: "name,landuse,operator,Shape__Area", returnGeometry: "false", returnCentroid: "true"
+  }, f => {
+    const a = f.attributes, c = f.centroid;
+    if (!a.name || !c) return;
+    const lat = +c.y.toFixed(5);
+    lu.push({ n: a.name, lat, lng: +c.x.toFixed(5), k: a.landuse,
+              op: a.operator || "", a: acresOf(a.Shape__Area, lat) });
+  });
+  out.cache["ctparks_landuse_v1"] = lu;
+  log(`  ${lu.length} places`, "ok");
+
+  // 6. Preserves & open space.
+  log("Preserves & open space…");
+  const pres = [];
+  await paged(OSM.leisure, {
+    where: "leisure='nature_reserve' AND (access IS NULL OR access NOT IN ('private','no'))",
+    outFields: "name,operator,website,Shape__Area", returnGeometry: "false", returnCentroid: "true"
+  }, f => {
+    const a = f.attributes, c = f.centroid;
+    if (!c) return;
+    const lat = +c.y.toFixed(5);
+    pres.push({ n: a.name || "", op: a.operator || "", lat, lng: +c.x.toFixed(5),
+                w: (a.website && /^https?:/i.test(a.website)) ? a.website : null });
+  });
+  out.cache["ctparks_preserve_raw_v1"] = pres;
+  log(`  ${pres.length} parcels`, "ok");
+
+  // 7. Cemeteries.
+  log("Cemeteries…");
+  const cem = [];
+  await paged(OSM.landuse, {
+    where: "landuse='cemetery' AND name IS NOT NULL AND (access IS NULL OR access NOT IN ('private','no'))",
+    outFields: "name,website,Shape__Area", returnGeometry: "false", returnCentroid: "true"
+  }, f => {
+    const a = f.attributes, c = f.centroid;
+    if (!a.name || !c) return;
+    const lat = +c.y.toFixed(5);
+    const rec = { n: a.name, lat, lng: +c.x.toFixed(5) };
+    if (a.website && /^https?:/i.test(a.website)) rec.w = a.website;
+    cem.push(rec);
+  });
+  out.cache["ctparks_cem_v2"] = cem;
+  log(`  ${cem.length} cemeteries`, "ok");
+
+  // 8. Museums with historic grounds.
+  log("Historic site grounds…");
+  const mus = [];
+  await paged(CONFIG.museums.url, {
+    where: "tourism='museum' AND name IS NOT NULL AND historic IS NOT NULL",
+    outFields: "name,historic,operator,website", returnGeometry: "false", returnCentroid: "true"
+  }, f => {
+    const a = f.attributes, c = f.centroid;
+    if (!a.name || !c) return;
+    mus.push({ n: a.name, lat: +c.y.toFixed(5), lng: +c.x.toFixed(5),
+               h: a.historic || "", op: a.operator || "",
+               w: (a.website && /^https?:/i.test(a.website)) ? a.website : null });
+  });
+  out.cache["ctparks_museum_v1"] = mus;
+  log(`  ${mus.length} sites`, "ok");
+
+  // 9. Sports facilities, playgrounds, pools.
+  log("Facilities…");
+  const fac = [];
+  await paged(OSM.leisure, {
+    where: "leisure IN ('pitch','track','swimming_pool','playground','dog_park'," +
+           "'sports_centre','fitness_station','beach_resort') AND " +
+           "(access IS NULL OR access NOT IN ('private','no'))",
+    outFields: "leisure,sport", returnGeometry: "false", returnCentroid: "true"
+  }, f => {
+    if (!f.centroid) return;
+    fac.push([+f.centroid.y.toFixed(5), +f.centroid.x.toFixed(5),
+              f.attributes.leisure || "", f.attributes.sport || ""]);
+  });
+  out.cache["ctparks_fac_v1"] = fac;
+  log(`  ${fac.length} facilities`, "ok");
+
+  // 10. Public parking.
+  log("Parking…");
+  const park = [];
+  await paged(OSM.pois, {
+    where: "amenity='parking' AND (access IS NULL OR access NOT IN ('private','no','customers','permit'))",
+    outFields: "OBJECTID", returnGeometry: "false", returnCentroid: "true"
+  }, f => { if (f.centroid) park.push([+f.centroid.y.toFixed(5), +f.centroid.x.toFixed(5)]); });
+  out.cache["ctparks_park_v1"] = park;
+  log(`  ${park.length} car parks`, "ok");
+
+  // 11. Named water bodies.
+  log("Water…");
+  const wtr = [];
+  await paged(OSM.water, {
+    where: "name IS NOT NULL", outFields: "name,Shape__Area",
+    returnGeometry: "false", returnCentroid: "true"
+  }, f => {
+    const a = f.attributes, c = f.centroid;
+    if (!c || !a.name) return;
+    const lat = +c.y.toFixed(5);
+    const k = Math.cos(lat * Math.PI / 180);
+    const area = (a.Shape__Area || 0) * k * k;
+    if (area < 2000) return;
+    wtr.push([lat, +c.x.toFixed(5), a.name, Math.round(Math.sqrt(area / Math.PI))]);
+  });
+  out.cache["ctparks_wtr_v1"] = wtr;
+  log(`  ${wtr.length} water bodies`, "ok");
+
+  // 12. Trail coverage grid — the slowest one by far.
+  log("Trail grid (this is the slow one)…");
+  const CELL = 0.0015;
+  const cells = new Set();
+  const cnt = await post(OSM.trails, { where: "highway IN ('path','track','bridleway')",
+    geometry: CT_BBOX, geometryType: "esriGeometryEnvelope", inSR: "4326", returnCountOnly: "true" });
+  const total = cnt.count || 0;
+  const PAGE = 2000;
+  for (let off = 0; off < total; off += PAGE * 4) {
+    await Promise.all([0, 1, 2, 3].map(async k => {
+      const o = off + k * PAGE;
+      if (o >= total) return;
+      const j = await post(OSM.trails, {
+        where: "highway IN ('path','track','bridleway')", geometry: CT_BBOX,
+        geometryType: "esriGeometryEnvelope", inSR: "4326", outSR: "4326", outFields: "",
+        returnGeometry: "true", maxAllowableOffset: "0.004", geometryPrecision: "4",
+        resultOffset: String(o), resultRecordCount: String(PAGE) });
+      for (const f of (j.features || []))
+        for (const path of (f.geometry && f.geometry.paths) || [])
+          for (const pt of path)
+            cells.add(Math.floor(pt[1] / CELL) * 1000000 + (Math.floor(pt[0] / CELL) + 500000));
+    }));
+    log(`  ${Math.min(off + PAGE * 4, total)} / ${total} trail segments`);
+  }
+  out.cache["ctparks_trailgrid_v2"] = [...cells];
+  log(`  ${cells.size} trail cells`, "ok");
+
+  // 13. PAD-US named places.
+  log("PAD-US places…");
+  const pad = [];
+  await paged(CONFIG.padus.endpoints[0] + "/query", {
+    where: "Unit_Nm<>'Unknown' AND Pub_Access<>'XA'",
+    outFields: "Unit_Nm,Own_Name,Mang_Name,Pub_Access,Des_Tp,GIS_Acres",
+    returnGeometry: "false", returnCentroid: "true"
+  }, f => {
+    const a = f.attributes, c = f.centroid;
+    if (!a.Unit_Nm || !c) return;
+    pad.push({ n: a.Unit_Nm.trim(), own: a.Own_Name || "UNK", acc: a.Pub_Access || "UK",
+               des: a.Des_Tp || "", a: Math.round(a.GIS_Acres || 0),
+               lat: +c.y.toFixed(5), lng: +c.x.toFixed(5) });
+  }, 20);
+  out.cache["ctparks_padusplaces_v1"] = pad;
+  log(`  ${pad.length} PAD-US places`, "ok");
+
+  return out;
+}
+
+document.getElementById("go").addEventListener("click", async (e) => {
+  e.target.disabled = true;
+  document.getElementById("log").innerHTML = "";
+  try {
+    const t0 = Date.now();
+    const data = await build();
+    const json = JSON.stringify(data);
+    log(`Done in ${Math.round((Date.now() - t0) / 1000)}s — ${(json.length / 1024 / 1024).toFixed(2)} MB`, "ok");
+    const url = URL.createObjectURL(new Blob([json], { type: "application/json" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = "baked.json"; a.click();
+    URL.revokeObjectURL(url);
+    log("Saved as baked.json — put it in the data/ folder and redeploy.", "ok");
+  } catch (err) {
+    log("Failed: " + err.message, "err");
+  }
+  e.target.disabled = false;
+});
+</script>
+</body>
+</html>

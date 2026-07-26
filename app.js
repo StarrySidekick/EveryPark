@@ -765,7 +765,37 @@
     return { kind: "preserve", label: "Nature Preserve" };
   }
 
+  // Turn one raw nature_reserve row into a preserve record, or null if it
+  // shouldn't become a place. Shared by the live fetch and the baked file
+  // so the rules only exist in one spot.
+  function preserveRow(name, operator, lat, lng, website) {
+    const cls = preserveClass(operator);
+    if (!cls) return null;
+    let nm = name;
+    if (!nm) {
+      if (!operator) return null;
+      nm = cls.kind === "national"
+         ? "Appalachian Trail Corridor"
+         : operator.replace(/,?\s*Inc\.?$/i, "") + " land";
+    }
+    const rec = { n: nm, lat, lng, k: cls.kind, l: cls.label };
+    if (!name) rec.un = 1;
+    if (operator) rec.op = operator;
+    if (website) rec.w = website;
+    return rec;
+  }
+
   function fetchPreserves() {
+    // Baked file stores the raw parcels; classify them here.
+    const rawBaked = BAKED && BAKED.cache && BAKED.cache["ctparks_preserve_raw_v1"];
+    if (rawBaked && rawBaked.length) {
+      const out = [];
+      for (const r of rawBaked) {
+        const rec = preserveRow(r.n, r.op, r.lat, r.lng, r.w);
+        if (rec) out.push(rec);
+      }
+      return Promise.resolve(out);
+    }
     return cachedDataset(PRES_CACHE, CONFIG.municipal.cacheDays, async () => {
       const out = [];
       // Unnamed parcels are included too: a lot of land trust and open
@@ -947,7 +977,25 @@
     };
   }
 
+  // ------------------------------------------------------------------
+  // Baked data. If data/baked.json exists it supplies everything, and no
+  // service is called at all. Generate it with build.html. Without it the
+  // map still works — it just fetches live on first visit.
+  // ------------------------------------------------------------------
+  let BAKED = null;
+  async function loadBaked() {
+    try {
+      const r = await fetch("data/baked.json", { cache: "force-cache" });
+      if (!r.ok) return;
+      BAKED = await r.json();
+      const n = Object.keys(BAKED.cache || {}).length;
+      console.info(`Using baked data from ${BAKED.built} (${n} datasets).`);
+    } catch (e) { /* no baked file — fetch live */ }
+  }
+
   function cachedDataset(key, days, fetcher) {
+    if (BAKED && BAKED.cache && BAKED.cache[key] && BAKED.cache[key].length)
+      return Promise.resolve(BAKED.cache[key]);
     try {
       const c = JSON.parse(localStorage.getItem(key));
       // Only trust a cache entry that actually has rows: an empty result is
@@ -1794,6 +1842,8 @@
   };
 
   function fetchPublicLand() {
+    if (BAKED && BAKED.stateLand && BAKED.stateLand.length)
+      return Promise.resolve(BAKED.stateLand);
     return cachedDataset("ctparks_publicland_v1", CONFIG.municipal.cacheDays, async () => {
       const body = new URLSearchParams({
         where: "1=1", outFields: "AV_LEGEND,PROPERTY,ACRE_GIS",
@@ -2154,8 +2204,9 @@
   });
 
   // ------------------------------------------------------------------
-  // Public land first — it's the thing the map is actually for.
-  loadPublicLand();
+  // Baked data first if it's there, then public land — the thing the map
+  // is actually for — then everything else.
+  loadBaked().then(loadPublicLand);
 
   document.querySelector("#legend .legend-title").addEventListener("click", () => {
     document.getElementById("legend").classList.toggle("collapsed");
