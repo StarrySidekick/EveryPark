@@ -30,11 +30,28 @@ from collections import defaultdict
 # ---------------------------------------------------------------- rules
 # Members-only places are not public land, however nice they are. The rule
 # of thumb: paid-but-open-to-anyone stays, exclusive-entry goes.
-EXCLUDE = re.compile(
-    r"state (park|forest)|scenic reserve|national (park|historical|scenic)|"
+# Membership is the price of entry, so these are not public land. Applied
+# to every source.
+MEMBERS_ONLY = re.compile(
     r"\bclub\b|racquet|members only|homeowners|\bhoa\b|"
     r"(beach|lake|shore|point|improvement) association|"
+    # Sportsmen's and rod-and-gun associations own a lot of Connecticut
+    # open space, but you have to belong.
+    r"sportsman|sportsmen|rod (and|&) gun|fish (and|&) game|"
     r"\bscout\b|scout reservation", re.I)
+
+# State and federal land has its own authoritative layer. This drops the
+# copies that OpenStreetMap and PAD-US also carry — it must NOT be applied
+# to the state and national layers themselves, or every state park
+# disappears from the map.
+DUPLICATE_LAYER = re.compile(
+    r"state (park|forest)|scenic reserve|national (park|historical|scenic)", re.I)
+
+EXCLUDE = re.compile(MEMBERS_ONLY.pattern + "|" + DUPLICATE_LAYER.pattern, re.I)
+
+# Some PAD-US name fields contain leaked XML from whatever produced the
+# export, e.g. '<ArcGIS Type="Editing"><ArrayOfPropertySet ...'.
+JUNK_NAME = re.compile(r"[<>]|ArcGIS|ArrayOf|PropertySet|^\W+$")
 
 # Connecticut's reservations are sovereign land — under CGS ch. 824 nobody
 # may enter without the tribe's written permission — and burial grounds
@@ -131,6 +148,28 @@ DESIG_WORD = {"PAGR": "Private agricultural", "PRAN": "Private ranch",
 TRAIL_CELL = 0.0015
 PADUS_MATCH_M = 500
 PARKING_RADIUS_M = 400
+
+# A conservation easement is a restriction on what the owner may build. It
+# is not a right of way, and the land underneath stays private — so these
+# are protected land you still can't visit. PAD-US records them under the
+# owner's name, which is why they arrive called "44 Sunny Ridge Road, LLC"
+# or "417 Eastern Blvd." A recreation easement (RECE) is the exception:
+# that one does grant public access, so it stays.
+EASEMENT_DESIG = {"CONE", "AGRE", "RANE", "FORE", "OTHE", "UNKE",
+                  "PAGR", "PRAN", "PFOR"}
+
+# Names that are a parcel, not a place: street addresses, companies, and
+# housing developments whose open space PAD-US happens to record.
+PARCEL_NAME = re.compile(
+    r"^\d+\s|\bLLC\b|\bL\.L\.C|\bInc\b|\bAssociates\b|Subdivision|\bLP\b|"
+    r"\bLtd\b|Properties|Realty|Development\b|\bEstates\b", re.I)
+
+# A company or housing development, whatever the source. Applied to every
+# place. Kept narrower than PARCEL_NAME so that "Stony Hill Subdivision
+# Open Space" — which really is the open space — still gets through.
+COMPANY_NAME = re.compile(
+    r"\bLLC\b|\bL\.L\.C|\bInc\.?$|\bIncorporated\b|\bAssociates\b|Realty|"
+    r"\bProperties\b|\bEstates\b|Development Corp", re.I)
 
 
 # ------------------------------------------------------------- geometry
@@ -285,15 +324,77 @@ class Builder:
         return f"{str(name).lower()}|{round(lat * scale)}|{round(lng * scale)}"
 
     def add(self, **p):
-        if not p.get("name") or p.get("lat") is None:
+        name = (p.get("name") or "").strip()
+        if not name or p.get("lat") is None:
             return False
-        k = self.key(p["name"], p["lat"], p["lng"])
+        if len(name) < 3 or JUNK_NAME.search(name):
+            return False
+        # One gate for every source, so a members-only club or a company
+        # parcel can't slip in just because it arrived from OpenStreetMap
+        # rather than PAD-US. Deliberately only the members-only and
+        # company rules — the duplicate-layer rule is per-source.
+        if name.lower() not in ALLOW and (MEMBERS_ONLY.search(name)
+                                          or COMPANY_NAME.search(name)):
+            return False
+        p["name"] = name
+        k = self.key(name, p["lat"], p["lng"])
         if k in self.seen:
             return False
         self.seen.add(k)
         p.setdefault("attrs", {})
         self.places.append(p)
         return True
+
+    def dedupe(self):
+        """
+        Drop repeats of the same place arriving from different sources.
+        The per-source key only catches near-identical coordinates; the
+        same park mapped by DEEP and by OpenStreetMap can sit a few
+        hundred metres apart and survive as two pins. Same name within
+        800 m is the same place — keep whichever record knows most.
+        """
+        def richness(p):
+            return (len(p.get("attrs") or {}), p.get("acres") or 0,
+                    1 if p.get("url") else 0, 1 if p.get("subtype") else 0)
+
+        drop = set()
+
+        # Same name in the same town is one place, however far apart the
+        # parcels sit. Big properties arrive as many parcels — the
+        # Quinebaug Fish Hatchery and the flood-control sites each came
+        # through half a dozen times — and nobody wants six identical
+        # pins for one destination.
+        by_town = defaultdict(list)
+        for p in self.places:
+            by_town[(norm(p["name"]), p.get("town"))].append(p)
+        for group in by_town.values():
+            if len(group) < 2:
+                continue
+            for b in sorted(group, key=richness, reverse=True)[1:]:
+                drop.add(id(b))
+
+        # Across town lines, fall back to proximity: the same park mapped
+        # by two sources can straddle a boundary.
+        by_name = defaultdict(list)
+        for p in self.places:
+            if id(p) not in drop:
+                by_name[norm(p["name"])].append(p)
+        for group in by_name.values():
+            if len(group) < 2:
+                continue
+            group = sorted(group, key=richness, reverse=True)
+            for i, a in enumerate(group):
+                if id(a) in drop:
+                    continue
+                for b in group[i + 1:]:
+                    if id(b) in drop:
+                        continue
+                    if dist_m(a["lat"], a["lng"], b["lat"], b["lng"]) < 800:
+                        drop.add(id(b))
+
+        before = len(self.places)
+        self.places = [p for p in self.places if id(p) not in drop]
+        return before - len(self.places)
 
 
 def load(path):
@@ -468,6 +569,12 @@ def main():
         # case, where the owner does customarily allow walking.
         if own == "PVT":
             continue
+        des = m.get("des") or ""
+        if des in EASEMENT_DESIG and own not in ("SDC", "SPR", "SFW", "SDNR",
+                                                 "OTHS", "CITY", "CNTY", "REG"):
+            continue                                   # private land, restricted only
+        if len(nm) < 3 or PARCEL_NAME.search(nm):
+            continue                                   # a parcel, not a place
         by_permission = re.search(r"NGO|UNK", own) and acc in ("RA", "UK")
         if B.add(name=nm, type=PADUS_TYPE.get(own, "preserve"),
                  subtype=DESIG_WORD.get(m.get("des"), "Protected land"),
@@ -481,6 +588,9 @@ def main():
                         "officialOwner": OWNER_WORD.get(own, own), "fromPadus": True}):
             added += 1
     print(f"  +{added:,} gap-filling places from PAD-US = {len(B.places):,}", flush=True)
+
+    removed = B.dedupe()
+    print(f"  -{removed:,} cross-source duplicates = {len(B.places):,}", flush=True)
 
     # --- 12. What's actually there -------------------------------------
     fac = Grid(0.01)
