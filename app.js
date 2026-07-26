@@ -552,13 +552,30 @@
   function cachedDataset(key, days, fetcher) {
     try {
       const c = JSON.parse(localStorage.getItem(key));
-      if (c && Date.now() - c.time < days * 864e5) return Promise.resolve(c.data);
+      // Only trust a cache entry that actually has rows: an empty result is
+      // almost always a transient network failure, and caching it would
+      // silently break the feature for a week.
+      if (c && c.data && c.data.length && Date.now() - c.time < days * 864e5) return Promise.resolve(c.data);
     } catch (e) { /* ignore */ }
     return fetcher().then(data => {
-      try { localStorage.setItem(key, JSON.stringify({ time: Date.now(), data })); } catch (e) {}
+      if (data && data.length) {
+        try { localStorage.setItem(key, JSON.stringify({ time: Date.now(), data })); }
+        catch (e) { /* over quota — fine, we just refetch next time */ }
+      }
       return data;
     });
   }
+
+  // Drop cache entries from older versions of the site so they don't
+  // sit in localStorage forever.
+  (function pruneOldCaches() {
+    const keep = new Set(["ctparks_municipal_v3", "ctparks_cem_v1", "ctparks_pres_v1",
+                          "ctparks_fac_v1", "ctparks_trl_v1", "ctparks_wtr_v1"]);
+    try {
+      for (const k of Object.keys(localStorage))
+        if (k.startsWith("ctparks_") && !keep.has(k)) localStorage.removeItem(k);
+    } catch (e) { /* ignore */ }
+  })();
 
   async function pagedQuery(url, extraParams, perFeature) {
     let offset = 0;
