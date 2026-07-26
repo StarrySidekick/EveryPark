@@ -108,6 +108,7 @@
   const allParks = [];          // {name, type, lat, lng, town, acres, url, marker}
   const activeTypes = new Set(["state", "national", "town", "preserve"]);   // cemeteries off by default
   let tilesActive = false;      // true once vector tiles take over the geometry
+  let deferredWork = Promise.resolve();   // trail + PAD-US passes, filled in later
   let searchTerm = "";
   let townIndex = null;         // for point-in-polygon town lookup
 
@@ -1245,7 +1246,10 @@
       }
       hideStatus();
       refresh();
-      applyTrailAccess()      // slower; fills in behind the scenes
+      // Deliberately NOT awaited: the map stays usable while these finish.
+      // Held in a promise so the ?dump=1 build step can wait for them —
+      // without it the dump captures places before trails or PAD-US land.
+      deferredWork = applyTrailAccess()
         .then(loadPadus);     // official ratings last — they override ours
     } catch (err) {
       console.warn("Enrichment failed:", err);
@@ -2283,9 +2287,11 @@
   // The answer is identical on every visit, so when data/places.json is
   // present we load it and skip the entire pipeline.
   // ------------------------------------------------------------------
-  const PLACE_FIELDS = ["name", "lat", "lng", "type", "t", "town", "a", "url",
-                        "fee", "why", "access", "accessLabel", "accessWhy",
-                        "steward", "kind", "attrs", "un", "op"];
+  // Keep everything except the runtime-only bits. An allow-list was a
+  // mistake here: it silently dropped `acres`, and without acreage the
+  // trail search radius collapses to a 120 m default, so large parks
+  // came out with no trails and no verified access.
+  const PLACE_SKIP = new Set(["marker", "_pre"]);
 
   async function loadPrecomputed() {
     let data;
@@ -2317,8 +2323,13 @@
   function dumpPlaces() {
     const out = allParks.map(p => {
       const rec = {};
-      for (const k of PLACE_FIELDS)
-        if (p[k] !== undefined && p[k] !== null && p[k] !== "") rec[k] = p[k];
+      for (const k of Object.keys(p)) {
+        if (PLACE_SKIP.has(k)) continue;
+        const v = p[k];
+        if (v === undefined || v === null || v === "" || v === false) continue;
+        if (typeof v === "function" || typeof v === "object" && v instanceof L.Class) continue;
+        rec[k] = v;
+      }
       rec.lat = +p.lat.toFixed(5);
       rec.lng = +p.lng.toFixed(5);
       if (rec.attrs) {
@@ -2344,6 +2355,7 @@
                 .then(loadExtraLanduse).then(loadMuseums)
                 .then(loadPreserves).then(loadCemeteries)
                 .then(enrich).then(refreshOverlays).then(refreshTrailLines)
+                .then(() => deferredWork)     // wait for trails + PAD-US
                 .then(() => { if (wantDump) dumpPlaces(); });
   }).catch(err => {
     console.error(err);
