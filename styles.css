@@ -93,6 +93,16 @@ header .tagline { font-size: .78rem; opacity: .85; display: block; font-weight: 
 }
 .popup-fee { font-size: .72rem; color: var(--muted); margin-bottom: 8px; }
 
+.popup-access {
+  font-size: .74rem;
+  font-weight: 600;
+  border-radius: 6px;
+  padding: 4px 8px;
+  margin-bottom: 8px;
+}
+.popup-access.ok   { background: #e8f4ec; color: #1d6b3f; }
+.popup-access.warn { background: #fdf1e3; color: #8a5a1b; }
+
 #listToggle {
   background: rgba(255,255,255,.15);
   border: none;

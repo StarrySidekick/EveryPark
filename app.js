@@ -140,8 +140,16 @@
     if (A.dogpark) t.push("🐕 Dog park");
     if (A.pool) t.push("🏊 Pool");
     if (A.historic) t.push("🏛️ Historic");
+    if (A.parking) t.push("🅿️ Parking");
+    if (A.terrain) t.push(`⛰️ ${A.terrain}`);
     if (!t.length) return "";
     return `<div class="popup-tags">${t.map(x => `<span class="tag">${x}</span>`).join("")}</div>`;
+  }
+
+  function accessHtml(p) {
+    if (!p.attrs || !p.attrs.accessNote) return "";
+    const ok = p.attrs.visitable;
+    return `<div class="popup-access ${ok ? "ok" : "warn"}">${ok ? "✅" : "⚠️"} ${p.attrs.accessNote}</div>`;
   }
 
   function feeHtml(p) {
@@ -162,14 +170,52 @@
       <span class="badge ${p.type}">${typeLabel(p)}</span>
       <div class="popup-name">${p.name}</div>
       <div class="popup-sub">${p.town || "Connecticut"}${acres}</div>
-      ${tagsHtml(p)}${feeHtml(p)}
+      ${tagsHtml(p)}${accessHtml(p)}${feeHtml(p)}
       <div class="popup-links">${linksFor(p)}</div>`;
   }
 
   function addPark(p) {
     p.marker = L.marker([p.lat, p.lng], { icon: icons[p.type], title: p.name })
       .bindPopup(popupHtml(p));
+    p.marker.on("popupopen", () => loadTerrain(p));
     allParks.push(p);
+  }
+
+  // ------------------------------------------------------------------
+  // Terrain, fetched only when a popup is opened (USGS 3DEP, ~1 m data).
+  // Sampling every place up front would take hours, so it loads lazily
+  // and the popup updates in place once the numbers arrive.
+  // ------------------------------------------------------------------
+  function terrainLabel(relief) {
+    if (relief < 12) return "Flat";
+    if (relief < 40) return "Gently rolling";
+    if (relief < 90) return "Hilly";
+    return "Steep";
+  }
+
+  async function loadTerrain(p) {
+    if (!CONFIG.terrain.enabled || !p.attrs || p.attrs.terrain || p._terrainBusy) return;
+    p._terrainBusy = true;
+    try {
+      // Sample a 3x3 grid scaled to the size of the place.
+      const rM = parkRadiusM(p) * 0.8;
+      const dLat = rM / 110574, dLng = rM / (111320 * Math.cos(p.lat * Math.PI / 180));
+      const pts = [];
+      for (let a = -1; a <= 1; a++)
+        for (let b = -1; b <= 1; b++)
+          pts.push([+(p.lng + b * dLng).toFixed(5), +(p.lat + a * dLat).toFixed(5)]);
+      const url = CONFIG.terrain.url +
+        "?geometry=" + encodeURIComponent(JSON.stringify({ points: pts, spatialReference: { wkid: 4326 } })) +
+        "&geometryType=esriGeometryMultipoint&returnFirstValueOnly=true&f=json";
+      const j = await fetch(url).then(r => r.json());
+      const vals = (j.samples || []).map(s => +s.value).filter(v => isFinite(v) && v > -100);
+      if (vals.length >= 3) {
+        const relief = Math.round(Math.max(...vals) - Math.min(...vals));
+        p.attrs.terrain = `${terrainLabel(relief)} · ${relief} m relief`;
+        p.marker.setPopupContent(popupHtml(p));
+      }
+    } catch (e) { /* terrain is a nicety; ignore failures */ }
+    p._terrainBusy = false;
   }
 
   // ------------------------------------------------------------------
@@ -579,7 +625,7 @@
 
   async function pagedQuery(url, extraParams, perFeature) {
     let offset = 0;
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 45; i++) {
       const body = new URLSearchParams(Object.assign({
         geometry: CT_BBOX, geometryType: "esriGeometryEnvelope",
         inSR: "4326", outSR: "4326",
@@ -612,20 +658,53 @@
     });
   }
 
-  function fetchTrails() {
-    return cachedDataset("ctparks_trl_v1", CONFIG.municipal.cacheDays, async () => {
-      const pts = [];
+  // --- Trail coverage grid -------------------------------------------
+  // We don't care about individual trails, only "is there a trail here".
+  // So every trail vertex collapses into a ~165 m grid cell and we cache
+  // the set of occupied cells: small to store, instant to test against.
+  const TRAIL_CELL = 0.0015;
+  function cellKey(lat, lng) {
+    return Math.floor(lat / TRAIL_CELL) * 1000000 + (Math.floor(lng / TRAIL_CELL) + 500000);
+  }
+
+  function fetchTrailCells() {
+    return cachedDataset("ctparks_trailgrid_v1", CONFIG.municipal.cacheDays, async () => {
+      const cells = new Set();
+      // path/track/bridleway = real trails. Footways are mostly sidewalks
+      // and building approaches, which would produce false positives.
       await pagedQuery(CONFIG.enrichment.trailsUrl, {
-        where: "name IS NOT NULL", outFields: "OBJECTID",
-        returnGeometry: "true", maxAllowableOffset: "0.002", geometryPrecision: "4"
+        where: "highway IN ('path','track','bridleway')", outFields: "OBJECTID",
+        returnGeometry: "true", maxAllowableOffset: "0.0008", geometryPrecision: "5"
       }, f => {
         const paths = f.geometry && f.geometry.paths;
         if (!paths) return;
         for (const path of paths)
-          for (let i = 0; i < path.length; i += 2)   // every other vertex is plenty
-            pts.push([path[i][1], path[i][0]]);
+          for (const pt of path) cells.add(cellKey(pt[1], pt[0]));
       });
-      return pts;
+      return [...cells];
+    });
+  }
+
+  function trailNear(lat, lng, radiusM, cellSet) {
+    const span = Math.min(6, Math.ceil(radiusM / 111000 / TRAIL_CELL));
+    const i0 = Math.floor(lat / TRAIL_CELL), j0 = Math.floor(lng / TRAIL_CELL);
+    for (let i = i0 - span; i <= i0 + span; i++)
+      for (let j = j0 - span; j <= j0 + span; j++)
+        if (cellSet.has(i * 1000000 + (j + 500000))) return true;
+    return false;
+  }
+
+  function fetchParking() {
+    return cachedDataset("ctparks_park_v1", CONFIG.municipal.cacheDays, async () => {
+      const out = [];
+      await pagedQuery(CONFIG.enrichment.poisUrl, {
+        where: "amenity='parking' AND (access IS NULL OR access NOT IN ('private','no','customers','permit'))",
+        outFields: "OBJECTID", returnGeometry: "false", returnCentroid: "true"
+      }, f => {
+        if (!f.centroid) return;
+        out.push([+f.centroid.y.toFixed(5), +f.centroid.x.toFixed(5)]);
+      });
+      return out;
     });
   }
 
@@ -657,15 +736,16 @@
     if (!CONFIG.enrichment.enabled) return;
     showStatus("Analyzing parks: sports, trails & water…");
     try {
-      const [fac, trl, wtr, coast] = await Promise.all([
-        fetchFacilities(), fetchTrails(), fetchWater(),
+      const [fac, trlCells, park, wtr, coast] = await Promise.all([
+        fetchFacilities(), fetchTrailCells(), fetchParking(), fetchWater(),
         fetch("data/coast.json").then(r => r.json()).catch(() => ({ pts: [] }))
       ]);
 
-      const facGrid = makeGrid(0.01), trlGrid = makeGrid(0.01),
+      const trailSet = new Set(trlCells);
+      const facGrid = makeGrid(0.01), parkGrid = makeGrid(0.01),
             wtrGrid = makeGrid(0.02), cstGrid = makeGrid(0.01);
       for (const [la, ln, leis, sp] of fac) facGrid.add(la, ln, [leis, sp]);
-      for (const [la, ln] of trl) trlGrid.add(la, ln, 1);
+      for (const [la, ln] of park) parkGrid.add(la, ln, 1);
       for (const [la, ln, nm, rad] of wtr) wtrGrid.add(la, ln, [nm, rad]);
       for (const [ln, la] of coast.pts || []) cstGrid.add(la, ln, 1);
 
@@ -689,8 +769,19 @@
         }
         if (sports.size) { A.sports = true; A.sportList = [...sports]; }
 
-        // trails
-        if (trlGrid.near(p.lat, p.lng, r + 240).length) A.trails = true;
+        // --- Can you actually get in? ---
+        // A mapped trail is the strongest evidence a place is walkable;
+        // public parking means you can at least reach and enter it.
+        if (trailNear(p.lat, p.lng, r + 150, trailSet)) A.trails = true;
+        if (parkGrid.near(p.lat, p.lng, Math.max(r, CONFIG.access.parkingRadiusM)).length)
+          A.parking = true;
+        A.visitable = !!(A.trails || A.parking || A.sports || A.playground || A.beach);
+        // Built facilities imply access even without a mapped trail; a bare
+        // preserve with none of the above is flagged as unverified.
+        A.accessNote = A.trails ? "Trails mapped"
+                     : A.parking ? "Parking nearby, no mapped trail"
+                     : A.visitable ? "Facilities on site"
+                     : "No mapped trail or parking";
 
         // inland water: nearest named waterbody whose edge comes close
         let best = null;

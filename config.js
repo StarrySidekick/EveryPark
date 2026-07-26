@@ -98,7 +98,25 @@ const CONFIG = {
   enrichment: {
     enabled: true,
     trailsUrl: "https://services6.arcgis.com/Do88DoK2xjTUCXd1/ArcGIS/rest/services/OSM_NA_Trails/FeatureServer/0/query",
-    waterUrl: "https://services6.arcgis.com/Do88DoK2xjTUCXd1/ArcGIS/rest/services/OSM_NA_Water/FeatureServer/0/query"
+    waterUrl: "https://services6.arcgis.com/Do88DoK2xjTUCXd1/ArcGIS/rest/services/OSM_NA_Water/FeatureServer/0/query",
+    poisUrl: "https://services6.arcgis.com/Do88DoK2xjTUCXd1/ArcGIS/rest/services/OSM_NA_POIs/FeatureServer/0/query"
+  },
+
+  // ---- CAN YOU ACTUALLY GO THERE? -----------------------------------
+  // Plenty of preserves are legally open but have no trail, no parking
+  // and no realistic way in. We check for mapped trails and public
+  // parking and label each place accordingly.
+  access: {
+    enabled: true,
+    parkingRadiusM: 400   // how close public parking must be to count
+  },
+
+  // ---- TERRAIN (on demand) ------------------------------------------
+  // USGS 3DEP elevation, sampled when a popup is opened (about 2-5 s).
+  // Too slow to run for every place up front, so it loads lazily.
+  terrain: {
+    enabled: true,
+    url: "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/getSamples"
   },
 
   // Map start position (Connecticut)

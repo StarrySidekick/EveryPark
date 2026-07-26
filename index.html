@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
   <!-- ?v= is a cache-buster: bump it on every deploy so visitors get fresh code -->
-  <link rel="stylesheet" href="styles.css?v=12">
+  <link rel="stylesheet" href="styles.css?v=13">
 </head>
 <body>
 
@@ -31,6 +31,7 @@
         <button class="chip" data-type="cemetery"><span class="dot"></span>Cemeteries</button>
       </div>
       <div class="chips" id="attrChips" title="Filter by feature">
+        <button class="chip attr" data-attr="visitable" title="Only show places with a mapped trail, parking or facilities">🚶 Visitable</button>
         <button class="chip attr" data-attr="water">🌊 Water</button>
         <button class="chip attr" data-attr="trails">🥾 Trails</button>
         <button class="chip attr" data-attr="sports">🏀 Sports</button>
@@ -54,7 +55,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
-  <script src="config.js?v=12"></script>
-  <script src="app.js?v=12"></script>
+  <script src="config.js?v=13"></script>
+  <script src="app.js?v=13"></script>
 </body>
 </html>
