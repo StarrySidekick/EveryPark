@@ -241,8 +241,13 @@ def stage(inputs, zooms):
             if not mvt_layers:
                 continue
             try:
+                # y_coord_down is essential. to_tile_coords already emits
+                # MVT-native coordinates with y measured DOWN from the top
+                # of the tile. Without this flag the encoder flips y a
+                # second time, mirroring every shape inside its own tile.
                 buf = mapbox_vector_tile.encode(
-                    mvt_layers, default_options={"extents": EXTENT})
+                    mvt_layers,
+                    default_options={"extents": EXTENT, "y_coord_down": True})
             except Exception:
                 continue
             if buf:
