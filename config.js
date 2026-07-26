@@ -109,7 +109,11 @@ const CONFIG = {
   // Set enabled:false to fall back to the old live per-viewport fetching.
   vectorTiles: {
     enabled: true,
-    url: "data/everypark.pmtiles"
+    url: "data/everypark.pmtiles",
+    // Highest zoom the archive actually contains. Beyond this the same
+    // tiles are stretched, which is why the map still draws when you zoom
+    // right in. Must match --maxzoom used when building.
+    maxDataZoom: 14
   },
 
   // ---- PUBLIC LAND — THE MAIN EVENT -----------------------------------

@@ -207,6 +207,11 @@ const EveryParkTiles = (() => {
           url: CONFIG.vectorTiles.url,
           paintRules: paintRules(),
           labelRules: [],
+          // The archive stops at zoom 14. Without this the renderer looks
+          // for tiles that don't exist once you zoom past it and draws
+          // nothing at all — the map goes blank exactly when you've zoomed
+          // in to look at something. This tells it to reuse zoom-14 tiles.
+          maxDataZoom: CONFIG.vectorTiles.maxDataZoom || 14,
           pane: "overlayPane"
         });
         layer.addTo(map);
