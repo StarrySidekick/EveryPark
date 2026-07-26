@@ -1237,6 +1237,49 @@
     }
   }
 
+  // --- Protected open-space parcels (CT DEEP POSM) --------------------
+  // Owner-less parcel geometry. Shows the real extent of protected land
+  // even where nothing in our data has a name or a shape for it.
+  map.createPane("parcelPane");
+  map.getPane("parcelPane").style.zIndex = 385;
+  const parcelLayer = L.layerGroup();
+  const loadedParcelIds = new Set();
+  let parcelsOn = false;
+
+  async function refreshParcels() {
+    const P = CONFIG.protectedParcels;
+    if (!P.enabled || !parcelsOn) return;
+    if (map.getZoom() < P.minZoom) return;
+    const b = map.getBounds();
+    const bbox = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()]
+      .map(x => x.toFixed(4)).join(",");
+    try {
+      const body = new URLSearchParams({
+        where: "1=1", geometry: bbox, geometryType: "esriGeometryEnvelope",
+        inSR: "4326", outSR: "4326", outFields: "OBJECTID,TOWN,ACRES",
+        returnGeometry: "true", maxAllowableOffset: "0.00006",
+        resultRecordCount: "600", f: "geojson"
+      });
+      const gj = await fetch(P.url, { method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" }, body }).then(r => r.json());
+      for (const f of (gj.features || [])) {
+        const id = (f.properties && f.properties.OBJECTID) || f.id;
+        if (id == null || loadedParcelIds.has(id)) continue;
+        loadedParcelIds.add(id);
+        const ac = Math.round((f.properties && f.properties.ACRES) || 0);
+        L.geoJSON(f, { pane: "parcelPane",
+          style: { color: P.color, weight: P.weight, opacity: 0.85,
+                   fillColor: P.color, fillOpacity: P.fillOpacity } })
+          .bindPopup(
+            `<span class="badge" style="background:${P.color}">Protected open space</span>
+             <div class="popup-name">${ac ? ac.toLocaleString() + " acres" : "Protected parcel"}</div>
+             <div class="popup-sub">${(f.properties && f.properties.TOWN) || ""}</div>
+             <div class="popup-fee">CT DEEP records this parcel as protected open space but doesn't record who owns it. It may belong to a preserve, town or land trust listed elsewhere on this map — or to one nothing has named yet.</div>`)
+          .addTo(parcelLayer);
+      }
+    } catch (e) { console.warn("Parcel overlay failed:", e); }
+  }
+
   // --- Blue-Blazed Hiking Trail System (CFPA) -------------------------
   // Loaded once for the whole state — only 351 segments — so the network
   // reads at any zoom. Own pane above the OSM paths.
@@ -1317,7 +1360,7 @@
 
   map.on("moveend zoomend", () => {
     clearTimeout(overlayTimer);
-    overlayTimer = setTimeout(() => { refreshOverlays(); refreshTrailLines(); }, 350);
+    overlayTimer = setTimeout(() => { refreshOverlays(); refreshTrailLines(); refreshParcels(); }, 350);
   });
 
   // ------------------------------------------------------------------
@@ -1420,6 +1463,24 @@
   document.getElementById("search").addEventListener("input", (e) => {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => { searchTerm = e.target.value.trim().toLowerCase(); refresh(); }, 180);
+  });
+
+  document.getElementById("parcelToggle").addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
+    if (map.hasLayer(parcelLayer)) {
+      map.removeLayer(parcelLayer);
+      parcelsOn = false;
+      btn.classList.remove("active");
+    } else {
+      parcelsOn = true;
+      btn.classList.add("active");
+      parcelLayer.addTo(map);
+      if (map.getZoom() < CONFIG.protectedParcels.minZoom) {
+        showStatus("Zoom in to see protected land parcels");
+        setTimeout(hideStatus, 3000);
+      }
+      await refreshParcels();
+    }
   });
 
   document.getElementById("bbToggle").addEventListener("click", async (e) => {

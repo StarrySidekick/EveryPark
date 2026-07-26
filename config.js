@@ -96,6 +96,20 @@ const CONFIG = {
     serviceUrl: "https://services6.arcgis.com/Do88DoK2xjTUCXd1/ArcGIS/rest/services/OSM_NA_Landuse/FeatureServer/0/query"
   },
 
+  // ---- PROTECTED OPEN SPACE PARCELS ----------------------------------
+  // CT DEEP's parcel-level map of protected land. It has no owner names,
+  // so it can't create places on its own — but it shows the true extent
+  // of protected land, including parcels nothing else has a name for.
+  // Useful where a place is only a point (hand-added, or unmapped).
+  protectedParcels: {
+    enabled: true,
+    url: "https://services1.arcgis.com/FjPcSmEFuDYlIdKC/arcgis/rest/services/Connecticut_Parcels_for_Protected_Open_Space_Mapping/FeatureServer/0/query",
+    minZoom: 13,
+    color: "#ff9800",
+    weight: 1.4,
+    fillOpacity: 0.14
+  },
+
   // ---- BLUE-BLAZED HIKING TRAILS -------------------------------------
   // The CFPA system: ~825 miles, running since 1929. Much of it crosses
   // PRIVATE land by easement or landowner permission — the footpath is

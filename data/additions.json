@@ -23,7 +23,7 @@
       "url": "https://ctaudubon.org/locations/deer-pond-farm/",
       "fee": "Free admission",
       "agency": "Connecticut Audubon Society",
-      "note": "15 miles of trails, 850 acres (half in Sherman CT, half in Pawling NY). Trails open dawn to dusk year round; visitor center and parking at 57 Wakeman Hill Road. No dogs, bikes or horses.",
+      "note": "15 miles of trails, 850 acres (half in Sherman CT, half in Pawling NY). Trails open dawn to dusk year round; visitor center and parking at 57 Wakeman Hill Road. No dogs, bikes or horses. Shown as a single point because no boundary for it exists in OpenStreetMap — turn on 'Protected land' to see the actual protected parcels covering this area.",
       "trails": true,
       "parking": true
     }
