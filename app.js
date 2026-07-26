@@ -1268,11 +1268,10 @@
     const bbox = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()]
       .map(x => x.toFixed(4)).join(",");
     try {
+      // State land is drawn once, statewide, by the public-land layer —
+      // no need to re-fetch it per viewport here.
       const jobs = [
-        fetchOverlayGeojson(CONFIG.overlays.stateUrl, {
-          where: "AV_LEGEND IN ('State Park','State Forest','State Park Scenic Reserve','Historic Preserve','Natural Area Preserve')",
-          geometry: bbox, outFields: "OBJECTID,PROPERTY,AV_LEGEND"
-        }),
+        Promise.resolve(null),
         fetchOverlayGeojson(CONFIG.municipal.serviceUrl, {
           where: "leisure='park' AND (access IS NULL OR access NOT IN ('private','no'))",
           geometry: bbox, outFields: "OBJECTID,name"
@@ -1290,9 +1289,7 @@
             geometry: bbox, outFields: "OBJECTID,name"
           })
         : Promise.resolve(null));
-      const [stateGj, townGj, presGj, cemGj] = await Promise.all(jobs);
-      addOverlayFeatures(stateGj, "state", "PROPERTY",
-        f => f.properties.AV_LEGEND || "State land");
+      const [, townGj, presGj, cemGj] = await Promise.all(jobs);
       addOverlayFeatures(townGj, "town", "name", () => "Town / City Park");
       if (presGj) {
         // Re-use the same operator rules so colors match the pins.
@@ -1312,6 +1309,63 @@
     } catch (err) {
       console.warn("Overlay load failed:", err);
     }
+  }
+
+  // --- PUBLIC LAND: the primary visual --------------------------------
+  // Every state-owned parcel, statewide, at every zoom. Tinted = public,
+  // untinted = private. Drawn on canvas so 491 polygons stay smooth.
+  map.createPane("publicPane");
+  map.getPane("publicPane").style.zIndex = 380;
+  const publicRenderer = L.canvas({ pane: "publicPane" });
+  const publicLandLayer = L.layerGroup().addTo(map);
+
+  // Which DEEP categories count as land you can walk on. DEP-owned
+  // waterbodies are lakes, so they're styled but not called walkable.
+  const LEGEND_LABELS = {
+    "State Forest": "State Forest", "State Park": "State Park",
+    "Wildlife Area": "Wildlife Management Area", "Wildlife Sanctuary": "Wildlife Sanctuary",
+    "State Park Scenic Reserve": "Scenic Reserve", "Natural Area Preserve": "Natural Area Preserve",
+    "Flood Control": "Flood Control Area", "Fish Hatchery": "Fish Hatchery",
+    "Historic Preserve": "Historic Preserve", "Water Access": "Water Access",
+    "DEP Owned Waterbody": "State Waterbody", "State Park Trail": "State Park Trail",
+    "Other": "Other State Land"
+  };
+
+  function fetchPublicLand() {
+    return cachedDataset("ctparks_publicland_v1", CONFIG.municipal.cacheDays, async () => {
+      const body = new URLSearchParams({
+        where: "1=1", outFields: "AV_LEGEND,PROPERTY,ACRE_GIS",
+        outSR: "4326", returnGeometry: "true",
+        maxAllowableOffset: CONFIG.publicLand.simplify,
+        geometryPrecision: "5", resultRecordCount: "1000", f: "geojson"
+      });
+      const gj = await fetch(CONFIG.publicLand.url, { method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" }, body }).then(r => r.json());
+      return gj.features || [];
+    });
+  }
+
+  async function loadPublicLand() {
+    if (!CONFIG.publicLand.enabled) return;
+    try {
+      const feats = await fetchPublicLand();
+      const P = CONFIG.publicLand;
+      for (const f of feats) {
+        const legend = (f.properties && f.properties.AV_LEGEND) || "Other";
+        const nm = (f.properties && f.properties.PROPERTY) || "State land";
+        const ac = Math.round((f.properties && f.properties.ACRE_GIS) || 0);
+        L.geoJSON(f, {
+          renderer: publicRenderer, pane: "publicPane",
+          style: { color: CONFIG.colors.state, weight: P.weight, opacity: 0.9,
+                   fillColor: CONFIG.colors.state, fillOpacity: P.fillOpacity }
+        }).bindPopup(
+          `<span class="badge state">${LEGEND_LABELS[legend] || legend}</span>
+           <div class="popup-name">${nm}</div>
+           <div class="popup-sub">Connecticut${ac ? " &middot; " + ac.toLocaleString() + " acres" : ""}</div>
+           <div class="popup-access ok">✅ Public land — owned by the State of Connecticut</div>`
+        ).addTo(publicLandLayer);
+      }
+    } catch (e) { console.warn("Public land layer failed:", e); }
   }
 
   // --- Protected open-space parcels (CT DEEP POSM) --------------------
@@ -1589,6 +1643,13 @@
   });
 
   // ------------------------------------------------------------------
+  // Public land first — it's the thing the map is actually for.
+  loadPublicLand();
+
+  document.querySelector("#legend .legend-title").addEventListener("click", () => {
+    document.getElementById("legend").classList.toggle("collapsed");
+  });
+
   loadStatic().then(loadStateExtra).then(loadBoatLaunches).then(fetchMunicipal)
               .then(loadExtraLanduse).then(loadMuseums)
               .then(loadPreserves).then(loadCemeteries)

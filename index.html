@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
   <!-- ?v= is a cache-buster: bump it on every deploy so visitors get fresh code -->
-  <link rel="stylesheet" href="styles.css?v=24">
+  <link rel="stylesheet" href="styles.css?v=25">
 </head>
 <body>
 
@@ -52,13 +52,25 @@
       <div id="parkList"></div>
     </aside>
     <div id="status"></div>
+
+    <div id="legend">
+      <div class="legend-title">Shaded land is public</div>
+      <div class="legend-row"><span class="sw" style="background:#2e7d32"></span>State — parks, forests, wildlife areas</div>
+      <div class="legend-row"><span class="sw" style="background:#8d5524"></span>Federal</div>
+      <div class="legend-row"><span class="sw" style="background:#1565c0"></span>Town &amp; city</div>
+      <div class="legend-row"><span class="sw" style="background:#00796b"></span>Land trust preserve</div>
+      <div class="legend-row"><span class="sw" style="background:#6b5b8e"></span>Cemetery</div>
+      <div class="legend-row"><span class="sw" style="background:#ff9800"></span>Protected, owner unrecorded</div>
+      <div class="legend-note">Unshaded = private land. Town, preserve and cemetery shapes appear as you zoom in.</div>
+    </div>
+
     <div id="credit">Data: CT DEEP · National Park Service · OpenStreetMap contributors</div>
   </main>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
-  <script src="config.js?v=24"></script>
-  <script src="app.js?v=24"></script>
+  <script src="config.js?v=25"></script>
+  <script src="app.js?v=25"></script>
 </body>
 </html>

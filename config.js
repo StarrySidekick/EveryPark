@@ -59,12 +59,26 @@ const CONFIG = {
     opacity: 0.45
   },
 
+  // ---- PUBLIC LAND — THE MAIN EVENT -----------------------------------
+  // The whole point of the map: at a glance, what's public and what isn't.
+  // All 491 state-owned parcels load in one request and stay visible at
+  // every zoom, so the public/private pattern reads statewide. Anything
+  // NOT tinted is private land.
+  publicLand: {
+    enabled: true,
+    url: "https://services1.arcgis.com/FjPcSmEFuDYlIdKC/arcgis/rest/services/Connecticut_DEEP_Property/FeatureServer/0/query",
+    simplify: "0.0005",
+    fillOpacity: 0.42,
+    weight: 0.8,
+    showLegend: true
+  },
+
   // ---- PARK BOUNDARY OVERLAYS ---------------------------------------
-  // Actual park shapes appear when zoomed in to `minZoom` or closer.
+  // Local detail — town, preserve and cemetery shapes, loaded per view.
   overlays: {
     enabled: true,
-    minZoom: 12,
-    fillOpacity: 0.28,
+    minZoom: 11,
+    fillOpacity: 0.38,
     stateUrl: "https://services1.arcgis.com/FjPcSmEFuDYlIdKC/arcgis/rest/services/Connecticut_DEEP_Property/FeatureServer/0/query"
   },
 
