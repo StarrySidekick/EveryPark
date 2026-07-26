@@ -1263,8 +1263,96 @@
       }
       hideStatus();
       refresh();
-      if (tagged) { showStatus(`PAD-US: official access applied to ${tagged.toLocaleString()} places`); setTimeout(hideStatus, 4000); }
+      if (tagged) { showStatus(`PAD-US: official access applied to ${tagged.toLocaleString()} places`); setTimeout(hideStatus, 3000); }
+      await loadPadusPlaces();     // then add what PAD-US knows and we don't
     } catch (e) { console.warn("PAD-US enrichment failed:", e); hideStatus(); }
+  }
+
+  // ------------------------------------------------------------------
+  // PAD-US as a source of PLACES. It carries names for land that
+  // OpenStreetMap has never heard of — "Upland Pastures" being the
+  // case that started this. Adds only genuinely new, named, open land.
+  // ------------------------------------------------------------------
+  const PADUS_TYPE = {
+    NPS: "national", FWS: "national", USFS: "national", USACE: "national",
+    DOD: "national", BLM: "national", OTHF: "national", BOEM: "national",
+    USBR: "national", NOAA: "national", NRCS: "national", ARS: "national",
+    SPR: "state", SDC: "state", SFW: "state", SDNR: "state", SLB: "state",
+    SDOL: "state", OTHS: "state",
+    CITY: "town", CNTY: "town", UNKL: "town", REG: "town", RWD: "town",
+    NGO: "preserve", PVT: "preserve", JNT: "preserve", OTHR: "preserve", UNK: "preserve"
+  };
+  // Names that aren't really names — they'd fill the list with noise.
+  const GENERIC_NAME = /^(town|city|borough|village) of\b|^private\b|^unknown$|^state of\b|^designation$/i;
+
+  function fetchPadusPlaces() {
+    return cachedDataset("ctparks_padusplaces_v1", CONFIG.municipal.cacheDays, async () => {
+      if (!padusBase) return [];
+      const out = [];
+      await pagedQuery(padusBase + "/query", {
+        where: "Unit_Nm<>'Unknown' AND Pub_Access<>'XA'",
+        outFields: "Unit_Nm,Own_Name,Mang_Name,Pub_Access,Des_Tp,GIS_Acres",
+        returnGeometry: "false", returnCentroid: "true"
+      }, f => {
+        const a = f.attributes, c = f.centroid;
+        if (!a.Unit_Nm || !c) return;
+        if (a.Own_Name === "TRIB" || a.Mang_Name === "TRIB") return;   // sovereign land
+        if (GENERIC_NAME.test(a.Unit_Nm.trim())) return;
+        out.push({ n: a.Unit_Nm.trim(), own: a.Own_Name || "UNK",
+                   acc: a.Pub_Access || "UK", des: a.Des_Tp || "",
+                   a: Math.round(a.GIS_Acres || 0),
+                   lat: +c.y.toFixed(5), lng: +c.x.toFixed(5) });
+      });
+      return out;
+    });
+  }
+
+  async function loadPadusPlaces() {
+    if (!CONFIG.padus.enabled || !padusBase) return;
+    try {
+      showStatus("Adding places from PAD-US…");
+      const items = await fetchPadusPlaces();
+      // Existing places, keyed by simplified name, for match-checking.
+      const byName = new Map();
+      const norm = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      for (const p of allParks) {
+        const k = norm(p.name);
+        if (!byName.has(k)) byName.set(k, []);
+        byName.get(k).push(p);
+      }
+      const seen = new Set();
+      let added = 0;
+      for (const m of items) {
+        const key = norm(m.n) + "|" + Math.round(m.lat * 200) + "|" + Math.round(m.lng * 200);
+        if (seen.has(key)) continue;         // PAD-US overlaps itself (fee + easement)
+        seen.add(key);
+        // Already on the map under this name and close by? Skip.
+        const same = byName.get(norm(m.n)) || [];
+        if (same.some(p => distM(p.lat, p.lng, m.lat, m.lng) < 800)) continue;
+        const town = findTown(m.lat, m.lng);
+        if (!town) continue;                 // outside Connecticut
+        if (EXCLUDE.test(m.n) && !ALLOW.has(m.n.toLowerCase())) continue;
+        if (TRIBAL_EXCLUDE.test(m.n)) continue;
+        const type = PADUS_TYPE[m.own] || "preserve";
+        const word = ACCESS_WORD[m.acc] || "Unknown";
+        const byPermission = /NGO|PVT|UNK/.test(m.own) && /^(RA|UK)$/.test(m.acc);
+        addPark({
+          name: m.n, type, subtype: DESIG_WORD[m.des] || "Protected land",
+          lat: m.lat, lng: m.lng, town, acres: m.a || null,
+          agency: OWNER_WORD[m.own] || null,
+          fee: m.acc === "OA" ? "Open access" : null,
+          note: byPermission
+            ? "Listed by USGS as restricted, which for land-trust and private conservation land usually means open by the owner's permission rather than by legal right. Check the owner's website or posted signs."
+            : null,
+          attrs: { officialAccess: word, officialOwner: OWNER_WORD[m.own] || m.own,
+                   fromPadus: true }
+        });
+        added++;
+      }
+      hideStatus();
+      refresh();
+      if (added) { showStatus(`Added ${added.toLocaleString()} places from PAD-US`); setTimeout(hideStatus, 4500); }
+    } catch (e) { console.warn("PAD-US places failed:", e); hideStatus(); }
   }
 
   // A mapped trail is the strongest evidence a place is actually walkable.
