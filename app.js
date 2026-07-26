@@ -422,6 +422,103 @@
   }
 
   // ------------------------------------------------------------------
+  // State land beyond parks and forests: Wildlife Management Areas,
+  // sanctuaries, flood control land and hatcheries. All public.
+  // ------------------------------------------------------------------
+  function fetchStateExtra() {
+    return cachedDataset("ctparks_stateextra_v1", CONFIG.municipal.cacheDays, async () => {
+      const legends = CONFIG.stateExtra.legends.map(l => "'" + l + "'").join(",");
+      const best = {};
+      await pagedQuery(CONFIG.stateExtra.url, {
+        where: "AV_LEGEND IN (" + legends + ")",
+        outFields: "PROPERTY,AV_LEGEND,ACRE_GIS",
+        returnGeometry: "false", returnCentroid: "true"
+      }, f => {
+        const a = f.attributes, c = f.centroid;
+        if (!a.PROPERTY || !c) return;
+        const acres = Math.round(a.ACRE_GIS || 0);
+        // A property can span many parcels; keep the biggest as its pin.
+        if (!best[a.PROPERTY] || acres > best[a.PROPERTY].a)
+          best[a.PROPERTY] = { n: a.PROPERTY, t: a.AV_LEGEND, a: acres,
+                               lat: +c.y.toFixed(5), lng: +c.x.toFixed(5) };
+      });
+      return Object.values(best).filter(x => x.a >= CONFIG.stateExtra.minAcres);
+    });
+  }
+
+  const LEGEND_LABEL = {
+    "Wildlife Area": "Wildlife Management Area",
+    "Wildlife Sanctuary": "Wildlife Sanctuary",
+    "Flood Control": "Flood Control Area",
+    "Fish Hatchery": "Fish Hatchery"
+  };
+
+  async function loadStateExtra() {
+    if (!CONFIG.stateExtra.enabled) return;
+    try {
+      for (const s of await fetchStateExtra()) {
+        addPark({
+          name: s.n, type: "state", subtype: LEGEND_LABEL[s.t] || s.t,
+          lat: s.lat, lng: s.lng, acres: s.a, town: findTown(s.lat, s.lng),
+          agency: "CT DEEP"
+        });
+      }
+      refresh();
+    } catch (e) { console.warn("State extra failed:", e); }
+  }
+
+  // Town greens and recreation grounds live under landuse, not leisure.
+  function fetchExtraLanduse() {
+    return cachedDataset("ctparks_landuse_v1", CONFIG.municipal.cacheDays, async () => {
+      const kinds = CONFIG.extraLanduse.kinds.map(k => "'" + k + "'").join(",");
+      const out = [];
+      await pagedQuery(CONFIG.extraLanduse.url, {
+        where: "landuse IN (" + kinds + ") AND name IS NOT NULL AND " +
+               "(access IS NULL OR access NOT IN ('private','no'))",
+        outFields: "name,landuse,operator,Shape__Area",
+        returnGeometry: "false", returnCentroid: "true"
+      }, f => {
+        const a = f.attributes, c = f.centroid;
+        if (!a.name || !c) return;
+        const lat = +c.y.toFixed(5);
+        const k = Math.cos(lat * Math.PI / 180);
+        const acres = Math.round((a.Shape__Area || 0) * k * k * 0.000247105);
+        out.push({ n: a.name, lat, lng: +c.x.toFixed(5), k: a.landuse,
+                   op: a.operator || "", a: acres });
+      });
+      return out;
+    });
+  }
+
+  const LANDUSE_LABEL = { recreation_ground: "Recreation Area",
+                          village_green: "Town Green", forest: "Forest" };
+
+  async function loadExtraLanduse() {
+    if (!CONFIG.extraLanduse.enabled) return;
+    try {
+      const items = await fetchExtraLanduse();
+      const existing = new Set(allParks.map(p =>
+        p.name.toLowerCase() + "|" + Math.round(p.lat * 300) + "|" + Math.round(p.lng * 300)));
+      for (const m of items) {
+        const key = m.n.toLowerCase() + "|" + Math.round(m.lat * 300) + "|" + Math.round(m.lng * 300);
+        if (existing.has(key)) continue;
+        existing.add(key);
+        const town = findTown(m.lat, m.lng);
+        if (!town) continue;
+        if (EXCLUDE.test(m.n) && !ALLOW.has(m.n.toLowerCase())) continue;
+        const isState = /State Forest|State of Connecticut/i.test(m.n + " " + m.op);
+        addPark({
+          name: m.n, type: isState ? "state" : "town",
+          subtype: LANDUSE_LABEL[m.k] || "Open Space",
+          lat: m.lat, lng: m.lng, town, acres: m.a || null,
+          agency: m.op || null
+        });
+      }
+      refresh();
+    } catch (e) { console.warn("Extra landuse failed:", e); }
+  }
+
+  // ------------------------------------------------------------------
   // Land trust preserves & open space (leisure=nature_reserve)
   //   land trust / conservancy / nonprofit  -> "preserve" layer
   //   town or city run                      -> Town layer, "Open Space"
@@ -1045,15 +1142,20 @@
     if (gapsBuilt) return;
     showStatus("Looking for unmapped trail areas…");
     const cells = await fetchTrailCells();
-    // Cell centres that have no park within ~500 m.
-    const parkGrid = makeGrid(0.01);
-    for (const p of allParks) parkGrid.add(p.lat, p.lng, 1);
+    // A cell is "covered" if it falls inside any place's own footprint
+    // (scaled from acreage) plus a small margin — measuring to the
+    // centre alone made big parks flag their own trails.
+    const parkGrid = makeGrid(0.02);
+    for (const p of allParks) parkGrid.add(p.lat, p.lng, parkRadiusM(p));
     const orphan = new Set();
     for (const key of cells) {
       const i = Math.floor(key / 1000000), j = (key % 1000000) - 500000;
       const lat = (i + 0.5) * TRAIL_CELL, lng = (j + 0.5) * TRAIL_CELL;
       if (!findTown(lat, lng)) continue;                 // outside Connecticut
-      if (parkGrid.near(lat, lng, 500).length) continue; // already covered
+      const near = parkGrid.near(lat, lng, 2600);
+      let covered = false;
+      for (const [dist, rad] of near) if (dist <= rad + 300) { covered = true; break; }
+      if (covered) continue;
       orphan.add(i + "," + j);
     }
     // Group touching cells so one trail network = one pin, not fifty.
@@ -1147,7 +1249,8 @@
   });
 
   // ------------------------------------------------------------------
-  loadStatic().then(fetchMunicipal).then(loadPreserves).then(loadCemeteries)
+  loadStatic().then(loadStateExtra).then(fetchMunicipal).then(loadExtraLanduse)
+              .then(loadPreserves).then(loadCemeteries)
               .then(enrich).then(refreshOverlays).then(refreshTrailLines).catch(err => {
     console.error(err);
     showStatus("Something went wrong loading park data. Try refreshing.");

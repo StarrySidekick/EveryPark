@@ -96,6 +96,25 @@ const CONFIG = {
     serviceUrl: "https://services6.arcgis.com/Do88DoK2xjTUCXd1/ArcGIS/rest/services/OSM_NA_Landuse/FeatureServer/0/query"
   },
 
+  // ---- OTHER STATE LAND ---------------------------------------------
+  // DEEP owns far more than parks and forests. Wildlife Management
+  // Areas alone are 30,000+ acres of public land, all open for hiking.
+  stateExtra: {
+    enabled: true,
+    url: "https://services1.arcgis.com/FjPcSmEFuDYlIdKC/arcgis/rest/services/Connecticut_DEEP_Property/FeatureServer/0/query",
+    legends: ["Wildlife Area", "Wildlife Sanctuary", "Flood Control", "Fish Hatchery"],
+    minAcres: 5
+  },
+
+  // ---- OTHER MUNICIPAL LAND ------------------------------------------
+  // Town greens and recreation grounds are tagged as landuse, not
+  // leisure, so they were invisible to the park query.
+  extraLanduse: {
+    enabled: true,
+    url: "https://services6.arcgis.com/Do88DoK2xjTUCXd1/ArcGIS/rest/services/OSM_NA_Landuse/FeatureServer/0/query",
+    kinds: ["recreation_ground", "village_green", "forest"]
+  },
+
   // ---- LAND TRUST PRESERVES & OPEN SPACE ---------------------------
   // Nature reserves from OpenStreetMap, split by who runs them:
   // land trusts / conservancies get their own layer; town-run open
