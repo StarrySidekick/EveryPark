@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
   <!-- ?v= is a cache-buster: bump it on every deploy so visitors get fresh code -->
-  <link rel="stylesheet" href="styles.css?v=29">
+  <link rel="stylesheet" href="styles.css?v=30">
 </head>
 <body>
 
@@ -79,14 +79,18 @@
     <div id="status"></div>
 
     <div id="legend">
-      <div class="legend-title">Shaded land is public</div>
-      <div class="legend-row"><span class="sw" style="background:#2e7d32"></span>State — parks, forests, wildlife areas</div>
-      <div class="legend-row"><span class="sw" style="background:#8d5524"></span>Federal</div>
-      <div class="legend-row"><span class="sw" style="background:#1565c0"></span>Town &amp; city</div>
-      <div class="legend-row"><span class="sw" style="background:#00796b"></span>Land trust preserve</div>
-      <div class="legend-row"><span class="sw" style="background:#6b5b8e"></span>Cemetery</div>
-      <div class="legend-row"><span class="sw" style="background:#ff9800"></span>Protected, owner unrecorded</div>
-      <div class="legend-note">Unshaded = private land. Town, preserve and cemetery shapes appear as you zoom in.</div>
+      <div class="legend-title">Green = you can go there</div>
+      <div class="legend-row"><span class="sw fill-open"></span>Open to all</div>
+      <div class="legend-row"><span class="sw fill-perm"></span>Open by permission</div>
+      <div class="legend-note" style="margin-bottom:7px">Unshaded land is private.</div>
+
+      <div class="legend-title">Border colour = who owns it</div>
+      <div class="legend-row"><span class="sw ring" style="border-color:#1b5e20"></span>State of Connecticut</div>
+      <div class="legend-row"><span class="sw ring" style="border-color:#6d4c41"></span>Federal</div>
+      <div class="legend-row"><span class="sw ring" style="border-color:#1565c0"></span>Town or city</div>
+      <div class="legend-row"><span class="sw ring" style="border-color:#00838f"></span>Land trust / non-profit</div>
+      <div class="legend-row"><span class="sw ring" style="border-color:#5e35b1"></span>Cemetery</div>
+      <div class="legend-note">The icon shows what kind of place it is.</div>
       <div class="legend-padus">
         <div class="legend-title" style="margin-top:8px">Access map (USGS PAD-US)</div>
         <div class="legend-row"><span class="sw" style="background:#2e9e4f"></span>Open — just go</div>
@@ -102,7 +106,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
-  <script src="config.js?v=29"></script>
-  <script src="app.js?v=29"></script>
+  <script src="config.js?v=30"></script>
+  <script src="app.js?v=30"></script>
 </body>
 </html>

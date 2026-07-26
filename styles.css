@@ -286,9 +286,12 @@ main { flex: 1; display: flex; position: relative; min-height: 0; }
 .legend-title { font-weight: 700; font-size: .78rem; margin-bottom: 6px; }
 .legend-row { display: flex; align-items: center; gap: 7px; }
 .legend-row .sw {
-  width: 13px; height: 13px; border-radius: 3px;
-  opacity: .75; flex-shrink: 0;
+  width: 14px; height: 14px; border-radius: 3px;
+  opacity: .9; flex-shrink: 0;
 }
+.legend-row .sw.fill-open { background: rgba(67,160,71,.55); border: 1.5px solid #43a047; }
+.legend-row .sw.fill-perm { background: rgba(67,160,71,.22); border: 1.5px dashed #43a047; }
+.legend-row .sw.ring { background: rgba(67,160,71,.28); border: 2.5px solid; border-radius: 4px; }
 .legend-note { margin-top: 6px; color: var(--muted); font-size: .66rem; }
 #legend.collapsed .legend-row, #legend.collapsed .legend-note,
 #legend.collapsed .legend-padus { display: none; }

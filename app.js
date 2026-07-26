@@ -29,14 +29,71 @@
   });
   L.control.layers(baseLayers, null, { position: "bottomright" }).addTo(map);
 
-  const icons = {};
-  for (const [key, def] of Object.entries(CONFIG.icons)) {
-    icons[key] = L.icon({
-      iconUrl: def.file,
-      iconSize: [def.size, def.size],
-      iconAnchor: [def.size / 2, def.size / 2],
-      popupAnchor: [0, -def.size / 2]
+  // ------------------------------------------------------------------
+  // Icons are generated, not files: the ring takes the owner's colour and
+  // the glyph says what kind of place it is, so one marker carries both.
+  // ------------------------------------------------------------------
+  const GLYPH = {
+    // Simple, chunky shapes that stay readable at 26px.
+    park:      "M32 13l9 15h-5l10 16H36v8h-8v-8H16l10-16h-5z",                       // conifer
+    forest:    "M21 15l7 12h-4l7 11H14l7-11h-4zM43 20l8 13h-4l8 12H35l8-12h-4z M28 45h8v6h-8z",
+    wildlife:  "M22 44c-4-4-6-9-6-14 0-8 7-14 16-14s16 6 16 14c0 5-2 10-6 14zM26 28a3 3 0 100 6 3 3 0 000-6zm12 0a3 3 0 100 6 3 3 0 000-6z",
+    preserve:  "M46 16C30 16 18 24 18 38c0 5 3 9 7 11 2-11 8-19 17-24-7 6-12 14-14 25 1 0 3 0 5 0 12 0 17-12 15-26-.4-4-1-6-2-8z",
+    beach:     "M14 42c4-3 7-3 11 0s7 3 11 0 7-3 11 0 7 3 11 0v6c-4 3-7 3-11 0s-7-3-11 0-7 3-11 0-7-3-11 0zM40 14a10 10 0 00-10 10h20a10 10 0 00-10-10z",
+    water:     "M32 12c7 10 12 17 12 23a12 12 0 01-24 0c0-6 5-13 12-23z",
+    boat:      "M13 42h38l-5 9H18zM30 14h4v24h-4zM34 18l12 6-12 6z",
+    historic:  "M32 12l20 10v5H12v-5zM18 30h5v16h-5zm10 0h5v16h-5zm10 0h5v16h-5zm10 0h5v16h-5zM12 49h40v5H12z",
+    cemetery:  "M32 12c-8 0-12 6-12 13v27h24V25c0-7-4-13-12-13zm-3 8h6v6h6v6h-6v14h-6V32h-6v-6h6z",
+    sports:    "M32 12a20 20 0 100 40 20 20 0 000-40zm0 5c3.5 0 6.8 1.1 9.5 3-2.4 3-4 6.8-4.4 11h-10c-.4-4.2-2-8-4.4-11a15 15 0 019.3-3z",
+    field:     "M14 20h36v24H14zm18 0v24M14 32h36",
+    trail:     "M20 50c6-6 4-12 8-16s10-2 12-8-2-10-6-12",
+    building:  "M16 26l16-12 16 12v24H16zM28 34h8v16h-8z",
+    default:   "M32 14a14 14 0 00-14 14c0 10 14 22 14 22s14-12 14-22a14 14 0 00-14-14zm0 9a5 5 0 110 10 5 5 0 010-10z"
+  };
+
+  // Which glyph for which kind of place. Matched loosely on the label.
+  function glyphFor(p) {
+    const k = ((p.subtype || "") + " " + (p.kind || "") + " " + p.name).toLowerCase();
+    if (p.type === "cemetery" || /cemeter|burying|burial/.test(k)) return "cemetery";
+    if (/boat launch|water access|marina|landing/.test(k))         return "boat";
+    if (/beach|shore|sound/.test(k))                               return "beach";
+    if (/forest/.test(k))                                          return "forest";
+    if (/wildlife|sanctuary|refuge|hatchery/.test(k))              return "wildlife";
+    if (/historic|museum|monument|fort|castle/.test(k))            return "historic";
+    if (/reservoir|pond|lake|river|flood|waterbody/.test(k))       return "water";
+    if (/preserve|conservation|open space|natural area|land trust/.test(k)) return "preserve";
+    if (/recreation|athletic|sports|ball/.test(k))                 return "sports";
+    if (/green|square|common/.test(k))                             return "field";
+    if (/trail|corridor/.test(k))                                  return "trail";
+    if (/park/.test(k))                                            return "park";
+    return "default";
+  }
+
+  const iconCache = new Map();
+  function iconFor(p) {
+    const glyph = glyphFor(p);
+    const ring = CONFIG.visual.owner[p.type] || CONFIG.visual.owner.preserve;
+    // Places you can walk into read solid; permission-only read lighter.
+    const solid = p.access === "open";
+    const key = glyph + ring + solid;
+    if (iconCache.has(key)) return iconCache.get(key);
+    const svg =
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="30" height="30">
+         <circle cx="32" cy="32" r="29" fill="${ring}" stroke="#fff" stroke-width="4"
+                 fill-opacity="${solid ? 1 : 0.82}"/>
+         ${solid ? "" : `<circle cx="32" cy="32" r="29" fill="none" stroke="#fff"
+                 stroke-width="2" stroke-dasharray="4 3" opacity=".9"/>`}
+         <g fill="#fff" stroke="#fff" stroke-width="${glyph === "field" || glyph === "trail" ? 4 : 0}"
+            stroke-linecap="round" fill-rule="evenodd">
+           <path d="${GLYPH[glyph]}" ${glyph === "field" || glyph === "trail" ? 'fill="none"' : ""}/>
+         </g>
+       </svg>`;
+    const icon = L.icon({
+      iconUrl: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg),
+      iconSize: [30, 30], iconAnchor: [15, 15], popupAnchor: [0, -15]
     });
+    iconCache.set(key, icon);
+    return icon;
   }
 
   const cluster = L.markerClusterGroup({
@@ -205,7 +262,7 @@
         if (al.why) p.akaNote = al.why;
       }
     }
-    p.marker = L.marker([p.lat, p.lng], { icon: icons[p.type], title: p.name })
+    p.marker = L.marker([p.lat, p.lng], { icon: iconFor(p), title: p.name })
       .bindPopup(popupHtml(p));
     p.marker.on("popupopen", () => loadTerrain(p));
     allParks.push(p);
@@ -287,10 +344,10 @@
     for (const p of shown.slice(0, 800)) {
       const div = document.createElement("div");
       div.className = "park-item";
-      div.innerHTML = `<img src="${CONFIG.icons[p.type].file}" alt="">
-        <div><div class="pi-name">${ACCESS_ICON[p.access] || ""} ${p.name}</div>
+      div.innerHTML = `<img src="${iconFor(p).options.iconUrl}" alt="">
+        <div><div class="pi-name">${p.name}</div>
         <div class="pi-sub">${typeLabel(p)}${p.town ? " · " + p.town : ""}</div>
-        <div class="pi-steward">${p.steward || ""}</div></div>`;
+        <div class="pi-steward">${ACCESS_ICON[p.access] || ""} ${p.steward || ""}</div></div>`;
       div.addEventListener("click", () => {
         map.flyTo([p.lat, p.lng], Math.max(map.getZoom(), 13), { duration: 0.7 });
         setTimeout(() => { cluster.zoomToShowLayer(p.marker, () => p.marker.openPopup()); }, 750);
@@ -1230,7 +1287,8 @@
           : "Requires a permit, registration, or has limited hours.";
         L.geoJSON(f, {
           renderer: padusRenderer, pane: "padusPane",
-          style: { color: col, weight: 1, opacity: 0.9, fillColor: col, fillOpacity: 0.35 }
+          // Borders were getting lost on canvas — give them real weight.
+          style: { color: col, weight: 2.2, opacity: 1, fillColor: col, fillOpacity: 0.22 }
         }).bindPopup(
           `<span class="badge" style="background:${col}">${word} access</span>
            <div class="popup-name">${pr.Unit_Nm && pr.Unit_Nm !== "Unknown" ? pr.Unit_Nm : "Protected area"}</div>
@@ -1482,10 +1540,22 @@
   const loadedOverlayIds = new Set();
   let overlayTimer = null;
 
+  // One green for "you can go here"; the border says who owns it.
+  function landStyle(ownerType, byPermission) {
+    const V = CONFIG.visual;
+    return {
+      color: V.owner[ownerType] || V.owner.preserve,
+      weight: V.borderWeight,
+      opacity: 0.95,
+      dashArray: byPermission ? "5 3" : null,
+      fillColor: V.publicFill,
+      fillOpacity: byPermission ? V.fillPermission : V.fillOpen
+    };
+  }
+
   function overlayStyle(kind) {
-    const color = CONFIG.colors[kind];
-    return { color, weight: 1.6, opacity: 0.9,
-             fillColor: color, fillOpacity: CONFIG.overlays.fillOpacity };
+    // Town land is public outright; land trust land is open by permission.
+    return landStyle(kind, kind === "preserve" || kind === "cemetery");
   }
 
   async function fetchOverlayGeojson(url, params) {
@@ -1611,8 +1681,7 @@
         const ac = Math.round((f.properties && f.properties.ACRE_GIS) || 0);
         L.geoJSON(f, {
           renderer: publicRenderer, pane: "publicPane",
-          style: { color: CONFIG.colors.state, weight: P.weight, opacity: 0.9,
-                   fillColor: CONFIG.colors.state, fillOpacity: P.fillOpacity }
+          style: landStyle("state", false)
         }).bindPopup(
           `<span class="badge state">${LEGEND_LABELS[legend] || legend}</span>
            <div class="popup-name">${nm}</div>

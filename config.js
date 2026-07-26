@@ -10,6 +10,27 @@ const CONFIG = {
   siteTitle: "Connecticut Parks Explorer",
   tagline: "Every state, national & town park in one map",
 
+  // ---- THE VISUAL SYSTEM ---------------------------------------------
+  // Three things encoded at once, so the map answers all three questions
+  // without you having to click anything:
+  //   FILL   green  = you can go here (solid = open, softer = by permission)
+  //   BORDER colour = who owns and maintains it
+  //   ICON   glyph  = what kind of place it is
+  visual: {
+    publicFill: "#43a047",        // one green for all public land
+    fillOpen: 0.34,
+    fillPermission: 0.20,         // softer — open, but by permission
+    borderWeight: 1.9,
+    // Border colour by owner. These are also the marker ring colours.
+    owner: {
+      state:    "#1b5e20",        // deep green
+      national: "#6d4c41",        // brown
+      town:     "#1565c0",        // blue
+      preserve: "#00838f",        // teal
+      cemetery: "#5e35b1"         // purple
+    }
+  },
+
   // ---- MARKER ICONS -------------------------------------------------
   // Each park type points to an image file in the icons/ folder.
   // To use your own graphics: drop a .svg or .png in icons/ and
@@ -99,7 +120,9 @@ const CONFIG = {
   // and cached in the visitor's browser for `cacheDays` days.
   municipal: {
     enabled: true,
-    cacheDays: 7,
+    // How long a visitor's browser keeps the downloaded data before
+    // refreshing it. Long, because this land doesn't move.
+    cacheDays: 30,
     serviceUrl: "https://services6.arcgis.com/Do88DoK2xjTUCXd1/ArcGIS/rest/services/OSM_NA_Leisure/FeatureServer/0/query"
   },
 
