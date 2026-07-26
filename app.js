@@ -1306,7 +1306,9 @@
 
   async function refreshPadusLayer() {
     const P = CONFIG.padus;
-    if (!padusOn || !padusBase || map.getZoom() < P.minZoom) return;
+    if (!padusOn || map.getZoom() < P.minZoom) return;
+    const base = await ensurePadusBase();
+    if (!base) return;
     const b = map.getBounds();
     const bbox = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map(x => x.toFixed(4)).join(",");
     try {
@@ -1317,7 +1319,7 @@
         returnGeometry: "true", maxAllowableOffset: "0.00008",
         resultRecordCount: "900", f: "geojson"
       });
-      const gj = await fetch(padusBase + "/query", { method: "POST",
+      const gj = await fetch(base + "/query", { method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" }, body }).then(r => r.json());
       for (const f of (gj.features || [])) {
         const pr = f.properties || {};
@@ -1357,30 +1359,57 @@
     } catch (e) { console.warn("PAD-US layer failed:", e); }
   }
 
-  async function loadPadus() {
-    if (!CONFIG.padus.enabled) return;
-    let base = null;
-    try { base = await probePadus(); } catch (e) { return; }
-    if (!base) { console.info("PAD-US unavailable — skipping official access ratings."); return; }
-    padusBase = base;
-    document.getElementById("padusToggle").removeAttribute("disabled");
-    // Now that PAD-US is confirmed reachable, redraw so land-trust
-    // boundaries appear for the view we're already looking at.
-    refreshOverlays();
-    try {
-      showStatus("Applying official PAD-US access ratings…");
-      const areas = [];
+  // Find a working PAD-US endpoint, but only when one is actually
+  // needed. Probing costs two requests per endpoint, and with baked
+  // data the ratings and places need no endpoint at all — only the
+  // polygon layers do. Memoised so concurrent callers share one probe.
+  let padusProbe = null;
+  function ensurePadusBase() {
+    if (padusBase) return Promise.resolve(padusBase);
+    if (!padusProbe) {
+      padusProbe = probePadus().then(b => {
+        if (b) {
+          padusBase = b;
+          document.getElementById("padusToggle").removeAttribute("disabled");
+        } else {
+          console.info("PAD-US unavailable — boundaries will be skipped.");
+        }
+        return b;
+      }).catch(() => null);
+    }
+    return padusProbe;
+  }
+
+  // Every PAD-US record including closed and unnamed ones — needed to
+  // rate places, not just to list them. Baked when available.
+  function fetchPadusAreas() {
+    return cachedDataset("ctparks_padusareas_v1", CONFIG.municipal.cacheDays, async () => {
+      const base = await ensurePadusBase();
+      if (!base) return [];
+      const out = [];
       await pagedQuery(base + "/query", {
-        where: "1=1", outFields: "Unit_Nm,Loc_Nm,Pub_Access,Own_Name,Mang_Name,Des_Tp,GIS_Acres",
+        where: "1=1", outFields: "Unit_Nm,Loc_Nm,Pub_Access,Own_Name,Mang_Name",
         returnGeometry: "false", returnCentroid: "true"
       }, f => {
         const a = f.attributes, c = f.centroid;
         if (!c) return;
-        areas.push({ n: a.Unit_Nm || a.Loc_Nm || "", acc: a.Pub_Access || "",
-                     own: a.Own_Name || "", mang: a.Mang_Name || "",
-                     lat: c.y, lng: c.x });
+        out.push({ n: a.Unit_Nm || a.Loc_Nm || "", acc: a.Pub_Access || "",
+                   own: a.Own_Name || "", mang: a.Mang_Name || "",
+                   lat: +c.y.toFixed(5), lng: +c.x.toFixed(5) });
       });
+      return out;
+    });
+  }
+
+  async function loadPadus() {
+    if (!CONFIG.padus.enabled) return;
+    try {
+      showStatus("Applying official PAD-US access ratings…");
+      const areas = await fetchPadusAreas();
       if (!areas.length) { hideStatus(); return; }
+      // Ratings came from somewhere, so the layer toggle is worth
+      // offering; turning it on is what triggers the endpoint probe.
+      document.getElementById("padusToggle").removeAttribute("disabled");
 
       const grid = makeGrid(0.01);
       for (const a of areas) grid.add(a.lat, a.lng, a);
@@ -1427,9 +1456,10 @@
 
   function fetchPadusPlaces() {
     return cachedDataset("ctparks_padusplaces_v1", CONFIG.municipal.cacheDays, async () => {
-      if (!padusBase) return [];
+      const base = await ensurePadusBase();
+      if (!base) return [];
       const out = [];
-      await pagedQuery(padusBase + "/query", {
+      await pagedQuery(base + "/query", {
         where: "Unit_Nm<>'Unknown' AND Pub_Access<>'XA'",
         outFields: "Unit_Nm,Own_Name,Mang_Name,Pub_Access,Des_Tp,GIS_Acres",
         returnGeometry: "false", returnCentroid: "true"
@@ -1448,7 +1478,7 @@
   }
 
   async function loadPadusPlaces() {
-    if (!CONFIG.padus.enabled || !padusBase) return;
+    if (!CONFIG.padus.enabled) return;
     try {
       showStatus("Adding places from PAD-US…");
       const items = await fetchPadusPlaces();
@@ -1805,8 +1835,12 @@
       // land already comes from DEEP and town land from OSM, so limiting
       // it this way fills the land-trust gap without stacking duplicate
       // parcels on top of each other.
-      jobs.push(padusBase && activeTypes.has("preserve")
-        ? fetchOverlayGeojson(padusBase + "/query", {
+      // Probing happens here rather than on page load: at the statewide
+      // view there are no boundaries to draw, so there's nothing to probe
+      // for. Zooming to a land trust is what makes it worth the requests.
+      const padBase = activeTypes.has("preserve") ? await ensurePadusBase() : null;
+      jobs.push(padBase
+        ? fetchOverlayGeojson(padBase + "/query", {
             where: "Unit_Nm<>'Unknown' AND Pub_Access<>'XA' AND " +
                    "Own_Name IN ('NGO','PVT','JNT','OTHR','UNK')",
             geometry: bbox, outFields: "OBJECTID,Unit_Nm,Own_Name,Pub_Access,Des_Tp"

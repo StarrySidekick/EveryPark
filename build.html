@@ -299,20 +299,40 @@ async function build() {
 
   // 13. PAD-US named places.
   log("PAD-US places…");
+  const PADUS = CONFIG.padus.endpoints[0] + "/query";
   const pad = [];
-  await paged(CONFIG.padus.endpoints[0] + "/query", {
+  await paged(PADUS, {
     where: "Unit_Nm<>'Unknown' AND Pub_Access<>'XA'",
     outFields: "Unit_Nm,Own_Name,Mang_Name,Pub_Access,Des_Tp,GIS_Acres",
     returnGeometry: "false", returnCentroid: "true"
   }, f => {
     const a = f.attributes, c = f.centroid;
     if (!a.Unit_Nm || !c) return;
+    if (a.Own_Name === "TRIB" || a.Mang_Name === "TRIB") return;   // sovereign land
     pad.push({ n: a.Unit_Nm.trim(), own: a.Own_Name || "UNK", acc: a.Pub_Access || "UK",
                des: a.Des_Tp || "", a: Math.round(a.GIS_Acres || 0),
                lat: +c.y.toFixed(5), lng: +c.x.toFixed(5) });
   }, 20);
   out.cache["ctparks_padusplaces_v1"] = pad;
   log(`  ${pad.length} PAD-US places`, "ok");
+
+  // 14. Every PAD-US record, including closed and unnamed ones. This is
+  // what rates the places already on the map, so it can't be filtered
+  // the way the list above is.
+  log("PAD-US access ratings…");
+  const areas = [];
+  await paged(PADUS, {
+    where: "1=1", outFields: "Unit_Nm,Loc_Nm,Pub_Access,Own_Name,Mang_Name",
+    returnGeometry: "false", returnCentroid: "true"
+  }, f => {
+    const a = f.attributes, c = f.centroid;
+    if (!c) return;
+    areas.push({ n: a.Unit_Nm || a.Loc_Nm || "", acc: a.Pub_Access || "",
+                 own: a.Own_Name || "", mang: a.Mang_Name || "",
+                 lat: +c.y.toFixed(5), lng: +c.x.toFixed(5) });
+  }, 30);
+  out.cache["ctparks_padusareas_v1"] = areas;
+  log(`  ${areas.length} rated areas`, "ok");
 
   return out;
 }
