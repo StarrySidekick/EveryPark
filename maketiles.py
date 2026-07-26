@@ -23,6 +23,7 @@ import argparse
 import glob
 import gzip
 import json
+import math
 import os
 import pickle
 import sys
@@ -158,16 +159,32 @@ def tile_clip(t, z):
     return box(b.west - pad, b.south - pad, b.east + pad, b.north + pad)
 
 
+MERC_MAX = 20037508.342789244
+
+
+def merc_y(lat):
+    """Latitude to Web Mercator northing, clamped near the poles."""
+    lat = max(min(lat, 85.05112878), -85.05112878)
+    return math.log(math.tan(math.pi / 4 + math.radians(lat) / 2)) * (MERC_MAX / math.pi)
+
+
 def to_tile_coords(geom, t):
-    """Map lon/lat into the tile's 0..4096 integer grid, y flipped."""
-    b = mercantile.bounds(t)
-    dx = b.east - b.west
-    dy = b.north - b.south
+    """
+    Map lon/lat into the tile's 0..4096 integer grid, y flipped.
+
+    The y axis MUST go through the Mercator projection first. Tiles are
+    square in projected metres, not in degrees, so interpolating latitude
+    linearly across a tile shears everything northward or southward —
+    subtly at high zoom, wildly at low zoom.
+    """
+    b = mercantile.xy_bounds(t)          # tile bounds in EPSG:3857 metres
+    dx = b.right - b.left
+    dy = b.top - b.bottom
 
     def fn(x, y, z=None):
         return (
-            [(px - b.west) / dx * EXTENT for px in x],
-            [EXTENT - (py - b.south) / dy * EXTENT for py in y],
+            [((px * MERC_MAX / 180.0) - b.left) / dx * EXTENT for px in x],
+            [EXTENT - (merc_y(py) - b.bottom) / dy * EXTENT for py in y],
         )
 
     return shp_transform(fn, geom)
