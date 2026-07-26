@@ -80,12 +80,38 @@ const EveryParkTiles = (() => {
         fill: V.publicFill,
         opacity: V.fillOpen,
         stroke: border,
-        // Hovering thickens the outline. This is the whole reason the
-        // border is drawn from the same rule as the fill.
-        width: (z, f) => keyOf(dataLayer, f) === hoverKey
-                       ? V.borderWeight * 2.8 : V.borderWeight
+        width: V.borderWeight      // the hover highlight is its own pass
       })
     };
+  }
+
+  // The hovered shape is redrawn on top of everything: a white casing, the
+  // owner's colour over it, and a brighter fill. Thickening the existing
+  // border was too subtle to read against satellite imagery.
+  function hoverRules() {
+    const V = CONFIG.visual;
+    const H = CONFIG.hover || {};
+    const isHot = dl => (z, f) => keyOf(dl, f) === hoverKey;
+    const rules = [];
+    for (const dl of Object.keys(OWNER)) {
+      rules.push({
+        dataLayer: dl, filter: isHot(dl),
+        symbolizer: new protomapsL.PolygonSymbolizer({
+          fill: H.fill || "#ffffff",
+          opacity: H.fillOpacity != null ? H.fillOpacity : 0.22,
+          stroke: H.casing || "#ffffff",
+          width: H.casingWidth || 7
+        })
+      });
+      rules.push({
+        dataLayer: dl, filter: isHot(dl),
+        symbolizer: new protomapsL.PolygonSymbolizer({
+          fill: V.publicFill, opacity: H.tint != null ? H.tint : 0.30,
+          stroke: OWNER[dl], width: H.width || 3.5
+        })
+      });
+    }
+    return rules;
   }
 
   function paintRules() {
@@ -109,7 +135,8 @@ const EveryParkTiles = (() => {
         symbolizer: new protomapsL.LineSymbolizer({
           color: B.color, width: B.weight, opacity: B.opacity
         })
-      }
+      },
+      ...hoverRules()          // last, so the highlight sits on top
     ];
   }
 

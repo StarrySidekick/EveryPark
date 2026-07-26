@@ -353,3 +353,72 @@ main { flex: 1; display: flex; position: relative; min-height: 0; }
     box-shadow: -4px 0 18px rgba(0,0,0,.2);
   }
 }
+
+/* ---------- Guide panel ---------- */
+#guideBtn {
+  background: rgba(255,255,255,.15);
+  border: none; color: #fff; border-radius: 20px;
+  padding: 6px 14px; font-size: .8rem; font-weight: 600; cursor: pointer;
+  align-self: flex-end;
+}
+#guideBtn:hover { background: rgba(255,255,255,.3); }
+
+#guideOverlay {
+  position: fixed; inset: 0; z-index: 2000;
+  background: rgba(16,24,20,.55);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+#guideOverlay[hidden] { display: none; }
+
+#guide {
+  background: #fff; border-radius: 16px;
+  max-width: 720px; width: 100%; max-height: 86vh;
+  overflow-y: auto; padding: 30px 34px 34px;
+  box-shadow: 0 18px 60px rgba(0,0,0,.4);
+  position: relative;
+  line-height: 1.6;
+}
+#guide h2 { font-size: 1.35rem; margin-bottom: 10px; }
+#guide .g-h3 { font-size: 1.05rem; margin: 26px 0 8px; }
+#guide .g-intro { font-size: .9rem; color: #47524d; margin-bottom: 6px; }
+
+#guideClose {
+  position: absolute; top: 14px; right: 16px;
+  background: none; border: none; font-size: 1.7rem; line-height: 1;
+  color: var(--muted); cursor: pointer; padding: 2px 8px; border-radius: 8px;
+}
+#guideClose:hover { background: #eef1ef; color: var(--text); }
+
+.g-cat {
+  border-top: 1px solid #eceeed;
+  padding: 16px 0 4px;
+  transition: background .3s;
+  border-radius: 8px;
+}
+.g-cat h3 { font-size: 1rem; display: flex; align-items: center; gap: 9px; margin-bottom: 6px; }
+.g-cat p { font-size: .88rem; margin-bottom: 7px; }
+.g-cat .g-why, .g-cat .g-acc { font-size: .84rem; color: #4b5651; }
+.g-sw {
+  width: 15px; height: 15px; border-radius: 4px;
+  border: 3px solid; background: rgba(67,160,71,.28);
+  flex-shrink: 0; display: inline-block;
+}
+.g-cat.g-flash { background: #fdf6e0; }
+
+.g-ex { font-size: .86rem; padding: 8px 0; border-bottom: 1px solid #f2f4f3; color: #4b5651; }
+.g-ex strong { color: var(--text); }
+
+/* Category badge in popups doubles as a link into the Guide */
+a.badge { text-decoration: none; cursor: pointer; }
+a.badge:hover { filter: brightness(1.15); text-decoration: underline; }
+
+/* Directions is the primary action */
+.popup-links a.primary {
+  background: var(--accent); color: #fff; border-color: var(--accent);
+}
+.popup-links a.primary:hover { filter: brightness(1.15); }
+
+@media (max-width: 760px) {
+  #guide { padding: 24px 20px 28px; max-height: 90vh; }
+}

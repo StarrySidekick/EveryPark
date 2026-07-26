@@ -33,6 +33,19 @@ const CONFIG = {
     }
   },
 
+  // ---- HOVER HIGHLIGHT ------------------------------------------------
+  // Drawn as its own pass on top of everything else: a white casing, the
+  // owner's colour over it, and a brighter fill. Turn the numbers up for a
+  // heavier effect, down for a subtler one.
+  hover: {
+    casing: "#ffffff",     // outer halo colour
+    casingWidth: 7,        // halo thickness
+    fill: "#ffffff",       // brightening wash under the tint
+    fillOpacity: 0.22,
+    tint: 0.30,            // extra green on top of the normal fill
+    width: 3.5             // the owner-coloured border while hovered
+  },
+
   // ---- MARKER ICONS -------------------------------------------------
   // Each park type points to an image file in the icons/ folder.
   // To use your own graphics: drop a .svg or .png in icons/ and
@@ -81,6 +94,54 @@ const CONFIG = {
     weight: 1,
     opacity: 0.45
   },
+
+  // ---- WHAT THE CATEGORIES MEAN --------------------------------------
+  // Shown in the Guide panel and linked from every popup, so the reasoning
+  // behind a classification is readable rather than implied. Edit freely —
+  // `what` is the definition, `why` explains how a place lands here, and
+  // `access` is the legal position.
+  categories: [
+    {
+      id: "state", label: "State land", swatch: "#1b5e20",
+      what: "Land owned by the State of Connecticut and managed by the Department of Energy and Environmental Protection — state parks, state forests, wildlife management areas, fish hatcheries, flood-control land and boat launches.",
+      why: "Classified from CT DEEP's own property layer, which is the authoritative record of what the state owns. The sub-label (State Park, State Forest, Wildlife Management Area…) comes straight from DEEP's category for that parcel.",
+      access: "Public by default. Some parks charge for parking rather than entry — Connecticut-registered vehicles park free under Passport to the Parks; out-of-state vehicles pay. Wildlife management areas are open but are working conservation land, not developed parks."
+    },
+    {
+      id: "national", label: "Federal land", swatch: "#6d4c41",
+      what: "Land owned by the federal government: the National Park Service, US Fish & Wildlife Service, and the Army Corps of Engineers. In Connecticut this is a short list, plus the Appalachian Trail's protective corridor.",
+      why: "Taken from a hand-checked list of federal sites, and from ownership codes in USGS PAD-US. The Appalachian Trail corridor appears because the NPS owns that land outright — it is genuinely public, though often only a narrow strip with private property either side.",
+      access: "Public by default. Individual refuges and historic sites keep their own hours, and a few have seasonal closures for nesting birds."
+    },
+    {
+      id: "town", label: "Town or city", swatch: "#1565c0",
+      what: "Municipal land: town and city parks, greens, recreation areas, town open space and the grounds of historic sites the town maintains.",
+      why: "Mostly from OpenStreetMap, filtered to places tagged as publicly accessible, plus municipally owned land recorded in PAD-US. Town greens and recreation grounds are tagged as land use rather than as parks, so they're pulled in separately.",
+      access: "Open to everyone. Connecticut town parks may not shut out non-residents — that was settled in Leydon v. Greenwich (2001), which struck down a residents-only beach rule. Towns may still charge non-residents more, and often do at beaches."
+    },
+    {
+      id: "preserve", label: "Land trust / non-profit", swatch: "#00838f",
+      what: "Nature preserves and open space held by land trusts, conservancies, Audubon, universities and similar non-profits.",
+      why: "From OpenStreetMap's nature reserves, classified by who operates them, and from PAD-US records where a non-profit owns the land. Water-company watershed land is excluded because it needs a permit, and members-only organisations are excluded entirely.",
+      access: "Usually open, but by the owner's permission rather than by legal right. Connecticut's Recreational Use Statute (CGS §§52-557f–i) protects landowners who allow free public recreation, which is why so much of this land is walkable. Respect posted signs — permission can be withdrawn."
+    },
+    {
+      id: "cemetery", label: "Cemetery", swatch: "#5e35b1",
+      what: "Municipal and non-profit burying grounds, including Connecticut's colonial-era ancient burying grounds.",
+      why: "From OpenStreetMap, excluding anything tagged private. Ones with historic naming — 'burying ground', 'ancient' — are labelled as historic burying grounds.",
+      access: "Open during daylight, and they are quiet public green space as well as places of burial. Tribal burial grounds are excluded from this map entirely: they are not visitor destinations."
+    }
+  ],
+
+  // What's deliberately left off the map, and why. Also shown in the Guide.
+  exclusions: [
+    ["Members-only land", "Golf and country clubs, yacht clubs, sportsmen's and rod-and-gun associations, beach and lake associations, homeowners' associations, scout reservations. The test is whether anyone can get in — paying is fine, belonging is not."],
+    ["Conservation easements on private land", "An easement restricts what an owner may build. It is not a right of way, and the land underneath stays private. These are recorded under the owner's name, which is why they arrive called things like '44 Sunny Ridge Road, LLC'."],
+    ["Private working land", "Farms, ranches and woodlots under agricultural or forest-stewardship easements. Protected, but somebody's livelihood rather than somewhere to visit."],
+    ["Tribal reservations and burial grounds", "Connecticut's reservations are sovereign land. Under CGS chapter 824 nobody may enter without the tribe's written permission."],
+    ["Land recorded as closed", "Places USGS records as closed to public access."],
+    ["Trails on their own", "A trail is a line, not a destination. The Blue-Blazed system is drawn as a layer, but individual paths don't get their own pins."]
+  ],
 
   // ---- THE DATASET ---------------------------------------------------
   // data/places.json is every public place, already classified, enriched

@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
   <!-- ?v= is a cache-buster: bump it on every deploy so visitors get fresh code -->
-  <link rel="stylesheet" href="styles.css?v=36">
+  <link rel="stylesheet" href="styles.css?v=50">
 </head>
 <body>
 
@@ -56,6 +56,7 @@
         </div>
       </div>
 
+      <button id="guideBtn" title="What the categories mean">? Guide</button>
       <button id="layersBtn" title="Extra map layers">⚙︎ Layers</button>
       <button id="listToggle">List</button>
     </div>
@@ -69,6 +70,31 @@
       <div class="lp-note">Trails and boundaries draw automatically as you zoom in.</div>
     </div>
   </header>
+
+  <div id="guideOverlay" hidden>
+    <div id="guide" role="dialog" aria-modal="true" aria-labelledby="guideTitle">
+      <button id="guideClose" aria-label="Close">×</button>
+      <h2 id="guideTitle">What's on this map</h2>
+      <p class="g-intro">Every place here is somewhere you can go outdoors in
+        Connecticut. They're grouped by <strong>who owns and runs the land</strong>,
+        because that's what decides whether you can walk in, what it's likely to
+        be like, and who to ask when something's unclear.</p>
+      <div id="guideCats"></div>
+      <h3 class="g-h3">What's deliberately left off</h3>
+      <p class="g-intro">The rule: paid-but-open-to-anyone stays, exclusive-entry
+        goes. A town beach charging non-residents is public. A members-only lake
+        association is not.</p>
+      <div id="guideExcl"></div>
+      <h3 class="g-h3">Where the data comes from</h3>
+      <p class="g-intro">CT DEEP's property records, the National Park Service,
+        US Fish &amp; Wildlife Service and Army Corps of Engineers, OpenStreetMap,
+        USGS PAD-US, and the Connecticut Forest &amp; Park Association's
+        Blue-Blazed trail system. Elevation comes from USGS 3DEP. Everything is
+        rebuilt from source rather than typed in by hand, so corrections belong
+        upstream — though a handful of places OpenStreetMap has never heard of
+        are added manually.</p>
+    </div>
+  </div>
 
   <main>
     <div id="map"></div>
@@ -106,8 +132,8 @@
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
   <script src="https://unpkg.com/protomaps-leaflet@4.0.1/dist/protomaps-leaflet.js"></script>
-  <script src="config.js?v=49"></script>
-  <script src="vectorlayers.js?v=49"></script>
-  <script src="app.js?v=49"></script>
+  <script src="config.js?v=50"></script>
+  <script src="vectorlayers.js?v=50"></script>
+  <script src="app.js?v=50"></script>
 </body>
 </html>

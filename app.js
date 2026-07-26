@@ -163,8 +163,16 @@
   // Park plumbing
   // ------------------------------------------------------------------
   function linksFor(p) {
-    const dir = `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}`;
-    let links = `<a href="${dir}" target="_blank" rel="noopener">Directions</a>`;
+    const dest = `${p.lat},${p.lng}`;
+    const label = encodeURIComponent(p.name);
+    // Getting there is the point of looking a place up, so directions are
+    // the primary action. Apple Maps is offered alongside because on an
+    // iPhone the Google link opens a browser rather than the map app.
+    let links =
+      `<a class="primary" href="https://www.google.com/maps/dir/?api=1&destination=${dest}"
+          target="_blank" rel="noopener">➜ Directions</a>` +
+      `<a href="https://maps.apple.com/?daddr=${dest}&q=${label}"
+          target="_blank" rel="noopener">Apple Maps</a>`;
     if (p.url) {
       links += `<a href="${p.url}" target="_blank" rel="noopener">Official site</a>`;
     } else {
@@ -232,7 +240,8 @@
     if (!p.access) classify(p);
     const acres = p.acres ? ` &middot; ${Number(p.acres).toLocaleString()} acres` : "";
     return `
-      <span class="badge ${p.type}">${typeLabel(p)}</span>
+      <a class="badge ${p.type}" href="#" data-cat="${p.type}"
+         title="What does this category mean?">${typeLabel(p)}</a>
       <div class="popup-name">${p.name}</div>
       <div class="popup-sub">${p.town || "Connecticut"}${acres}</div>
 
@@ -2279,6 +2288,67 @@
 
   document.querySelector("#legend .legend-title").addEventListener("click", () => {
     document.getElementById("legend").classList.toggle("collapsed");
+  });
+
+  // ------------------------------------------------------------------
+  // The Guide: what each category means and why a place lands in it.
+  // Built from CONFIG so the wording is editable without touching code.
+  // ------------------------------------------------------------------
+  function buildGuide() {
+    const cats = document.getElementById("guideCats");
+    if (!cats || !CONFIG.categories) return;
+    cats.innerHTML = CONFIG.categories.map(c => `
+      <section class="g-cat" id="cat-${c.id}">
+        <h3><span class="g-sw" style="border-color:${c.swatch}"></span>${c.label}</h3>
+        <p>${c.what}</p>
+        <p class="g-why"><strong>How a place lands here.</strong> ${c.why}</p>
+        <p class="g-acc"><strong>Can you go?</strong> ${c.access}</p>
+      </section>`).join("");
+    const ex = document.getElementById("guideExcl");
+    if (ex && CONFIG.exclusions) {
+      ex.innerHTML = CONFIG.exclusions.map(([t, d]) =>
+        `<div class="g-ex"><strong>${t}.</strong> ${d}</div>`).join("");
+    }
+  }
+
+  function openGuide(catId) {
+    const ov = document.getElementById("guideOverlay");
+    if (!ov) return;
+    ov.hidden = false;
+    const target = catId && document.getElementById("cat-" + catId);
+    const box = document.getElementById("guide");
+    if (target) {
+      target.classList.add("g-flash");
+      setTimeout(() => target.classList.remove("g-flash"), 1600);
+      box.scrollTop = target.offsetTop - 60;
+    } else if (box) {
+      box.scrollTop = 0;
+    }
+  }
+
+  function closeGuide() {
+    const ov = document.getElementById("guideOverlay");
+    if (ov) ov.hidden = true;
+  }
+
+  buildGuide();
+  const guideBtn = document.getElementById("guideBtn");
+  if (guideBtn) guideBtn.addEventListener("click", () => openGuide());
+  const guideClose = document.getElementById("guideClose");
+  if (guideClose) guideClose.addEventListener("click", closeGuide);
+  const guideOverlay = document.getElementById("guideOverlay");
+  if (guideOverlay) {
+    guideOverlay.addEventListener("click", e => {
+      if (e.target === guideOverlay) closeGuide();
+    });
+  }
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape") closeGuide();
+  });
+  // Popups link their category badge here.
+  document.addEventListener("click", e => {
+    const el = e.target.closest && e.target.closest("[data-cat]");
+    if (el) { e.preventDefault(); openGuide(el.getAttribute("data-cat")); }
   });
 
   // ------------------------------------------------------------------
