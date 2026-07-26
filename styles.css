@@ -238,7 +238,11 @@ main { flex: 1; display: flex; position: relative; min-height: 0; }
   opacity: .75; flex-shrink: 0;
 }
 .legend-note { margin-top: 6px; color: var(--muted); font-size: .66rem; }
-#legend.collapsed .legend-row, #legend.collapsed .legend-note { display: none; }
+#legend.collapsed .legend-row, #legend.collapsed .legend-note,
+#legend.collapsed .legend-padus { display: none; }
+.legend-padus { display: none; }
+#legend.padus .legend-padus { display: block; }
+.chip.attr[disabled] { opacity: .4; cursor: default; }
 #legend .legend-title { cursor: pointer; }
 
 @media (max-width: 760px) {

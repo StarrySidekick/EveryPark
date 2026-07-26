@@ -123,11 +123,16 @@ const CONFIG = {
   padus: {
     enabled: true,
     endpoints: [
-      "https://gis1.usgs.gov/arcgis/rest/services/padus4/Public_Access/MapServer/0",
-      "https://gis1.usgs.gov/arcgis/rest/services/padus3/Public_Access/MapServer/0",
-      "https://gis1.usgs.gov/arcgis/rest/services/padus4/Manager_Name/MapServer/0"
+      // Esri Living Atlas copy — public, no token, national coverage.
+      "https://services.arcgis.com/v01gqwM5QqNysAAi/arcgis/rest/services/Manager_Name_PADUS/FeatureServer/0",
+      // USGS's own service, if it ever comes back up.
+      "https://gis1.usgs.gov/arcgis/rest/services/padus4/Public_Access/MapServer/0"
     ],
-    matchRadiusM: 500
+    matchRadiusM: 500,
+    // Draw PAD-US polygons coloured by official access level.
+    showLayer: true,
+    minZoom: 11,
+    colors: { OA: "#2e9e4f", RA: "#e8a33d", XA: "#c0392b", UK: "#8e9a93" }
   },
 
   // ---- PROTECTED OPEN SPACE PARCELS ----------------------------------

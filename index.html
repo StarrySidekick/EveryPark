@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
   <!-- ?v= is a cache-buster: bump it on every deploy so visitors get fresh code -->
-  <link rel="stylesheet" href="styles.css?v=25">
+  <link rel="stylesheet" href="styles.css?v=26">
 </head>
 <body>
 
@@ -38,6 +38,7 @@
         <button class="chip attr" data-attr="playground">🛝 Playground</button>
         <button class="chip attr" data-attr="historic">🏛️ Historic</button>
       </div>
+      <button class="chip attr" id="padusToggle" disabled title="Official USGS access ratings: Open, Restricted or Closed">🔓 Access map</button>
       <button class="chip attr" id="bbToggle" title="Connecticut's Blue-Blazed Hiking Trail System — ~825 miles, much of it crossing private land">🔵 Blue-Blazed</button>
       <button class="chip attr" id="parcelToggle" title="CT DEEP's protected open space parcels — shows the real extent of protected land, including parcels nothing has named">🟧 Protected land</button>
       <button class="chip attr" id="gapToggle" title="Show trail networks that have no listed place — candidates we may be missing">🔎 Find gaps</button>
@@ -62,6 +63,13 @@
       <div class="legend-row"><span class="sw" style="background:#6b5b8e"></span>Cemetery</div>
       <div class="legend-row"><span class="sw" style="background:#ff9800"></span>Protected, owner unrecorded</div>
       <div class="legend-note">Unshaded = private land. Town, preserve and cemetery shapes appear as you zoom in.</div>
+      <div class="legend-padus">
+        <div class="legend-title" style="margin-top:8px">Access map (USGS PAD-US)</div>
+        <div class="legend-row"><span class="sw" style="background:#2e9e4f"></span>Open — just go</div>
+        <div class="legend-row"><span class="sw" style="background:#e8a33d"></span>Restricted — permit or limited hours</div>
+        <div class="legend-row"><span class="sw" style="background:#c0392b"></span>Closed — no public access</div>
+        <div class="legend-row"><span class="sw" style="background:#8e9a93"></span>Unknown</div>
+      </div>
     </div>
 
     <div id="credit">Data: CT DEEP · National Park Service · OpenStreetMap contributors</div>
@@ -70,7 +78,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
-  <script src="config.js?v=25"></script>
-  <script src="app.js?v=25"></script>
+  <script src="config.js?v=26"></script>
+  <script src="app.js?v=26"></script>
 </body>
 </html>

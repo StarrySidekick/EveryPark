@@ -1135,13 +1135,73 @@
 
   const ACCESS_WORD = { OA: "Open", RA: "Restricted", XA: "Closed", UK: "Unknown",
                         "Open Access": "Open", "Restricted Access": "Restricted",
-                        "Closed Access": "Closed", "Unknown": "Unknown" };
+                        "Closed": "Closed", "Closed Access": "Closed", "Unknown": "Unknown" };
+
+  // PAD-US owner codes, decoded for humans.
+  const OWNER_WORD = {
+    NPS: "National Park Service", FWS: "US Fish & Wildlife Service", USFS: "US Forest Service",
+    USACE: "Army Corps of Engineers", DOD: "Department of Defense", BLM: "Bureau of Land Management",
+    TRIB: "Tribal land", SPR: "State Parks & Recreation", SDC: "State Dept. of Conservation",
+    SFW: "State Fish & Wildlife", SDNR: "State Dept. of Natural Resources", OTHS: "State land",
+    CITY: "City", CNTY: "County", REG: "Regional agency", RWD: "Regional water district",
+    UNKL: "Local government", NGO: "Non-profit / land trust", PVT: "Private",
+    JNT: "Jointly held", DESG: "Designation", OTHR: "Other", UNK: "Unknown", OTHF: "Federal land"
+  };
+
+  // --- PAD-US access layer: the definitive public/private picture ------
+  map.createPane("padusPane");
+  map.getPane("padusPane").style.zIndex = 378;
+  const padusLayer = L.layerGroup();
+  const padusRenderer = L.canvas({ pane: "padusPane" });
+  const loadedPadusIds = new Set();
+  let padusOn = false, padusBase = null;
+
+  async function refreshPadusLayer() {
+    const P = CONFIG.padus;
+    if (!padusOn || !padusBase || map.getZoom() < P.minZoom) return;
+    const b = map.getBounds();
+    const bbox = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map(x => x.toFixed(4)).join(",");
+    try {
+      const body = new URLSearchParams({
+        where: "1=1", geometry: bbox, geometryType: "esriGeometryEnvelope",
+        inSR: "4326", outSR: "4326",
+        outFields: "OBJECTID,Unit_Nm,Pub_Access,Own_Name,Mang_Name,GIS_Acres",
+        returnGeometry: "true", maxAllowableOffset: "0.00008",
+        resultRecordCount: "900", f: "geojson"
+      });
+      const gj = await fetch(padusBase + "/query", { method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" }, body }).then(r => r.json());
+      for (const f of (gj.features || [])) {
+        const pr = f.properties || {};
+        const id = pr.OBJECTID || f.id;
+        if (id == null || loadedPadusIds.has(id)) continue;
+        loadedPadusIds.add(id);
+        const code = pr.Pub_Access || "UK";
+        const col = P.colors[code] || P.colors.UK;
+        const word = ACCESS_WORD[code] || code;
+        const owner = OWNER_WORD[pr.Own_Name] || pr.Own_Name || "Unknown";
+        L.geoJSON(f, {
+          renderer: padusRenderer, pane: "padusPane",
+          style: { color: col, weight: 1, opacity: 0.9, fillColor: col, fillOpacity: 0.35 }
+        }).bindPopup(
+          `<span class="badge" style="background:${col}">${word} access</span>
+           <div class="popup-name">${pr.Unit_Nm || "Protected area"}</div>
+           <div class="popup-sub">Owner: ${owner}${pr.GIS_Acres ? " &middot; " + Number(pr.GIS_Acres).toLocaleString() + " acres" : ""}</div>
+           <div class="popup-fee">Official classification from USGS PAD-US, the national protected-areas inventory.
+           <strong>Open</strong> = no special requirement to enter. <strong>Restricted</strong> = permit, registration or limited hours.
+           <strong>Closed</strong> = no public access.</div>`
+        ).addTo(padusLayer);
+      }
+    } catch (e) { console.warn("PAD-US layer failed:", e); }
+  }
 
   async function loadPadus() {
     if (!CONFIG.padus.enabled) return;
     let base = null;
     try { base = await probePadus(); } catch (e) { return; }
     if (!base) { console.info("PAD-US unavailable — skipping official access ratings."); return; }
+    padusBase = base;
+    document.getElementById("padusToggle").removeAttribute("disabled");
     try {
       showStatus("Applying official PAD-US access ratings…");
       const areas = [];
@@ -1169,7 +1229,7 @@
         if (!word) continue;
         const A = p.attrs || (p.attrs = {});
         A.officialAccess = word;
-        if (best.own) A.officialOwner = best.own;
+        if (best.own) A.officialOwner = OWNER_WORD[best.own] || best.own;
         if (word === "Open") { A.visitable = true; A.accessNote = "Open to the public (USGS PAD-US)"; }
         else if (word === "Closed") { A.visitable = false; A.accessNote = "Closed to public access (USGS PAD-US)"; }
         else if (word === "Restricted") { A.accessNote = "Restricted access (USGS PAD-US) — check before visiting"; }
@@ -1491,7 +1551,9 @@
 
   map.on("moveend zoomend", () => {
     clearTimeout(overlayTimer);
-    overlayTimer = setTimeout(() => { refreshOverlays(); refreshTrailLines(); refreshParcels(); }, 350);
+    overlayTimer = setTimeout(() => {
+      refreshOverlays(); refreshTrailLines(); refreshParcels(); refreshPadusLayer();
+    }, 350);
   });
 
   // ------------------------------------------------------------------
@@ -1594,6 +1656,27 @@
   document.getElementById("search").addEventListener("input", (e) => {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => { searchTerm = e.target.value.trim().toLowerCase(); refresh(); }, 180);
+  });
+
+  document.getElementById("padusToggle").addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
+    if (map.hasLayer(padusLayer)) {
+      map.removeLayer(padusLayer);
+      padusOn = false;
+      btn.classList.remove("active");
+      document.getElementById("legend").classList.remove("padus");
+    } else {
+      if (!padusBase) { showStatus("Still checking PAD-US…"); setTimeout(hideStatus, 2500); return; }
+      padusOn = true;
+      btn.classList.add("active");
+      padusLayer.addTo(map);
+      document.getElementById("legend").classList.add("padus");
+      if (map.getZoom() < CONFIG.padus.minZoom) {
+        showStatus("Zoom in to see official access areas");
+        setTimeout(hideStatus, 3000);
+      }
+      await refreshPadusLayer();
+    }
   });
 
   document.getElementById("parcelToggle").addEventListener("click", async (e) => {
