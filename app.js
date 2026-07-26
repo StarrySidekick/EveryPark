@@ -1148,6 +1148,18 @@
     JNT: "Jointly held", DESG: "Designation", OTHR: "Other", UNK: "Unknown", OTHF: "Federal land"
   };
 
+  // Designation types worth spelling out — they explain the access rating.
+  const DESIG_WORD = {
+    PAGR: "Private agricultural", PRAN: "Private ranch", PFOR: "Private forest stewardship",
+    PCON: "Private conservation", PPRK: "Private park", PREC: "Private recreation",
+    CONE: "Conservation easement", AGRE: "Agricultural easement", RANE: "Ranch easement",
+    FORE: "Forest stewardship easement", RECE: "Recreation easement", OTHE: "Easement",
+    UNKE: "Easement (type unrecorded)", SP: "State park", SCA: "State conservation area",
+    SREC: "State recreation area", LP: "Local park", LCA: "Local conservation area",
+    LREC: "Local recreation area", NWR: "National wildlife refuge", NP: "National park",
+    NT: "National scenic or historic trail", WPA: "Watershed protection area"
+  };
+
   // --- PAD-US access layer: the definitive public/private picture ------
   map.createPane("padusPane");
   map.getPane("padusPane").style.zIndex = 378;
@@ -1180,16 +1192,29 @@
         const col = P.colors[code] || P.colors.UK;
         const word = ACCESS_WORD[code] || code;
         const owner = OWNER_WORD[pr.Own_Name] || pr.Own_Name || "Unknown";
+        const desg = DESIG_WORD[pr.Des_Tp] || "";
+        // "Restricted" on land-trust or private conservation land almost
+        // always means "walkable by permission, not by legal right" —
+        // not "keep out". Say so, or the map scares people off land
+        // they're welcome on.
+        const byPermission = /NGO|PVT|UNK/.test(pr.Own_Name || "") &&
+                             /^(RA|UK)$/.test(code);
+        const explain = code === "OA"
+          ? "No special requirement to enter."
+          : code === "XA"
+          ? "No public access permitted."
+          : byPermission
+          ? "<strong>Restricted doesn't necessarily mean closed.</strong> On land-trust and private conservation land it usually means there's no guaranteed <em>right</em> of access — you're there by the owner's permission, which they can vary or withdraw. Many such places are walked freely every day. Check the owner's website or posted signs."
+          : "Requires a permit, registration, or has limited hours.";
         L.geoJSON(f, {
           renderer: padusRenderer, pane: "padusPane",
           style: { color: col, weight: 1, opacity: 0.9, fillColor: col, fillOpacity: 0.35 }
         }).bindPopup(
           `<span class="badge" style="background:${col}">${word} access</span>
-           <div class="popup-name">${pr.Unit_Nm || "Protected area"}</div>
-           <div class="popup-sub">Owner: ${owner}${pr.GIS_Acres ? " &middot; " + Number(pr.GIS_Acres).toLocaleString() + " acres" : ""}</div>
-           <div class="popup-fee">Official classification from USGS PAD-US, the national protected-areas inventory.
-           <strong>Open</strong> = no special requirement to enter. <strong>Restricted</strong> = permit, registration or limited hours.
-           <strong>Closed</strong> = no public access.</div>`
+           <div class="popup-name">${pr.Unit_Nm && pr.Unit_Nm !== "Unknown" ? pr.Unit_Nm : "Protected area"}</div>
+           <div class="popup-sub">Owner: ${owner}${desg ? " &middot; " + desg : ""}${pr.GIS_Acres ? " &middot; " + Number(pr.GIS_Acres).toLocaleString() + " acres" : ""}</div>
+           <div class="popup-fee">${explain}</div>
+           <div class="popup-fee" style="opacity:.7">Classification from USGS PAD-US.</div>`
         ).addTo(padusLayer);
       }
     } catch (e) { console.warn("PAD-US layer failed:", e); }
