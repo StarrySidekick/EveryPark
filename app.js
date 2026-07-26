@@ -437,6 +437,97 @@
   }
 
   // ------------------------------------------------------------------
+  // Boat launches and water access — DEEP publishes these separately
+  // from its property layer.
+  // ------------------------------------------------------------------
+  function fetchBoatLaunches() {
+    return cachedDataset("ctparks_boat_v1", CONFIG.municipal.cacheDays, async () => {
+      const body = new URLSearchParams({
+        where: "1=1", outFields: "ACCSS_NAME,PROPERTY,ACCSS_TOWN,WATERBODY,TRAILER,CARRY_IN,HANDICAP,LINK",
+        outSR: "4326", returnGeometry: "true", resultRecordCount: "200", f: "json"
+      });
+      const j = await fetch(CONFIG.boatLaunches.url, { method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" }, body }).then(r => r.json());
+      return (j.features || []).filter(f => f.geometry).map(f => {
+        const a = f.attributes;
+        return { n: a.ACCSS_NAME || a.PROPERTY, town: a.ACCSS_TOWN || "",
+                 w: a.WATERBODY || "", trailer: a.TRAILER, carry: a.CARRY_IN,
+                 hc: a.HANDICAP, url: a.LINK || null,
+                 lat: +f.geometry.y.toFixed(5), lng: +f.geometry.x.toFixed(5) };
+      });
+    });
+  }
+
+  async function loadBoatLaunches() {
+    if (!CONFIG.boatLaunches.enabled) return;
+    try {
+      for (const b of await fetchBoatLaunches()) {
+        if (!b.n) continue;
+        const bits = [];
+        if (b.w) bits.push("On " + b.w + ".");
+        const kinds = [];
+        if (/y|1|true/i.test(String(b.trailer))) kinds.push("trailer launch");
+        if (/y|1|true/i.test(String(b.carry))) kinds.push("car-top / carry-in");
+        if (kinds.length) bits.push("Suitable for " + kinds.join(" and ") + ".");
+        if (/y|1|true/i.test(String(b.hc))) bits.push("Accessible facilities.");
+        addPark({
+          name: b.n, type: "state", subtype: "Boat Launch / Water Access",
+          lat: b.lat, lng: b.lng, town: b.town || findTown(b.lat, b.lng),
+          url: b.url, agency: "CT DEEP", note: bits.join(" ") || null,
+          attrs: { water: true, waterName: b.w || "Water access", parking: true }
+        });
+      }
+      refresh();
+    } catch (e) { console.warn("Boat launches failed:", e); }
+  }
+
+  // ------------------------------------------------------------------
+  // Museum & historic-site grounds. OSM rarely records admission, so we
+  // only take sites that are explicitly free or tagged historic, and we
+  // word the popup so nobody assumes the building is free too.
+  // ------------------------------------------------------------------
+  function fetchMuseums() {
+    return cachedDataset("ctparks_museum_v1", CONFIG.municipal.cacheDays, async () => {
+      const out = [];
+      await pagedQuery(CONFIG.museums.url, {
+        where: "tourism='museum' AND name IS NOT NULL AND historic IS NOT NULL",
+        outFields: "name,historic,operator,website",
+        returnGeometry: "false", returnCentroid: "true"
+      }, f => {
+        const a = f.attributes, c = f.centroid;
+        if (!a.name || !c) return;
+        out.push({ n: a.name, lat: +c.y.toFixed(5), lng: +c.x.toFixed(5),
+                   h: a.historic || "", op: a.operator || "",
+                   w: (a.website && /^https?:/i.test(a.website)) ? a.website : null });
+      });
+      return out;
+    });
+  }
+
+  async function loadMuseums() {
+    if (!CONFIG.museums.enabled) return;
+    try {
+      const items = await fetchMuseums();
+      const existing = new Set(allParks.map(p =>
+        p.name.toLowerCase() + "|" + Math.round(p.lat * 300) + "|" + Math.round(p.lng * 300)));
+      for (const m of items) {
+        const key = m.n.toLowerCase() + "|" + Math.round(m.lat * 300) + "|" + Math.round(m.lng * 300);
+        if (existing.has(key)) continue;
+        existing.add(key);
+        const town = findTown(m.lat, m.lng);
+        if (!town) continue;
+        addPark({
+          name: m.n, type: "town", subtype: "Historic Site Grounds",
+          lat: m.lat, lng: m.lng, town, url: m.w, agency: m.op || null,
+          note: "Grounds are usually open and free to walk; admission to the building may be charged. Check before visiting.",
+          attrs: { historic: true }
+        });
+      }
+      refresh();
+    } catch (e) { console.warn("Museums failed:", e); }
+  }
+
+  // ------------------------------------------------------------------
   // State land beyond parks and forests: Wildlife Management Areas,
   // sanctuaries, flood control land and hatcheries. All public.
   // ------------------------------------------------------------------
@@ -1114,6 +1205,46 @@
     }
   }
 
+  // --- Blue-Blazed Hiking Trail System (CFPA) -------------------------
+  // Loaded once for the whole state — only 351 segments — so the network
+  // reads at any zoom. Own pane above the OSM paths.
+  map.createPane("bbPane");
+  map.getPane("bbPane").style.zIndex = 395;
+  const bbLayer = L.layerGroup();
+  let bbLoaded = false;
+
+  async function loadBlueBlazed() {
+    if (bbLoaded || !CONFIG.blueBlazed.enabled) return;
+    const B = CONFIG.blueBlazed;
+    showStatus("Loading Blue-Blazed trails…");
+    try {
+      const body = new URLSearchParams({
+        where: "1=1", outFields: "TrailName,Blaze,Length",
+        outSR: "4326", returnGeometry: "true",
+        maxAllowableOffset: "0.0002", geometryPrecision: "5",
+        resultRecordCount: "400", f: "geojson"
+      });
+      const gj = await fetch(B.url, { method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" }, body }).then(r => r.json());
+      for (const f of (gj.features || [])) {
+        const p = f.properties || {};
+        const miles = p.Length ? (+p.Length).toFixed(1) + " mi" : "";
+        const line = L.geoJSON(f, { pane: "bbPane",
+          style: { color: B.color, weight: B.weight, opacity: B.opacity } });
+        line.bindPopup(
+          `<span class="badge" style="background:${B.color}">Blue-Blazed Trail</span>
+           <div class="popup-name">${p.TrailName || "Blue-Blazed Trail"}</div>
+           <div class="popup-sub">${[p.Blaze ? p.Blaze + " blaze" : "", miles].filter(Boolean).join(" &middot; ")}</div>
+           <div class="popup-fee">Part of the Connecticut Forest &amp; Park Association's Blue-Blazed system (~825 miles, since 1929). Much of it crosses private land by easement or landowner permission — <strong>the footpath is public, the land beside it often isn't</strong>. Stay on the trail.</div>`
+        );
+        if (p.TrailName) line.bindTooltip(p.TrailName, { sticky: true });
+        bbLayer.addLayer(line);
+      }
+      bbLoaded = true;
+    } catch (e) { console.warn("Blue-Blazed load failed:", e); }
+    hideStatus();
+  }
+
   // --- Visible trail lines -------------------------------------------
   async function refreshTrailLines() {
     const T = CONFIG.trailLines;
@@ -1259,6 +1390,18 @@
     searchTimer = setTimeout(() => { searchTerm = e.target.value.trim().toLowerCase(); refresh(); }, 180);
   });
 
+  document.getElementById("bbToggle").addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
+    if (map.hasLayer(bbLayer)) {
+      map.removeLayer(bbLayer);
+      btn.classList.remove("active");
+    } else {
+      btn.classList.add("active");
+      await loadBlueBlazed();
+      bbLayer.addTo(map);
+    }
+  });
+
   document.getElementById("gapToggle").addEventListener("click", async (e) => {
     const btn = e.currentTarget;
     if (map.hasLayer(gapLayer)) {
@@ -1276,7 +1419,8 @@
   });
 
   // ------------------------------------------------------------------
-  loadStatic().then(loadStateExtra).then(fetchMunicipal).then(loadExtraLanduse)
+  loadStatic().then(loadStateExtra).then(loadBoatLaunches).then(fetchMunicipal)
+              .then(loadExtraLanduse).then(loadMuseums)
               .then(loadPreserves).then(loadCemeteries)
               .then(enrich).then(refreshOverlays).then(refreshTrailLines).catch(err => {
     console.error(err);

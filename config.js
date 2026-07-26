@@ -96,6 +96,31 @@ const CONFIG = {
     serviceUrl: "https://services6.arcgis.com/Do88DoK2xjTUCXd1/ArcGIS/rest/services/OSM_NA_Landuse/FeatureServer/0/query"
   },
 
+  // ---- BLUE-BLAZED HIKING TRAILS -------------------------------------
+  // The CFPA system: ~825 miles, running since 1929. Much of it crosses
+  // PRIVATE land by easement or landowner permission — the footpath is
+  // public, the land beside it usually isn't. Drawn in blaze blue.
+  blueBlazed: {
+    enabled: true,
+    url: "https://services1.arcgis.com/FjPcSmEFuDYlIdKC/ArcGIS/rest/services/BlueBlazedHikingTrails/FeatureServer/0/query",
+    color: "#2f6fed",
+    weight: 2.6,
+    opacity: 0.95,
+    minZoom: 9
+  },
+
+  // ---- BOAT LAUNCHES & WATER ACCESS ----------------------------------
+  boatLaunches: {
+    enabled: true,
+    url: "https://services1.arcgis.com/FjPcSmEFuDYlIdKC/ArcGIS/rest/services/DEEP_State_Trailered_Boat_Launches/FeatureServer/0/query"
+  },
+
+  // ---- MUSEUM & HISTORIC SITE GROUNDS --------------------------------
+  museums: {
+    enabled: true,
+    url: "https://services6.arcgis.com/Do88DoK2xjTUCXd1/ArcGIS/rest/services/OSM_NA_Tourism/FeatureServer/0/query"
+  },
+
   // ---- OTHER STATE LAND ---------------------------------------------
   // DEEP owns far more than parks and forests. Wildlife Management
   // Areas alone are 30,000+ acres of public land, all open for hiking.
