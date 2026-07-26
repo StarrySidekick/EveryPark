@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
   <!-- ?v= is a cache-buster: bump it on every deploy so visitors get fresh code -->
-  <link rel="stylesheet" href="styles.css?v=28">
+  <link rel="stylesheet" href="styles.css?v=29">
 </head>
 <body>
 
@@ -22,27 +22,51 @@
       <span class="tagline" id="tagline"></span>
     </div>
     <div class="controls">
-      <input id="search" type="search" placeholder="Search parks or towns…" autocomplete="off">
-      <div class="chips">
-        <button class="chip active" data-type="state"><span class="dot"></span>State</button>
-        <button class="chip active" data-type="national"><span class="dot"></span>Federal</button>
-        <button class="chip active" data-type="town"><span class="dot"></span>Town</button>
-        <button class="chip active" data-type="preserve"><span class="dot"></span>Preserves</button>
-        <button class="chip" data-type="cemetery"><span class="dot"></span>Cemeteries</button>
+      <input id="search" type="search" placeholder="Search a place, town or steward…" autocomplete="off">
+
+      <div class="group" title="Can you go there?">
+        <span class="glabel">Can I go?</span>
+        <div class="chips">
+          <button class="chip acc active" data-access="open">Open to all</button>
+          <button class="chip acc active" data-access="permission">By permission</button>
+          <button class="chip acc" data-access="unknown">Unverified</button>
+        </div>
       </div>
-      <div class="chips" id="attrChips" title="Filter by feature">
-        <button class="chip attr" data-attr="visitable" title="Only show places with a mapped trail, parking or facilities">🚶 Visitable</button>
-        <button class="chip attr" data-attr="water">🌊 Water</button>
-        <button class="chip attr" data-attr="trails">🥾 Trails</button>
-        <button class="chip attr" data-attr="sports">🏀 Sports</button>
-        <button class="chip attr" data-attr="playground">🛝 Playground</button>
-        <button class="chip attr" data-attr="historic">🏛️ Historic</button>
+
+      <div class="group" title="Who owns and maintains the land">
+        <span class="glabel">Who runs it</span>
+        <div class="chips">
+          <button class="chip active" data-type="state"><span class="dot"></span>State</button>
+          <button class="chip active" data-type="national"><span class="dot"></span>Federal</button>
+          <button class="chip active" data-type="town"><span class="dot"></span>Town</button>
+          <button class="chip active" data-type="preserve"><span class="dot"></span>Land trust</button>
+          <button class="chip" data-type="cemetery"><span class="dot"></span>Cemetery</button>
+        </div>
       </div>
-      <button class="chip attr" id="padusToggle" disabled title="Official USGS access ratings: Open, Restricted or Closed">🔓 Access map</button>
-      <button class="chip attr" id="bbToggle" title="Connecticut's Blue-Blazed Hiking Trail System — ~825 miles, much of it crossing private land">🔵 Blue-Blazed</button>
-      <button class="chip attr" id="parcelToggle" title="CT DEEP's protected open space parcels — shows the real extent of protected land, including parcels nothing has named">🟧 Protected land</button>
-      <button class="chip attr" id="gapToggle" title="Show trail networks that have no listed place — candidates we may be missing">🔎 Find gaps</button>
+
+      <div class="group" title="What's actually there">
+        <span class="glabel">What's there</span>
+        <div class="chips" id="attrChips">
+          <button class="chip attr" data-attr="trails">🥾 Trails</button>
+          <button class="chip attr" data-attr="water">🌊 Water</button>
+          <button class="chip attr" data-attr="sports">🏀 Sports</button>
+          <button class="chip attr" data-attr="playground">🛝 Playground</button>
+          <button class="chip attr" data-attr="historic">🏛️ Historic</button>
+          <button class="chip attr" data-attr="parking">🅿️ Parking</button>
+        </div>
+      </div>
+
+      <button id="layersBtn" title="Extra map layers">⚙︎ Layers</button>
       <button id="listToggle">List</button>
+    </div>
+
+    <div id="layersPanel" hidden>
+      <div class="lp-title">Map layers</div>
+      <button class="chip attr" id="padusToggle" disabled title="Official USGS access ratings">🔓 Official access map</button>
+      <button class="chip attr" id="bbToggle" title="~825 miles, much of it crossing private land">🔵 Blue-Blazed trails</button>
+      <button class="chip attr" id="parcelToggle" title="Protected parcels with no recorded owner">🟧 Protected land</button>
+      <button class="chip attr" id="gapToggle" title="Trail networks with no listed place">🔎 Find gaps</button>
+      <div class="lp-note">Trails and boundaries draw automatically as you zoom in.</div>
     </div>
   </header>
 
@@ -78,7 +102,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
-  <script src="config.js?v=28"></script>
-  <script src="app.js?v=28"></script>
+  <script src="config.js?v=29"></script>
+  <script src="app.js?v=29"></script>
 </body>
 </html>

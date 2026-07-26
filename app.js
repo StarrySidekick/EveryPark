@@ -172,17 +172,33 @@
     return out;
   }
 
+  const ACCESS_ICON = { open: "✅", permission: "🤝", closed: "⛔", unknown: "❓" };
+
   function popupHtml(p) {
+    if (!p.access) classify(p);
     const acres = p.acres ? ` &middot; ${Number(p.acres).toLocaleString()} acres` : "";
     return `
       <span class="badge ${p.type}">${typeLabel(p)}</span>
       <div class="popup-name">${p.name}</div>
       <div class="popup-sub">${p.town || "Connecticut"}${acres}</div>
-      ${tagsHtml(p)}${accessHtml(p)}${feeHtml(p)}
+
+      <div class="pblock acc-${p.access}">
+        <div class="pb-head">${ACCESS_ICON[p.access]} ${p.accessLabel}</div>
+        <div class="pb-body">${p.accessWhy}</div>
+      </div>
+
+      <div class="pblock plain">
+        <div class="pb-head">Maintained by</div>
+        <div class="pb-body">${p.steward}</div>
+      </div>
+
+      ${tagsHtml(p)}
+      ${feeHtml(p)}
       <div class="popup-links">${linksFor(p)}</div>`;
   }
 
   function addPark(p) {
+    classify(p);
     for (const al of ALIASES) {
       if (al.match && al.match.toLowerCase() === String(p.name).toLowerCase()) {
         p.aka = al.aka || [];
@@ -241,13 +257,18 @@
   // data/additions.json. People search for the road or farm they know.
   let ALIASES = [];
 
+  const activeAccess = new Set(["open", "permission"]);   // can I go there?
+
   function visible(p) {
+    if (!p.access) classify(p);
+    if (p.access === "closed") return false;              // never show closed land
+    if (!activeAccess.has(p.access)) return false;
     if (!activeTypes.has(p.type)) return false;
     for (const a of activeAttrs) if (!p.attrs || !p.attrs[a]) return false;
     if (!searchTerm) return true;
     // Match on everything a person might reasonably type: the name, the
     // town, what kind of place it is, who runs it, and any local alias.
-    if (!p._hay) p._hay = [p.name, p.town, p.subtype, p.agency, (p.aka || []).join(" ")]
+    if (!p._hay) p._hay = [p.name, p.town, p.subtype, p.steward, p.agency, (p.aka || []).join(" ")]
       .filter(Boolean).join(" ").toLowerCase();
     return p._hay.includes(searchTerm);
   }
@@ -267,8 +288,9 @@
       const div = document.createElement("div");
       div.className = "park-item";
       div.innerHTML = `<img src="${CONFIG.icons[p.type].file}" alt="">
-        <div><div class="pi-name">${p.name}</div>
-        <div class="pi-sub">${typeLabel(p)}${p.town ? " · " + p.town : ""}</div></div>`;
+        <div><div class="pi-name">${ACCESS_ICON[p.access] || ""} ${p.name}</div>
+        <div class="pi-sub">${typeLabel(p)}${p.town ? " · " + p.town : ""}</div>
+        <div class="pi-steward">${p.steward || ""}</div></div>`;
       div.addEventListener("click", () => {
         map.flyTo([p.lat, p.lng], Math.max(map.getZoom(), 13), { duration: 0.7 });
         setTimeout(() => { cluster.zoomToShowLayer(p.marker, () => p.marker.openPopup()); }, 750);
@@ -1355,14 +1377,74 @@
     } catch (e) { console.warn("PAD-US places failed:", e); hideStatus(); }
   }
 
-  // A mapped trail is the strongest evidence a place is actually walkable.
+  // ------------------------------------------------------------------
+  // The three questions this map exists to answer:
+  //   1. Can I go there?      -> p.access   open | permission | unknown
+  //   2. Who maintains it?    -> p.steward
+  //   3. What kind of place?  -> p.kind  (+ p.attrs for what's there)
+  // Everything else is presentation.
+  // ------------------------------------------------------------------
+  const STEWARD_BY_TYPE = {
+    state: "State of Connecticut (DEEP)",
+    national: "Federal government",
+    town: "Town or city",
+    preserve: "Land trust or non-profit",
+    cemetery: "Cemetery association or town"
+  };
+
+  function classify(p) {
+    const A = p.attrs || (p.attrs = {});
+
+    // --- 1. Can I go there? ---
+    // Official rating wins. Otherwise: state, federal and town land is
+    // public by default; land trust land is open by permission, which in
+    // Connecticut is the normal arrangement rather than an exception.
+    if (A.officialAccess === "Open")            p.access = "open";
+    else if (A.officialAccess === "Closed")     p.access = "closed";
+    else if (A.officialAccess === "Restricted") p.access = "permission";
+    else if (p.type === "state" || p.type === "national" || p.type === "town")
+                                                p.access = "open";
+    else if (p.type === "preserve" || p.type === "cemetery")
+                                                p.access = "permission";
+    else                                        p.access = "unknown";
+
+    // Somewhere with no trail, no parking and no facilities is a place we
+    // can't vouch for, whoever owns it.
+    A.visitable = !!(A.trails || A.parking || A.sports || A.playground || A.beach || A.pool);
+    if (!A.visitable && p.access !== "closed" && !A.officialAccess) p.access = "unknown";
+
+    p.accessLabel = { open: "Open to all", permission: "Open by permission",
+                      closed: "Closed to the public", unknown: "Access unverified" }[p.access];
+    p.accessWhy =
+      p.access === "open"
+        ? (A.officialAccess === "Open" ? "Officially open (USGS PAD-US)."
+           : p.type === "state" ? "State land — public by default."
+           : p.type === "national" ? "Federal land — public by default."
+           : "Municipal land — Connecticut town parks must admit non-residents.")
+      : p.access === "permission"
+        ? "Privately held but customarily open. You're here by the owner's permission, not by legal right — Connecticut's Recreational Use Statute is what makes this common. Respect posted signs."
+      : p.access === "closed"
+        ? "Recorded as closed to public access."
+      : "We found no trail, parking or facility here, and no official rating. It may still be open — we just can't confirm it.";
+
+    // --- 2. Who maintains it? ---
+    p.steward = A.officialOwner || p.agency || STEWARD_BY_TYPE[p.type] || "Unknown";
+
+    // --- 3. What kind of place? ---
+    p.kind = p.subtype || { state: "State Park", national: "Federal Land",
+                            town: "Town Park", preserve: "Preserve",
+                            cemetery: "Cemetery" }[p.type] || "Public land";
+  }
+
+  // Kept for the trail pass, which re-scores then re-classifies.
   function scoreAccess(p) {
     const A = p.attrs || (p.attrs = {});
     A.visitable = !!(A.trails || A.parking || A.sports || A.playground || A.beach || A.pool);
     A.accessNote = A.trails ? "Trails mapped"
                  : A.parking ? "Parking nearby, no mapped trail"
                  : A.visitable ? "Facilities on site"
-                 : "No mapped trail or parking — access unverified";
+                 : "No mapped trail or parking";
+    classify(p);
   }
 
   async function applyTrailAccess() {
@@ -1754,6 +1836,28 @@
       refresh();
       if (t === "cemetery") { loadedOverlayIds.clear(); overlayLayer.clearLayers(); refreshOverlays(); }
     });
+  });
+
+  document.querySelectorAll(".chip[data-access]").forEach(chip => {
+    chip.addEventListener("click", () => {
+      const a = chip.dataset.access;
+      if (activeAccess.has(a)) { activeAccess.delete(a); chip.classList.remove("active"); }
+      else { activeAccess.add(a); chip.classList.add("active"); }
+      refresh();
+    });
+  });
+
+  const layersPanel = document.getElementById("layersPanel");
+  document.getElementById("layersBtn").addEventListener("click", (e) => {
+    layersPanel.hidden = !layersPanel.hidden;
+    e.currentTarget.classList.toggle("active", !layersPanel.hidden);
+  });
+  document.addEventListener("click", (e) => {
+    if (!layersPanel.hidden && !layersPanel.contains(e.target) &&
+        e.target.id !== "layersBtn") {
+      layersPanel.hidden = true;
+      document.getElementById("layersBtn").classList.remove("active");
+    }
   });
 
   document.querySelectorAll(".chip[data-attr]").forEach(chip => {

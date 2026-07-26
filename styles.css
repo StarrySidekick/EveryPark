@@ -83,6 +83,58 @@ header .tagline { font-size: .78rem; opacity: .85; display: block; font-weight: 
 .chip.attr { border-style: dashed; opacity: .85; padding: 5px 10px; }
 .chip.attr.active { border-style: solid; opacity: 1; }
 
+/* ---------- Grouped controls ---------- */
+.group { display: flex; flex-direction: column; gap: 3px; }
+.glabel {
+  font-size: .58rem;
+  text-transform: uppercase;
+  letter-spacing: .09em;
+  opacity: .62;
+  padding-left: 2px;
+}
+.chip.acc { border-width: 2px; }
+.chip.acc.active[data-access="open"]       { background:#e6f6ec; color:#1d6b3f; border-color:#e6f6ec; }
+.chip.acc.active[data-access="permission"] { background:#fdf3e3; color:#8a5a1b; border-color:#fdf3e3; }
+.chip.acc.active[data-access="unknown"]    { background:#eef0ef; color:#4a544f; border-color:#eef0ef; }
+
+#layersBtn {
+  background: rgba(255,255,255,.15);
+  border: none; color: #fff; border-radius: 20px;
+  padding: 6px 14px; font-size: .8rem; font-weight: 600; cursor: pointer;
+  align-self: flex-end;
+}
+#layersBtn:hover, #layersBtn.active { background: rgba(255,255,255,.3); }
+
+#layersPanel {
+  position: absolute;
+  top: 100%; right: 14px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 6px 22px rgba(0,0,0,.28);
+  padding: 12px;
+  z-index: 1400;
+  display: flex; flex-direction: column; gap: 7px;
+  min-width: 215px;
+}
+#layersPanel .lp-title { font-size: .7rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--muted); }
+#layersPanel .chip { color: var(--text); border-color: #d6ddd8; justify-content: flex-start; }
+#layersPanel .chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+#layersPanel .lp-note { font-size: .66rem; color: var(--muted); margin-top: 2px; }
+
+/* ---------- Popup blocks ---------- */
+.pblock { border-radius: 7px; padding: 6px 9px; margin-bottom: 7px; }
+.pblock .pb-head { font-weight: 700; font-size: .78rem; }
+.pblock .pb-body { font-size: .71rem; margin-top: 2px; line-height: 1.4; }
+.pblock.acc-open       { background: #e8f4ec; color: #1d6b3f; }
+.pblock.acc-permission { background: #fdf1e3; color: #8a5a1b; }
+.pblock.acc-unknown    { background: #eef0ef; color: #4a544f; }
+.pblock.acc-closed     { background: #fbe9e7; color: #a3352a; }
+.pblock.plain          { background: #f4f6f5; color: #33403a; }
+.pblock.plain .pb-body { font-size: .76rem; font-weight: 600; }
+
+.pi-steward { font-size: .68rem; color: var(--muted); margin-top: 1px; }
+
 .popup-tags { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 8px; }
 .popup-tags .tag {
   font-size: .72rem;
