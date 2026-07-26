@@ -2311,7 +2311,7 @@
       // Plain fetch, not force-cache: force-cache happily returns a stale
       // 404 from before this file existed, which silently drops the whole
       // map back to the slow live path. Normal HTTP caching is enough.
-      const r = await fetch("data/places.json");
+      const r = await fetch("data/places.json?v=" + (CONFIG.dataVersion || "1"));
       if (!r.ok) return false;
       data = await r.json();
     } catch (e) { return false; }

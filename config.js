@@ -82,6 +82,18 @@ const CONFIG = {
     opacity: 0.45
   },
 
+  // ---- THE DATASET ---------------------------------------------------
+  // data/places.json is every public place, already classified, enriched
+  // and deduplicated. Nothing is fetched from a live service at runtime.
+  //
+  // Rebuild it with:
+  //   python3 buildplaces.py --raw <dir with baked.json + ep-padus.geojson>
+  //                          --data data -o data/places.json
+  //
+  // Bump dataVersion whenever you regenerate it, otherwise browsers will
+  // keep serving the copy they already have.
+  dataVersion: "2",
+
   // ---- VECTOR TILES --------------------------------------------------
   // Every boundary and trail, pre-cut into map tiles and packed into one
   // file. The map reads only the tiles for what's on screen, using HTTP
