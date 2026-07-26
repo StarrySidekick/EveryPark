@@ -2294,6 +2294,18 @@
   const PLACE_SKIP = new Set(["marker", "_pre"]);
 
   async function loadPrecomputed() {
+    try {
+      return await loadPrecomputedInner();
+    } catch (e) {
+      // Falling back silently would hide a broken dataset behind a slow
+      // but working map, which is exactly how this went unnoticed before.
+      window.__precomputedError = String((e && e.stack) || e);
+      console.error("Precomputed places failed, falling back to live load:", e);
+      return false;
+    }
+  }
+
+  async function loadPrecomputedInner() {
     let data;
     try {
       const r = await fetch("data/places.json", { cache: "force-cache" });
