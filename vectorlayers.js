@@ -154,7 +154,10 @@ const EveryParkTiles = (() => {
     return best;
   }
 
+  let moveCount = 0;
+
   function onMove(e) {
+    moveCount++;
     const hit = pick(e.latlng);
     const key = hit ? keyOf(hit.dataLayer, hit.f) : null;
     if (key === hoverKey) return;
@@ -233,6 +236,20 @@ const EveryParkTiles = (() => {
       else if (layer.redraw) layer.redraw();
     },
 
-    active() { return !!layer; }
+    active() { return !!layer; },
+
+    // Diagnostics, reachable from the console.
+    _probe(lat, lng) {
+      const hit = pick({ lat, lng });
+      let raw = null;
+      try {
+        const q = layer.queryTileFeaturesDebug(lng, lat);
+        const g = q instanceof Map ? [...q.values()] : Object.values(q || {});
+        raw = g.flat().map(p => ({ ln: p.layerName, props: (p.feature || {}).props }));
+      } catch (e) { raw = "ERR " + e.message; }
+      return { moves: moveCount, hasLayer: !!layer, hasMap: !!map,
+               active: active ? [...active] : null, hoverKey, raw,
+               hit: hit ? { layer: hit.dataLayer, name: nameOf(hit.f) } : null };
+    }
   };
 })();
