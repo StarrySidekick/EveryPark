@@ -4,6 +4,7 @@
   --national: #8d5524;
   --town: #1565c0;
   --cemetery: #6b5b8e;
+  --preserve: #00796b;
   --bg: #f5f6f4;
   --panel: #ffffff;
   --text: #1c2321;
@@ -159,6 +160,7 @@ main { flex: 1; display: flex; position: relative; min-height: 0; }
 .badge.national { background: var(--national); }
 .badge.town { background: var(--town); }
 .badge.cemetery { background: var(--cemetery); }
+.badge.preserve { background: var(--preserve); }
 
 .leaflet-popup-content { margin: 14px 18px; min-width: 190px; }
 .popup-name { font-weight: 700; font-size: .98rem; margin: 6px 0 2px; }

@@ -18,7 +18,8 @@ const CONFIG = {
     state:    { file: "icons/state.svg",    size: 30 },
     national: { file: "icons/national.svg", size: 32 },
     town:     { file: "icons/town.svg",     size: 24 },
-    cemetery: { file: "icons/cemetery.svg", size: 24 }
+    cemetery: { file: "icons/cemetery.svg", size: 24 },
+    preserve: { file: "icons/preserve.svg", size: 26 }
   },
 
   // ---- COLORS -------------------------------------------------------
@@ -28,6 +29,7 @@ const CONFIG = {
     national: "#8d5524",   // brown
     town:     "#1565c0",   // blue
     cemetery: "#6b5b8e",   // purple
+    preserve: "#00796b",   // teal
     accent:   "#0f4c3a",   // header / highlights
     clusterText: "#ffffff"
   },
@@ -80,6 +82,15 @@ const CONFIG = {
   cemeteries: {
     enabled: true,
     serviceUrl: "https://services6.arcgis.com/Do88DoK2xjTUCXd1/ArcGIS/rest/services/OSM_NA_Landuse/FeatureServer/0/query"
+  },
+
+  // ---- LAND TRUST PRESERVES & OPEN SPACE ---------------------------
+  // Nature reserves from OpenStreetMap, split by who runs them:
+  // land trusts / conservancies get their own layer; town-run open
+  // space folds into the Town layer. State-run duplicates are skipped.
+  preserves: {
+    enabled: true,
+    serviceUrl: "https://services6.arcgis.com/Do88DoK2xjTUCXd1/ArcGIS/rest/services/OSM_NA_Leisure/FeatureServer/0/query"
   },
 
   // ---- ATTRIBUTE ENRICHMENT (sports, trails, water) ----------------

@@ -16,6 +16,7 @@
   rootStyle.setProperty("--national", CONFIG.colors.national);
   rootStyle.setProperty("--town", CONFIG.colors.town);
   rootStyle.setProperty("--cemetery", CONFIG.colors.cemetery);
+  rootStyle.setProperty("--preserve", CONFIG.colors.preserve);
   rootStyle.setProperty("--accent", CONFIG.colors.accent);
 
   const map = L.map("map", { zoomControl: true }).setView(CONFIG.mapCenter, CONFIG.mapZoom);
@@ -53,7 +54,7 @@
   // State
   // ------------------------------------------------------------------
   const allParks = [];          // {name, type, lat, lng, town, acres, url, marker}
-  const activeTypes = new Set(["state", "national", "town"]);   // cemeteries off by default
+  const activeTypes = new Set(["state", "national", "town", "preserve"]);   // cemeteries off by default
   let searchTerm = "";
   let townIndex = null;         // for point-in-polygon town lookup
 
@@ -123,7 +124,8 @@
     if (p.type === "state") return p.subtype || "State Park";
     if (p.type === "national") return p.subtype || "Federal Land";
     if (p.type === "cemetery") return p.subtype || "Cemetery";
-    return "Town / City Park";
+    if (p.type === "preserve") return p.subtype || "Nature Preserve";
+    return p.subtype || "Town / City Park";
   }
 
   function tagsHtml(p) {
@@ -357,6 +359,83 @@
     if (fresh) {
       showStatus(`Loaded ${parks.length.toLocaleString()} town & city parks`);
       setTimeout(hideStatus, 3500);
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Land trust preserves & open space (leisure=nature_reserve)
+  //   land trust / conservancy / nonprofit  -> "preserve" layer
+  //   town or city run                      -> Town layer, "Open Space"
+  //   state run                             -> skipped (already mapped)
+  //   water-supply watershed                -> skipped (permit-only)
+  // ------------------------------------------------------------------
+  const PRES_CACHE = "ctparks_pres_v1";
+  const OP_STATE = /Department of Energy and Environmental|State of Connecticut|\bDEEP\b|Connecticut DEP|U\.?S\.? Fish|National Park Service|Army Corps/i;
+  const OP_WATER = /Water Supply|Water Authority|Water Company|Bureau of Water|Aquarion|Regional Water/i;
+  const OP_TOWN  = /^(Town|City|Borough|Village) of\b|^City\b|Parks (and|&) Recreation/i;
+  const OP_TRUST = /Land Trust|Conservancy|Conservation Trust|Land Conservation|Audubon|Nature Center|Nature Conservancy|Preservation|\bTrust\b/i;
+
+  function preserveClass(op) {
+    if (!op) return { kind: "preserve", label: "Nature Preserve" };
+    if (OP_STATE.test(op)) return null;                 // duplicate of state/federal layers
+    if (OP_WATER.test(op)) return null;                 // permit-only watershed land
+    if (OP_TOWN.test(op))  return { kind: "town", label: "Town Open Space" };
+    if (OP_TRUST.test(op)) return { kind: "preserve", label: "Land Trust Preserve" };
+    return { kind: "preserve", label: "Nature Preserve" };
+  }
+
+  function fetchPreserves() {
+    return cachedDataset(PRES_CACHE, CONFIG.municipal.cacheDays, async () => {
+      const out = [];
+      await pagedQuery(CONFIG.preserves.serviceUrl, {
+        where: "leisure='nature_reserve' AND name IS NOT NULL AND " +
+               "(access IS NULL OR access NOT IN ('private','no'))",
+        outFields: "name,operator,website,Shape__Area",
+        returnGeometry: "false", returnCentroid: "true"
+      }, f => {
+        const a = f.attributes, c = f.centroid;
+        if (!a.name || !c) return;
+        const cls = preserveClass(a.operator);
+        if (!cls) return;
+        const lat = +c.y.toFixed(5);
+        const rec = { n: a.name, lat, lng: +c.x.toFixed(5), k: cls.kind, l: cls.label };
+        if (a.operator) rec.op = a.operator;
+        if (a.Shape__Area) {
+          const k = Math.cos(lat * Math.PI / 180);
+          const acres = a.Shape__Area * k * k * 0.000247105;
+          if (acres >= 1) rec.a = Math.round(acres);
+        }
+        if (a.website && /^https?:\/\//i.test(a.website)) rec.w = a.website;
+        out.push(rec);
+      });
+      return out;
+    });
+  }
+
+  async function loadPreserves() {
+    if (!CONFIG.preserves.enabled) return;
+    try {
+      const items = await fetchPreserves();
+      // Don't re-add something already on the map under the same name nearby.
+      const existing = new Set(allParks.map(p =>
+        p.name.toLowerCase() + "|" + Math.round(p.lat * 300) + "|" + Math.round(p.lng * 300)));
+      const seen = new Set();
+      for (const m of items) {
+        const key = m.n.toLowerCase() + "|" + Math.round(m.lat * 300) + "|" + Math.round(m.lng * 300);
+        if (existing.has(key) || seen.has(key)) continue;
+        seen.add(key);
+        const town = findTown(m.lat, m.lng);
+        if (!town) continue;
+        if (EXCLUDE.test(m.n) && !ALLOW.has(m.n.toLowerCase())) continue;
+        addPark({
+          name: m.n, type: m.k, subtype: m.l, lat: m.lat, lng: m.lng, town,
+          acres: m.a || null, url: m.w || null,
+          agency: m.op || null, fee: m.k === "preserve" ? "Free" : null
+        });
+      }
+      refresh();
+    } catch (err) {
+      console.warn("Preserve load failed:", err);
     }
   }
 
@@ -685,16 +764,36 @@
           geometry: bbox, outFields: "OBJECTID,name"
         })
       ];
-      if (activeTypes.has("cemetery")) {
-        jobs.push(fetchOverlayGeojson(CONFIG.cemeteries.serviceUrl, {
-          where: "landuse='cemetery' AND (access IS NULL OR access NOT IN ('private','no'))",
-          geometry: bbox, outFields: "OBJECTID,name"
-        }));
-      }
-      const [stateGj, townGj, cemGj] = await Promise.all(jobs);
+      jobs.push(activeTypes.has("preserve")
+        ? fetchOverlayGeojson(CONFIG.preserves.serviceUrl, {
+            where: "leisure='nature_reserve' AND (access IS NULL OR access NOT IN ('private','no'))",
+            geometry: bbox, outFields: "OBJECTID,name,operator"
+          })
+        : Promise.resolve(null));
+      jobs.push(activeTypes.has("cemetery")
+        ? fetchOverlayGeojson(CONFIG.cemeteries.serviceUrl, {
+            where: "landuse='cemetery' AND (access IS NULL OR access NOT IN ('private','no'))",
+            geometry: bbox, outFields: "OBJECTID,name"
+          })
+        : Promise.resolve(null));
+      const [stateGj, townGj, presGj, cemGj] = await Promise.all(jobs);
       addOverlayFeatures(stateGj, "state", "PROPERTY",
         f => f.properties.AV_LEGEND || "State land");
       addOverlayFeatures(townGj, "town", "name", () => "Town / City Park");
+      if (presGj) {
+        // Re-use the same operator rules so colors match the pins.
+        presGj.features = (presGj.features || []).filter(f => {
+          const cls = preserveClass(f.properties && f.properties.operator);
+          if (!cls) return false;
+          f.properties._label = cls.label;
+          f.properties._kind = cls.kind;
+          return true;
+        });
+        for (const f of presGj.features) {
+          addOverlayFeatures({ features: [f] }, f.properties._kind, "name",
+            g => g.properties._label);
+        }
+      }
       if (cemGj) addOverlayFeatures(cemGj, "cemetery", "name", () => "Cemetery");
     } catch (err) {
       console.warn("Overlay load failed:", err);
@@ -740,7 +839,8 @@
   });
 
   // ------------------------------------------------------------------
-  loadStatic().then(fetchMunicipal).then(loadCemeteries).then(enrich).then(refreshOverlays).catch(err => {
+  loadStatic().then(fetchMunicipal).then(loadPreserves).then(loadCemeteries)
+              .then(enrich).then(refreshOverlays).catch(err => {
     console.error(err);
     showStatus("Something went wrong loading park data. Try refreshing.");
   });
