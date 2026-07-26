@@ -269,6 +269,29 @@ main { flex: 1; display: flex; position: relative; min-height: 0; }
   white-space: nowrap;
 }
 
+/* ---------- Hover caption ---------- */
+#hoverLabel {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1200;
+  background: rgba(20,30,26,.9);
+  color: #fff;
+  padding: 6px 15px;
+  border-radius: 18px;
+  font-size: .82rem;
+  font-weight: 600;
+  pointer-events: none;
+  white-space: nowrap;
+  max-width: 70%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 2px 10px rgba(0,0,0,.3);
+}
+
+.leaflet-interactive:hover { cursor: pointer; }
+
 /* ---------- Legend ---------- */
 #legend {
   position: absolute;

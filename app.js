@@ -1553,6 +1553,46 @@
   function overlayStyle(kind) { return landStyle(kind); }
 
   // ------------------------------------------------------------------
+  // Hover: lift the parcel you're pointing at so its edges are obvious.
+  // Land boundaries are irregular and often adjacent, so being able to
+  // see where one ends is most of the value.
+  // ------------------------------------------------------------------
+  function attachHover(lyr, base, label) {
+    const hot = {
+      weight: base.weight * 2.6,
+      opacity: 1,
+      color: base.color,
+      fillOpacity: Math.min(0.55, base.fillOpacity + 0.18)
+    };
+    lyr.on("mouseover", () => {
+      lyr.setStyle(hot);
+      if (lyr.bringToFront) { try { lyr.bringToFront(); } catch (e) {} }
+      if (label) showHoverLabel(label);
+    });
+    lyr.on("mouseout", () => {
+      lyr.setStyle(base);
+      hideHoverLabel();
+    });
+    return lyr;
+  }
+
+  // A small floating caption, so hovering also tells you what it is.
+  const hoverEl = document.createElement("div");
+  hoverEl.id = "hoverLabel";
+  hoverEl.style.display = "none";
+  document.getElementById("map").appendChild(hoverEl);
+  let hoverHideTimer = null;
+
+  function showHoverLabel(text) {
+    clearTimeout(hoverHideTimer);
+    hoverEl.textContent = text;
+    hoverEl.style.display = "block";
+  }
+  function hideHoverLabel() {
+    hoverHideTimer = setTimeout(() => { hoverEl.style.display = "none"; }, 90);
+  }
+
+  // ------------------------------------------------------------------
   // Overlap control. The same patch of ground turns up in several
   // sources — OSM has a preserve, PAD-US has the fee parcel AND the
   // easement over it, DEEP has the state parcel. Drawing all of them
@@ -1622,7 +1662,9 @@
       if (alreadyDrawn(nm, c)) { loadedOverlayIds.add(id); continue; }
       loadedOverlayIds.add(id);
       registerDrawn(nm, c);
-      const lyr = L.geoJSON(f, { style: () => overlayStyle(kind) });
+      const st = overlayStyle(kind);
+      const lyr = L.geoJSON(f, { style: () => st });
+      attachHover(lyr, st, nm);
       if (nm) lyr.bindPopup(`<span class="badge ${kind}">${labelFn(f)}</span><div class="popup-name">${nm}</div>`);
       overlayLayer.addLayer(lyr);
     }
@@ -1647,7 +1689,9 @@
       loadedOverlayIds.add(id);
       registerDrawn(nm, c);
       const open = pr.Pub_Access === "OA";
-      const lyr = L.geoJSON(f, { style: landStyle("preserve") });
+      const padStyle = landStyle("preserve");
+      const lyr = L.geoJSON(f, { style: padStyle });
+      attachHover(lyr, padStyle, nm);
       lyr.bindPopup(
         `<span class="badge preserve">${DESIG_WORD[pr.Des_Tp] || "Protected land"}</span>
          <div class="popup-name">${nm}</div>
@@ -1774,10 +1818,13 @@
         const ac = Math.round((f.properties && f.properties.ACRE_GIS) || 0);
         const pc = shapeCentre(f);
         if (pc) publicGrid.add(pc.lat, pc.lng, { key: normName(nm) });
-        L.geoJSON(f, {
+        const stStyle = landStyle("state");
+        const stLyr = L.geoJSON(f, {
           renderer: publicRenderer, pane: "publicPane",
-          style: landStyle("state")
-        }).bindPopup(
+          style: stStyle
+        });
+        attachHover(stLyr, stStyle, nm);
+        stLyr.bindPopup(
           `<span class="badge state">${LEGEND_LABELS[legend] || legend}</span>
            <div class="popup-name">${nm}</div>
            <div class="popup-sub">Connecticut${ac ? " &middot; " + ac.toLocaleString() + " acres" : ""}</div>
