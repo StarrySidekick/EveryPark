@@ -601,12 +601,13 @@
   function fetchMuseums() {
     return cachedDataset("ctparks_museum_v1", CONFIG.municipal.cacheDays, async () => {
       const out = [];
+      // Tourism is a POINT layer — same centroid limitation as POIs.
       await pagedQuery(CONFIG.museums.url, {
         where: "tourism='museum' AND name IS NOT NULL AND historic IS NOT NULL",
         outFields: "name,historic,operator,website",
-        returnGeometry: "false", returnCentroid: "true"
+        returnGeometry: "true"
       }, f => {
-        const a = f.attributes, c = f.centroid;
+        const a = f.attributes, c = pointOf(f);
         if (!a.name || !c) return;
         out.push({ n: a.name, lat: +c.y.toFixed(5), lng: +c.x.toFixed(5),
                    h: a.historic || "", op: a.operator || "",
@@ -1113,6 +1114,17 @@
     });
   }
 
+  // A feature's location, whichever way the service gave it to us.
+  // Polygon layers answer returnCentroid; point layers can't, and hand
+  // back a plain geometry instead. Getting this wrong fails silently —
+  // the query succeeds and every feature is skipped.
+  function pointOf(f) {
+    if (f.centroid) return f.centroid;
+    const g = f.geometry;
+    if (g && typeof g.x === "number" && typeof g.y === "number") return g;
+    return null;
+  }
+
   function trailNear(lat, lng, radiusM, cellSet) {
     const span = Math.min(6, Math.ceil(radiusM / 111000 / TRAIL_CELL));
     const i0 = Math.floor(lat / TRAIL_CELL), j0 = Math.floor(lng / TRAIL_CELL);
@@ -1125,12 +1137,14 @@
   function fetchParking() {
     return cachedDataset("ctparks_park_v1", CONFIG.municipal.cacheDays, async () => {
       const out = [];
+      // POIs is a POINT layer, so it rejects returnCentroid outright
+      // (supportsReturningGeometryCentroid: false) — ask for the geometry.
       await pagedQuery(CONFIG.enrichment.poisUrl, {
         where: "amenity='parking' AND (access IS NULL OR access NOT IN ('private','no','customers','permit'))",
-        outFields: "OBJECTID", returnGeometry: "false", returnCentroid: "true"
+        outFields: "OBJECTID", returnGeometry: "true"
       }, f => {
-        if (!f.centroid) return;
-        out.push([+f.centroid.y.toFixed(5), +f.centroid.x.toFixed(5)]);
+        const g = pointOf(f);
+        if (g) out.push([+g.y.toFixed(5), +g.x.toFixed(5)]);
       });
       return out;
     });

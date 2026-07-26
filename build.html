@@ -74,6 +74,14 @@ const acresOf = (area, lat) => {
   return Math.round((area || 0) * k * k * 0.000247105);
 };
 
+// Polygon layers answer returnCentroid; POINT layers (POIs, Tourism)
+// reject it and return a plain geometry instead. Handle both.
+const pointOf = f => {
+  if (f.centroid) return f.centroid;
+  const g = f.geometry;
+  return (g && typeof g.x === "number") ? g : null;
+};
+
 async function build() {
   const out = { built: new Date().toISOString(), cache: {} };
 
@@ -207,9 +215,9 @@ async function build() {
   const mus = [];
   await paged(CONFIG.museums.url, {
     where: "tourism='museum' AND name IS NOT NULL AND historic IS NOT NULL",
-    outFields: "name,historic,operator,website", returnGeometry: "false", returnCentroid: "true"
+    outFields: "name,historic,operator,website", returnGeometry: "true"
   }, f => {
-    const a = f.attributes, c = f.centroid;
+    const a = f.attributes, c = pointOf(f);
     if (!a.name || !c) return;
     mus.push({ n: a.name, lat: +c.y.toFixed(5), lng: +c.x.toFixed(5),
                h: a.historic || "", op: a.operator || "",
@@ -239,8 +247,8 @@ async function build() {
   const park = [];
   await paged(OSM.pois, {
     where: "amenity='parking' AND (access IS NULL OR access NOT IN ('private','no','customers','permit'))",
-    outFields: "OBJECTID", returnGeometry: "false", returnCentroid: "true"
-  }, f => { if (f.centroid) park.push([+f.centroid.y.toFixed(5), +f.centroid.x.toFixed(5)]); });
+    outFields: "OBJECTID", returnGeometry: "true"
+  }, f => { const g = pointOf(f); if (g) park.push([+g.y.toFixed(5), +g.x.toFixed(5)]); });
   out.cache["ctparks_park_v1"] = park;
   log(`  ${park.length} car parks`, "ok");
 
