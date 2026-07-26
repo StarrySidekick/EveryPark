@@ -18,8 +18,10 @@ const CONFIG = {
   //   ICON   glyph  = what kind of place it is
   visual: {
     publicFill: "#43a047",        // one green for all public land
-    fillOpen: 0.34,
-    fillPermission: 0.20,         // softer — open, but by permission
+    fillOpen: 0.32,
+    // Open and open-by-permission look identical: for a walker the
+    // practical answer is the same, and the popup explains the nuance.
+    fillPermission: 0.32,
     borderWeight: 1.9,
     // Border colour by owner. These are also the marker ring colours.
     owner: {

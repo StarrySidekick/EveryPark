@@ -73,16 +73,11 @@
   function iconFor(p) {
     const glyph = glyphFor(p);
     const ring = CONFIG.visual.owner[p.type] || CONFIG.visual.owner.preserve;
-    // Places you can walk into read solid; permission-only read lighter.
-    const solid = p.access === "open";
-    const key = glyph + ring + solid;
+    const key = glyph + ring;
     if (iconCache.has(key)) return iconCache.get(key);
     const svg =
       `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="30" height="30">
-         <circle cx="32" cy="32" r="29" fill="${ring}" stroke="#fff" stroke-width="4"
-                 fill-opacity="${solid ? 1 : 0.82}"/>
-         ${solid ? "" : `<circle cx="32" cy="32" r="29" fill="none" stroke="#fff"
-                 stroke-width="2" stroke-dasharray="4 3" opacity=".9"/>`}
+         <circle cx="32" cy="32" r="29" fill="${ring}" stroke="#fff" stroke-width="4"/>
          <g fill="#fff" stroke="#fff" stroke-width="${glyph === "field" || glyph === "trail" ? 4 : 0}"
             stroke-linecap="round" fill-rule="evenodd">
            <path d="${GLYPH[glyph]}" ${glyph === "field" || glyph === "trail" ? 'fill="none"' : ""}/>
@@ -1544,21 +1539,66 @@
   let overlayTimer = null;
 
   // One green for "you can go here"; the border says who owns it.
-  function landStyle(ownerType, byPermission) {
+  function landStyle(ownerType) {
     const V = CONFIG.visual;
     return {
       color: V.owner[ownerType] || V.owner.preserve,
       weight: V.borderWeight,
       opacity: 0.95,
-      dashArray: byPermission ? "5 3" : null,
       fillColor: V.publicFill,
-      fillOpacity: byPermission ? V.fillPermission : V.fillOpen
+      fillOpacity: V.fillOpen
     };
   }
 
-  function overlayStyle(kind) {
-    // Town land is public outright; land trust land is open by permission.
-    return landStyle(kind, kind === "preserve" || kind === "cemetery");
+  function overlayStyle(kind) { return landStyle(kind); }
+
+  // ------------------------------------------------------------------
+  // Overlap control. The same patch of ground turns up in several
+  // sources — OSM has a preserve, PAD-US has the fee parcel AND the
+  // easement over it, DEEP has the state parcel. Drawing all of them
+  // stacks borders and muddies the fill, so we register every shape we
+  // draw and refuse anything that lands on top of one.
+  // ------------------------------------------------------------------
+  // State land is drawn once and never cleared, so it gets its own
+  // permanent registry; viewport shapes use one that resets on zoom-out.
+  const publicGrid = makeGrid(0.004);
+  let drawnGrid = makeGrid(0.004);            // ~400 m cells
+  const normName = s => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+  function shapeCentre(f) {
+    const g = f.geometry;
+    if (!g) return null;
+    const rings = g.type === "Polygon" ? g.coordinates
+                : g.type === "MultiPolygon" ? g.coordinates.flat() : null;
+    if (!rings || !rings.length) return null;
+    let minX = 180, minY = 90, maxX = -180, maxY = -90, n = 0;
+    for (const r of rings) for (const pt of r) {
+      if (pt[0] < minX) minX = pt[0]; if (pt[0] > maxX) maxX = pt[0];
+      if (pt[1] < minY) minY = pt[1]; if (pt[1] > maxY) maxY = pt[1];
+      n++;
+    }
+    if (!n) return null;
+    return { lat: (minY + maxY) / 2, lng: (minX + maxX) / 2,
+             span: Math.max(maxX - minX, maxY - minY) };
+  }
+
+  // Already drawn if something with the same name sits nearby, or if any
+  // shape's centre is nearly on top of this one.
+  function alreadyDrawn(name, c) {
+    if (!c) return false;
+    const key = normName(name);
+    // Bigger parcels tolerate a bigger offset before we call it the same.
+    const tol = Math.min(400, Math.max(90, c.span * 111000 * 0.28));
+    for (const grid of [drawnGrid, publicGrid])
+      for (const [dist, prev] of grid.near(c.lat, c.lng, 1600)) {
+        if (prev.key && key && prev.key === key && dist < 1600) return true;
+        if (dist < tol) return true;
+      }
+    return false;
+  }
+
+  function registerDrawn(name, c) {
+    if (c) drawnGrid.add(c.lat, c.lng, { key: normName(name) });
   }
 
   async function fetchOverlayGeojson(url, params) {
@@ -1578,7 +1618,10 @@
       if (loadedOverlayIds.has(id)) continue;
       const nm = f.properties ? f.properties[nameProp] : null;
       if (kind === "town" && nm && EXCLUDE.test(nm) && !ALLOW.has(nm.toLowerCase())) continue;
+      const c = shapeCentre(f);
+      if (alreadyDrawn(nm, c)) { loadedOverlayIds.add(id); continue; }
       loadedOverlayIds.add(id);
+      registerDrawn(nm, c);
       const lyr = L.geoJSON(f, { style: () => overlayStyle(kind) });
       if (nm) lyr.bindPopup(`<span class="badge ${kind}">${labelFn(f)}</span><div class="popup-name">${nm}</div>`);
       overlayLayer.addLayer(lyr);
@@ -1597,9 +1640,14 @@
       if (!nm || nm === "Unknown") continue;
       if (GENERIC_NAME.test(nm) || TRIBAL_EXCLUDE.test(nm)) continue;
       if (EXCLUDE.test(nm) && !ALLOW.has(nm.toLowerCase())) continue;
+      const c = shapeCentre(f);
+      // PAD-US is drawn last, so this catches its duplicates of OSM
+      // preserves and its own overlapping fee/easement records.
+      if (alreadyDrawn(nm, c)) { loadedOverlayIds.add(id); continue; }
       loadedOverlayIds.add(id);
+      registerDrawn(nm, c);
       const open = pr.Pub_Access === "OA";
-      const lyr = L.geoJSON(f, { style: landStyle("preserve", !open) });
+      const lyr = L.geoJSON(f, { style: landStyle("preserve") });
       lyr.bindPopup(
         `<span class="badge preserve">${DESIG_WORD[pr.Des_Tp] || "Protected land"}</span>
          <div class="popup-name">${nm}</div>
@@ -1619,6 +1667,7 @@
     if (map.getZoom() < CONFIG.overlays.minZoom) {
       overlayLayer.clearLayers();
       loadedOverlayIds.clear();
+      drawnGrid = makeGrid(0.004);      // forget viewport shapes too
       return;
     }
     const b = map.getBounds();
@@ -1723,9 +1772,11 @@
         const legend = (f.properties && f.properties.AV_LEGEND) || "Other";
         const nm = (f.properties && f.properties.PROPERTY) || "State land";
         const ac = Math.round((f.properties && f.properties.ACRE_GIS) || 0);
+        const pc = shapeCentre(f);
+        if (pc) publicGrid.add(pc.lat, pc.lng, { key: normName(nm) });
         L.geoJSON(f, {
           renderer: publicRenderer, pane: "publicPane",
-          style: landStyle("state", false)
+          style: landStyle("state")
         }).bindPopup(
           `<span class="badge state">${LEGEND_LABELS[legend] || legend}</span>
            <div class="popup-name">${nm}</div>
