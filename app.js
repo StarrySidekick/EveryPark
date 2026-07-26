@@ -525,7 +525,7 @@
   //   state run                             -> skipped (already mapped)
   //   water-supply watershed                -> skipped (permit-only)
   // ------------------------------------------------------------------
-  const PRES_CACHE = "ctparks_pres_v3";
+  const PRES_CACHE = "ctparks_pres_v4";
   const OP_STATE = /Department of Energy and Environmental|State of Connecticut|\bDEEP\b|Connecticut DEP/i;
   // Federal land held as parcels — in Connecticut this is overwhelmingly
   // the Appalachian Trail protective corridor, which the NPS owns
@@ -566,13 +566,12 @@
         let nm = a.name;
         if (!nm) {
           // Skip nameless scraps with no steward — they're usually
-          // fragments of a larger parcel and just add noise.
+          // fragments and just add noise. (This OSM view doesn't return
+          // Shape__Area, so a named operator is our quality signal.)
           if (!a.operator) return;
-          const areaM = (a.Shape__Area || 0) * Math.pow(Math.cos(lat * Math.PI / 180), 2);
-          if (areaM < 8000) return;                 // under ~2 acres
           nm = cls.kind === "national"
              ? "Appalachian Trail Corridor"
-             : a.operator.replace(/,?\s*Inc\.?$/i, "") + " preserve";
+             : a.operator.replace(/,?\s*Inc\.?$/i, "") + " land";
         }
         const rec = { n: nm, lat, lng: +c.x.toFixed(5), k: cls.kind, l: cls.label };
         if (!a.name) rec.un = 1;
@@ -749,7 +748,7 @@
   // Drop cache entries from older versions of the site so they don't
   // sit in localStorage forever.
   (function pruneOldCaches() {
-    const keep = new Set(["ctparks_municipal_v3", "ctparks_cem_v1", "ctparks_pres_v3",
+    const keep = new Set(["ctparks_municipal_v3", "ctparks_cem_v1", "ctparks_pres_v4",
                           "ctparks_fac_v1", "ctparks_trl_v1", "ctparks_wtr_v1"]);
     try {
       for (const k of Object.keys(localStorage))
