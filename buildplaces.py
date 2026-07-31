@@ -402,6 +402,195 @@ def load(path):
         return json.load(fh)
 
 
+# --------------------------------------------------------- boundaries
+def attach_geometry(places, raw_dir):
+    """
+    Give every place its real boundary, and an area measured from it.
+
+    Acreage previously came from whatever the source happened to record —
+    27% coverage — and that number drives the trail search radius, so a
+    park with no recorded acreage was judged by a 120 m circle. Measuring
+    the polygon instead takes it to nearly everything, and is a fact
+    rather than a field someone remembered to fill in.
+
+    A place with no boundary at all can't be assessed for access, so it
+    can't be a verified park. That's recorded here as `shaped`.
+    """
+    import glob
+    from shapely.geometry import shape, Point
+    from shapely.strtree import STRtree
+
+    polys, meta = [], []
+    for path in sorted(glob.glob(os.path.join(raw_dir, "ep-*.geojson"))):
+        lay = os.path.basename(path).split("ep-")[1].split(".")[0]
+        if lay in ("trails", "blueblazed"):
+            continue
+        try:
+            feats = load(path)["features"]
+        except Exception:                          # noqa: BLE001
+            continue
+        for f in feats:
+            g = f.get("geometry")
+            if not g or g.get("type") not in ("Polygon", "MultiPolygon"):
+                continue
+            try:
+                s = shape(g)
+                if not s.is_valid:
+                    s = s.buffer(0)
+                if s.is_empty:
+                    continue
+            except Exception:                      # noqa: BLE001
+                continue
+            pr = f.get("properties") or {}
+            polys.append(s)
+            meta.append((lay, norm(pr.get("PROPERTY") or pr.get("Unit_Nm")
+                                   or pr.get("name") or "")))
+    if not polys:
+        return 0
+
+    tree = STRtree(polys)
+    # Total area per property name, computed once — a big forest is dozens
+    # of parcels and we want the property, not the parcel underfoot.
+    # Keyed by (source layer, name). Summing on name alone triples a state
+    # park's acreage, because DEEP, PAD-US and OpenStreetMap each carry a
+    # copy of it — Sleeping Giant came out at 3,495 acres against a real
+    # 1,575.
+    area_by_name = defaultdict(float)
+    for i, (lay, m) in enumerate(meta):
+        if m:
+            area_by_name[(lay, m)] += polys[i].area
+    # Every polygon that carries a given name, so a property whose
+    # representative point misses its own parcels can still be found.
+    by_name = defaultdict(list)
+    for i, (lay, m) in enumerate(meta):
+        if m:
+            by_name[m].append(i)
+
+    hits = 0
+    moved = 0
+    for p in places:
+        pt = Point(p["lng"], p["lat"])
+        cands = [i for i in tree.query(pt) if polys[i].contains(pt)]
+
+        if not cands:
+            # Big properties are fragmented, and the mean centre of a
+            # scattered forest lands in a private-land gap between its own
+            # parcels. Cockaponset State Forest — 17,000 acres — sat
+            # outside every polygon it owns. Fall back to the name, then
+            # move the pin somewhere actually inside the land.
+            nm0 = norm(p["name"])
+            near = [i for i in by_name.get(nm0, ())
+                    if dist_m(p["lat"], p["lng"],
+                              polys[i].centroid.y, polys[i].centroid.x) < 8000]
+            if not near:
+                continue
+            cands = near
+            big = max(near, key=lambda i: polys[i].area)
+            rp = polys[big].representative_point()
+            p["lat"], p["lng"] = round(rp.y, 5), round(rp.x, 5)
+            moved += 1
+        nm = norm(p["name"])
+        named = [i for i in cands if meta[i][1] == nm]
+        # DEEP's parcels are the authoritative measure of state land, so
+        # prefer them when more than one source describes this place.
+        RANK = {"stateland": 0, "townparks": 1, "cemeteries": 2,
+                "landuse": 3, "preserves": 4, "padus": 5, "parcels": 6}
+        named.sort(key=lambda i: RANK.get(meta[i][0], 9))
+        lat = p["lat"]
+        deg2acre = math.cos(math.radians(lat)) * (111320 ** 2) / 4046.86
+
+        if named:
+            # A big property arrives as many parcels sharing one name —
+            # Pachaug State Forest is dozens of them. Taking the parcel the
+            # centroid happens to land in reported 4,481 acres against a
+            # real 26,662, so sum every parcel of that name instead.
+            area = area_by_name[(meta[named[0]][0], nm)]
+        else:
+            # No name to go on: the smallest polygon containing the point is
+            # the most specific description of where you're standing.
+            area = polys[min(cands, key=lambda i: polys[i].area)].area
+        acres = area * deg2acre
+        if acres >= 0.1:
+            p["acres"] = round(acres, 1) if acres < 10 else round(acres)
+        p.setdefault("attrs", {})["shaped"] = True
+        hits += 1
+    if moved:
+        print(f"  {moved:,} pins moved inside their own boundary", flush=True)
+    return hits
+
+
+# ------------------------------------------------------- what is a park
+# A park has to pass three tests, and we have to be able to show our
+# working on each. Anything we can't evidence is marked unverified rather
+# than quietly presented as a park.
+#
+#   legal     you may lawfully walk there
+#   physical  there's a realistic way in and something to do
+#   free      no admission charge
+#
+# Fee is recorded in three states, because Connecticut's state parks are
+# free to walk into but charge for parking, and calling that simply
+# "paid" would be wrong.
+def fee_state(p):
+    txt = " ".join(str(p.get(k) or "") for k in ("fee", "note")).lower()
+
+    # Say-so of being free wins outright. Matching on the word "admission"
+    # alone marked "Free admission" as paid, which is exactly backwards.
+    if re.search(r"\bfree\b(?!.*\b(fee|charge|\$)\b)", txt):
+        free_text = True
+    else:
+        free_text = False
+
+    charges = re.search(r"admission (fee|charge|\$)|entry fee|entrance fee|"
+                        r"\bticket\b|\$\d+(?!.*parking)", txt)
+    parking_charge = re.search(r"parking (fee|charge|\$)|passport to the parks|"
+                               r"out-of-state|per vehicle", txt)
+
+    if charges and not free_text:
+        return "paid"
+    if parking_charge:
+        return "parking"
+    if free_text:
+        return "free"
+    if p["type"] == "state":
+        # Free to walk into. Connecticut-registered vehicles park free under
+        # Passport to the Parks; out-of-state vehicles pay at staffed parks.
+        return "parking"
+    return "free"          # assume free unless there's evidence otherwise
+
+
+def verify_all(places):
+    for p in places:
+        A = p.setdefault("attrs", {})
+        # `access` is a derived field and isn't stored in the file, so
+        # recompute it here rather than assuming it survived the round trip.
+        if not p.get("access"):
+            score_access(p)
+        legal = p.get("access") in ("open", "permission")
+        physical = bool(A.get("trails") or A.get("parking") or A.get("sports")
+                        or A.get("playground") or A.get("beach") or A.get("pool"))
+        shaped = bool(A.get("shaped"))
+        fee = fee_state(p)
+
+        why = []
+        if not legal:
+            why.append("no confirmed legal right or permission to walk here")
+        if not physical:
+            why.append("no mapped trail, parking or facility, so no confirmed way in")
+        if not shaped:
+            why.append("no mapped boundary, so its extent is unknown")
+
+        p["feeState"] = fee
+        if fee == "paid":
+            p["status"] = "fee"
+        elif legal and physical and shaped:
+            p["status"] = "park"
+        else:
+            p["status"] = "unverified"
+            p["statusWhy"] = "We can't confirm this is a park: " + \
+                             "; ".join(why) + "."
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--raw", required=True, help="dir with baked.json + ep-*.geojson")
@@ -747,7 +936,8 @@ def main():
     # and scoreAccess() used here. Deriving rather than storing keeps about
     # 2.9 MB out of the file and, more usefully, means changing the wording
     # or the rules is a code edit, not a rebuild.
-    DERIVED = {"access", "accessLabel", "accessWhy", "steward", "kind"}
+    DERIVED = {"access", "accessLabel", "accessWhy", "steward", "kind",
+               "statusWhy"}   # statusWhy is rebuilt in the browser from the flags
     DERIVED_ATTRS = {"accessNote", "visitable"}
     PADUS_NOTE = ("Listed by USGS as restricted, which for land-trust and private "
                   "conservation land usually means open by the owner's permission "

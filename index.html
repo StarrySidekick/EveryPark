@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
   <!-- ?v= is a cache-buster: bump it on every deploy so visitors get fresh code -->
-  <link rel="stylesheet" href="styles.css?v=52">
+  <link rel="stylesheet" href="styles.css?v=53">
 </head>
 <body>
 
@@ -105,9 +105,11 @@
     <div id="status"></div>
 
     <div id="legend">
-      <div class="legend-title">Green = you can go there</div>
-      <div class="legend-note" style="margin-bottom:7px">Unshaded land is private. Some green land is
-        open by the owner's permission rather than by right — the popup says which.</div>
+      <div class="legend-title">Green = confirmed a park</div>
+      <div class="legend-row"><span class="sw fill-open"></span>Verified: legal, reachable, free</div>
+      <div class="legend-row"><span class="sw unverified"></span>Unverified — can't confirm you can visit</div>
+      <div class="legend-note" style="margin-bottom:7px">Unshaded land is private. Amber is public land
+        with no mapped way in, or no known boundary — the popup says which test it failed.</div>
 
       <div class="legend-title">Border colour = who owns it</div>
       <div class="legend-row"><span class="sw ring" style="border-color:#1b5e20"></span>State of Connecticut</div>
@@ -132,8 +134,8 @@
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
   <script src="https://unpkg.com/protomaps-leaflet@4.0.1/dist/protomaps-leaflet.js"></script>
-  <script src="config.js?v=52"></script>
-  <script src="vectorlayers.js?v=52"></script>
-  <script src="app.js?v=52"></script>
+  <script src="config.js?v=53"></script>
+  <script src="vectorlayers.js?v=53"></script>
+  <script src="app.js?v=53"></script>
 </body>
 </html>

@@ -428,3 +428,6 @@ a.badge:hover { filter: brightness(1.15); text-decoration: underline; }
 .leaflet-container a.badge,
 .leaflet-popup-content a.badge { color: #fff; }
 .leaflet-container a.badge:hover { color: #fff; }
+
+/* Amber = we can't confirm it's a visitable park */
+.legend-row .sw.unverified { background: rgba(245,179,1,.55); border: 1.5px solid #b8860b; }

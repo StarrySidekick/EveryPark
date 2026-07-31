@@ -17,7 +17,11 @@ const CONFIG = {
   //   BORDER colour = who owns and maintains it
   //   ICON   glyph  = what kind of place it is
   visual: {
-    publicFill: "#43a047",        // one green for all public land
+    publicFill: "#43a047",        // green: confirmed a park
+    // Amber: public land we can't confirm is visitable — no mapped way in,
+    // or no known boundary. Honest uncertainty rather than a confident lie.
+    unverifiedFill: "#f5b301",
+    unverifiedBorder: "#b8860b",
     fillOpen: 0.32,
     // Open and open-by-permission look identical: for a walker the
     // practical answer is the same, and the popup explains the nuance.
@@ -151,7 +155,7 @@ const CONFIG = {
   //
   // Bump dataVersion whenever you regenerate it, otherwise browsers will
   // keep serving the copy they already have.
-  dataVersion: "2",
+  dataVersion: "3",
 
   // ---- VECTOR TILES --------------------------------------------------
   // Every boundary and trail, pre-cut into map tiles and packed into one

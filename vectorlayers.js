@@ -14,6 +14,10 @@
 const EveryParkTiles = (() => {
   let layer = null, map = null, active = null;
   let hoverKey = null, hoverLabelEl = null;
+  // normalised name -> "park" | "unverified" | "fee". The tiles carry
+  // geometry and source attributes but not our verdict, so the verdict is
+  // handed in from the place list and matched by name.
+  let statusBy = null;
 
   // Border colour by who owns the land. Same palette as the pins.
   const OWNER = {
@@ -51,6 +55,15 @@ const EveryParkTiles = (() => {
     return dataLayer + "|" + nameOf(f) + "|" + size;
   };
 
+  const normName = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+  // Unverified land is drawn amber, not green: we can't confirm you can
+  // actually walk it, and saying so is more useful than a confident colour.
+  const statusOf = f => {
+    if (!statusBy) return "park";
+    return statusBy.get(normName(nameOf(f))) || "unverified";
+  };
+
   const visible = (dataLayer, f) => {
     const chip = CHIP[dataLayer];
     if (chip && active && !active.has(chip)) return false;
@@ -82,12 +95,16 @@ const EveryParkTiles = (() => {
       // layer loading tiles at all.
       symbolizer: new protomapsL.PolygonSymbolizer({
         fill: (z, f) => keyOf(dataLayer, f) === hoverKey
-                      ? (H.fill || "#c8f5cf") : V.publicFill,
+                      ? (H.fill || "#c8f5cf")
+                      : (statusOf(f) === "park" ? V.publicFill
+                         : V.unverifiedFill || "#f5b301"),
         opacity: (z, f) => keyOf(dataLayer, f) === hoverKey
                          ? (H.fillOpacity != null ? H.fillOpacity : 0.62)
                          : V.fillOpen,
         stroke: (z, f) => keyOf(dataLayer, f) === hoverKey
-                        ? (H.stroke || "#ffffff") : border,
+                        ? (H.stroke || "#ffffff")
+                        : (statusOf(f) === "park" ? border
+                           : V.unverifiedBorder || "#b8860b"),
         width: (z, f) => keyOf(dataLayer, f) === hoverKey
                        ? (H.width || 6) : V.borderWeight
       })
@@ -236,6 +253,12 @@ const EveryParkTiles = (() => {
       map.on("mousemove", onMove);
       map.on("click", onClick);
       return true;
+    },
+
+    // Hand in the verified/unverified verdict per place name.
+    setStatus(lookup) {
+      statusBy = lookup;
+      if (layer && layer.rerenderTiles) layer.rerenderTiles();
     },
 
     // Called when the filter chips change. No refetching — the data is

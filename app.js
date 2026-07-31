@@ -245,10 +245,24 @@
       <div class="popup-name">${p.name}</div>
       <div class="popup-sub">${p.town || "Connecticut"}${acres}</div>
 
+      ${p.status === "unverified" ? `
+      <div class="pblock acc-unknown">
+        <div class="pb-head">⚠️ Unverified</div>
+        <div class="pb-body">${statusReason(p)}</div>
+      </div>` : `
       <div class="pblock acc-${p.access}">
         <div class="pb-head">${ACCESS_ICON[p.access]} ${p.accessLabel}</div>
         <div class="pb-body">${p.accessWhy}</div>
-      </div>
+      </div>`}
+      ${p.feeState === "parking" ? `
+      <div class="pblock plain"><div class="pb-head">🅿️ Free to enter, paid parking</div>
+        <div class="pb-body">Walking or cycling in is free. Connecticut-registered
+        vehicles park free under Passport to the Parks; out-of-state vehicles pay.</div>
+      </div>` : ""}
+      ${p.feeState === "paid" ? `
+      <div class="pblock acc-permission"><div class="pb-head">💵 Admission charged</div>
+        <div class="pb-body">This place charges to get in, so it sits outside the
+        free-park category.</div></div>` : ""}
 
       <div class="pblock plain">
         <div class="pb-head">Maintained by</div>
@@ -1607,6 +1621,21 @@
   }
 
   // Kept for the trail pass, which re-scores then re-classifies.
+  // Why a place isn't a confirmed park. Rebuilt here rather than stored:
+  // it's a long sentence and it would repeat thousands of times.
+  function statusReason(p) {
+    const A = p.attrs || {};
+    const why = [];
+    if (!(p.access === "open" || p.access === "permission"))
+      why.push("no confirmed legal right or permission to walk here");
+    if (!(A.trails || A.parking || A.sports || A.playground || A.beach || A.pool))
+      why.push("no mapped trail, parking or facility, so no confirmed way in");
+    if (!A.shaped) why.push("no mapped boundary, so its extent is unknown");
+    return why.length
+      ? "We can't confirm this is a park: " + why.join("; ") + "."
+      : "";
+  }
+
   function scoreAccess(p) {
     const A = p.attrs || (p.attrs = {});
     A.visitable = !!(A.trails || A.parking || A.sports || A.playground || A.beach || A.pool);
@@ -2403,12 +2432,16 @@
     const PADUS_NOTE = "Listed by USGS as restricted, which for land-trust and " +
       "private conservation land usually means open by the owner's permission " +
       "rather than by legal right. Check the owner's website or posted signs.";
+    const statusLookup = new Map();
+    const normNm = t => String(t).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
     for (const p of data.places) {
+      if (p.status) statusLookup.set(normNm(p.name), p.status);
       if (p.attrs && p.attrs.byPermission && !p.note) p.note = PADUS_NOTE;
       scoreAccess(p);          // sets visitable + accessNote, then classifies
       p._pre = true;           // so addPark doesn't classify a second time
       addPark(p);
     }
+    if (tilesActive) EveryParkTiles.setStatus(statusLookup);
     refresh();
     console.info(`Loaded ${data.places.length.toLocaleString()} precomputed places ` +
                  `(built ${data.built}). No live fetching.`);
