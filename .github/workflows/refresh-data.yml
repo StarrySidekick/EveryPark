@@ -28,13 +28,19 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: pip install requests shapely mercantile mapbox-vector-tile pmtiles
+        run: pip install requests shapely mercantile mapbox-vector-tile pmtiles pillow
 
       - name: Fetch every source
         run: python3 fetchsources.py --out raw
 
       - name: Build the place list
         run: python3 buildplaces.py --raw raw --data data -o data/places.json
+
+      - name: Attach real boundaries and verify what counts as a park
+        run: python3 verifyplaces.py --raw raw --in data/places.json -o data/places.json
+
+      - name: Sample elevation and land cover
+        run: python3 enrichraster.py --in data/places.json -o data/places.json
 
       - name: Build the tile archive
         if: ${{ !inputs.skip_tiles }}
