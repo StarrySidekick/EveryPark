@@ -145,15 +145,17 @@ def fetch_elevation(places, workers=4, batch=80):
                            "geometryType": "esriGeometryMultipoint",
                            "returnFirstValueOnly": "true",
                            "returnCatalogItems": "false", "f": "json"})
-            for s in (r.json().get("samples") or []):
-                # sampleId indexes into the points we sent.
-                sid = s.get("sampleId")
+            for k, s in enumerate(r.json().get("samples") or []):
+                # The field is locationId, not sampleId. Reading the wrong
+                # key silently discarded every value and left elevation at
+                # 0% coverage. Fall back to response order if it's absent.
+                sid = s.get("locationId", s.get("sampleId", k))
                 v = s.get("value")
-                if sid is None or v in (None, "NoData"):
+                if v in (None, "", "NoData"):
                     continue
                 try:
                     values[start + int(sid)] = float(v)
-                except (ValueError, IndexError):
+                except (ValueError, IndexError, TypeError):
                     pass
         except Exception as e:                      # noqa: BLE001
             print(f"    elevation batch @{start} failed: {e}", flush=True)
@@ -207,17 +209,25 @@ def fetch_landcover(places, workers=8, size=24):
         try:
             r = SESSION.get(NLCD, params=params, timeout=60)
             r.raise_for_status()
-            img = Image.open(io.BytesIO(r.content))
+            # Always work in RGB. A paletted PNG's indices are GeoServer's
+            # own palette, not NLCD class codes — assuming otherwise matched
+            # about a fifth of pixels and put every one of them in the same
+            # bucket. Nearest-colour matching also absorbs the small
+            # rounding differences between published NLCD colour tables.
+            img = Image.open(io.BytesIO(r.content)).convert("RGB")
             counts = Counter()
-            if img.mode == "P":
-                for v in img.getdata():
-                    if v in NLCD_CLASS:
-                        counts[v] += 1
-            else:
-                for px in img.convert("RGB").getdata():
-                    c = NLCD_RGB.get(px)
-                    if c:
-                        counts[c] += 1
+            for px in img.getdata():
+                c = NLCD_RGB.get(px)
+                if c is None:
+                    best, bd = None, 400
+                    for rgb, cls in NLCD_RGB.items():
+                        d = ((px[0]-rgb[0])**2 + (px[1]-rgb[1])**2
+                             + (px[2]-rgb[2])**2)
+                        if d < bd:
+                            best, bd = cls, d
+                    c = best
+                if c:
+                    counts[c] += 1
             total = sum(counts.values())
             if not total:
                 return
