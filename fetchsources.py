@@ -356,11 +356,19 @@ def fetch_attributes(outdir):
         area = (a.get("Shape__Area") or 0) * k * k
         if area < 2000:
             return
+        kind = (a.get("water") or a.get("waterway") or "").lower()
         wtr.append([lat, round(c["x"], 5), a["name"],
-                    round(math.sqrt(area / math.pi))])
+                    round(math.sqrt(area / math.pi)), kind])
 
-    paged(OSM6 + "OSM_NA_Water/FeatureServer/0/query", "name IS NOT NULL",
-          "name,Shape__Area", wf)
+    # Ask for the type tags, but fall back if this mirror doesn't expose
+    # them — a bad outFields list makes the whole query error out.
+    try:
+        paged(OSM6 + "OSM_NA_Water/FeatureServer/0/query", "name IS NOT NULL",
+              "name,Shape__Area,water,waterway", wf)
+    except Exception:                               # noqa: BLE001
+        wtr.clear()
+        paged(OSM6 + "OSM_NA_Water/FeatureServer/0/query", "name IS NOT NULL",
+              "name,Shape__Area", wf)
     cache["ctparks_wtr_v1"] = wtr
 
     # --- PAD-US named places -------------------------------------------
@@ -408,6 +416,28 @@ def fetch_attributes(outdir):
 
     with ThreadPoolExecutor(max_workers=3) as ex:
         list(ex.map(grab, offsets))
+
+    # The Blue-Blazed system is ~825 miles that OpenStreetMap often hasn't
+    # tagged as paths. It was already being drawn on the map but wasn't
+    # counted as evidence of a way in, which left real hiking land sitting
+    # in the unverified pile.
+    try:
+        bb = post(DEEP + "BlueBlazedHikingTrails/FeatureServer/0/query",
+                  {"where": "1=1", "outSR": "4326", "returnGeometry": "true",
+                   "maxAllowableOffset": "0.0002", "geometryPrecision": "5",
+                   "resultRecordCount": "1000", "outFields": ""})
+        added = 0
+        for f in bb.get("features") or []:
+            for path in (f.get("geometry") or {}).get("paths") or []:
+                for pt in path:
+                    cells.add(math.floor(pt[1] / TRAIL_CELL) * 1000000
+                              + (math.floor(pt[0] / TRAIL_CELL) + 500000))
+                    added += 1
+        print(f"  blue-blazed vertices folded into trail grid: {added:,}",
+              flush=True)
+    except Exception as e:                          # noqa: BLE001
+        print(f"  blue-blazed trail grid skipped: {e}", flush=True)
+
     cache["ctparks_trailgrid_v2"] = sorted(cells)
 
     for k, v in cache.items():

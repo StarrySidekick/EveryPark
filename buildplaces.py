@@ -255,6 +255,10 @@ def norm(s):
     return re.sub(r"[^a-z0-9]+", " ", str(s).lower()).strip()
 
 
+def nm_lower(s):
+    return str(s or "").lower()
+
+
 # ----------------------------------------------------------- classifying
 def classify(p):
     A = p.setdefault("attrs", {})
@@ -787,7 +791,8 @@ def main():
         fac.add(row[0], row[1], (row[2], row[3]))
     wtr = Grid(0.02)
     for row in baked.get("ctparks_wtr_v1") or []:
-        wtr.add(row[0], row[1], (row[2], row[3]))
+        # Older files have 4 columns, newer ones carry the type tag too.
+        wtr.add(row[0], row[1], (row[2], row[3], row[4] if len(row) > 4 else ""))
     parking = Grid(0.01)
     for row in baked.get("ctparks_park_v1") or []:
         parking.add(row[0], row[1], 1)
@@ -841,13 +846,28 @@ def main():
             A["parking"] = True
 
         best = None
-        for d, (nm, rad) in wtr.near(p["lat"], p["lng"], r + 2400):
+        for d, (nm, rad, kind) in wtr.near(p["lat"], p["lng"], r + 2400):
             edge = d - (rad or 0)
             if edge < r + 150 and (best is None or edge < best[0]):
-                best = (edge, nm)
+                best = (edge, nm, kind)
         if best:
             A["water"] = True
             A["waterName"] = best[1]
+            # "Has water" is much less useful than knowing whether it's a
+            # lake you can swim in or a river running past.
+            k = (best[2] or "").lower()
+            if k in ("lake", "reservoir", "pond", "basin"):
+                A["waterType"] = "lake" if k != "reservoir" else "reservoir"
+            elif k in ("river", "stream", "canal", "brook"):
+                A["waterType"] = "river"
+            elif k == "waterfall":
+                A["waterType"] = "waterfall"
+            elif re.search(r"\bfalls?\b", nm_lower(best[1])):
+                A["waterType"] = "waterfall"
+            elif re.search(r"\b(lake|pond|reservoir)\b", nm_lower(best[1])):
+                A["waterType"] = "lake"
+            elif re.search(r"\b(river|brook|creek|stream)\b", nm_lower(best[1])):
+                A["waterType"] = "river"
         if p.get("town") in SHORE_TOWNS and coast.near(p["lat"], p["lng"], max(r + 250, 700)):
             A["water"] = True
             A["waterName"] = "Long Island Sound"
