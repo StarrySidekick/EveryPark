@@ -571,8 +571,14 @@ def verify_all(places):
         if not p.get("access"):
             score_access(p)
         legal = p.get("access") in ("open", "permission")
+        # `reachable` is set by a cited category rule — e.g. Connecticut
+        # state land is open to walk by regulation, and a cemetery is walk-in
+        # daylight public space. Both are genuinely visitable without anyone
+        # having mapped a trail inside them, and asserting a trail we haven't
+        # seen would be putting a false fact in the data to game the test.
         physical = bool(A.get("trails") or A.get("parking") or A.get("sports")
-                        or A.get("playground") or A.get("beach") or A.get("pool"))
+                        or A.get("playground") or A.get("beach") or A.get("pool")
+                        or A.get("reachable"))
         shaped = bool(A.get("shaped"))
         fee = fee_state(p)
 

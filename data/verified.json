@@ -14,7 +14,9 @@
     "",
     "Fields you can set: trails, parking, water, waterName, waterType, sports,",
     "sportList, playground, historic, beach, pool, dogpark, fee, url, note,",
-    "agency, acres."
+    "agency, acres.",
+    "",
+    "`rules` entries match on type/subtype/agency instead of a single name, so one cited regulation can settle hundreds of places at once. Same requirement: source and checked date."
   ],
   "places": [
     {
@@ -75,6 +77,79 @@
         "https://www.nature.org/en-us/get-involved/how-to-help/places-we-protect/lucius-pond-ordwaydevils-den-preserve/"
       ],
       "checked": "2026-08-02"
+    }
+  ],
+  "rules": [
+    {
+      "id": "ct-state-land",
+      "match": {
+        "type": "state"
+      },
+      "siteRules": [
+        "Open 8am to sunset",
+        "Dogs must be leashed (7 ft max)",
+        "No motor vehicles off designated roads"
+      ],
+      "source": [
+        "https://portal.ct.gov/deep/natural-resources/responsible-recreation",
+        "https://portal.ct.gov/DEEP/State-Parks/Recreation-Information/Recreational-Trail-Use-Information"
+      ],
+      "checked": "2026-08-02",
+      "why": "Connecticut state parks, forests and wildlife management areas are open to the public daily from 8am to sunset by regulation. Walking is permitted throughout, so state land does not need a mapped trail to be reachable.",
+      "reachable": true
+    },
+    {
+      "id": "ct-wma",
+      "match": {
+        "subtype": "Wildlife Management Area"
+      },
+      "siteRules": [
+        "Open 8am to sunset; closed half an hour after sunset to half an hour before sunrise",
+        "Dogs leashed, 7 ft maximum",
+        "No camping",
+        "No ATVs, motorcycles or snowmobiles"
+      ],
+      "source": [
+        "https://www.law.cornell.edu/regulations/connecticut/Regs-Conn-State-Agencies-SS-26-16-3a"
+      ],
+      "checked": "2026-08-02",
+      "why": "Conn. Agencies Regs. 26-16-3a governs public use of state wildlife management areas. Hiking is permitted; these are working conservation land rather than developed parks.",
+      "reachable": true
+    },
+    {
+      "id": "cemetery-daylight",
+      "match": {
+        "type": "cemetery"
+      },
+      "siteRules": [
+        "Open during daylight hours",
+        "Quiet enjoyment; respect burials"
+      ],
+      "checked": "2026-08-02",
+      "source": [],
+      "why": "Municipal and non-profit burying grounds are walk-in public space during daylight. They are not required to have a mapped trail to be visitable.",
+      "reachable": true
+    },
+    {
+      "id": "avalonia",
+      "match": {
+        "agency": "Avalonia Land Conservancy"
+      },
+      "reachable": true,
+      "trails": true,
+      "fee": "Free",
+      "siteRules": [
+        "Open dawn to dusk",
+        "Stay on trails",
+        "Dogs on a leash",
+        "Some preserves restricted for nesting or fragile habitat \u2014 check posted signs"
+      ],
+      "source": [
+        "https://avalonia.org/preserves/",
+        "https://ctconservation.org/land-trusts/avalonia-land-conservancy-inc/"
+      ],
+      "checked": "2026-08-02",
+      "why": "Avalonia's 46 preserves, over 5,000 acres across nine southeastern Connecticut towns, are open and free to the public dawn to dusk, with trail maps online and posted on site."
     }
   ]
 }

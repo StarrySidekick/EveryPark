@@ -282,6 +282,8 @@
     if (A.cover) rows.push(["Terrain", A.cover +
       (A.coverTop ? ` · ${A.coverTop.toLowerCase()}` : "")]);
     if (A.historic) rows.push(["Historic", "Buildings or monuments"]);
+    if (A.siteRules && A.siteRules.length)
+      rows.push(["Rules", A.siteRules.join(" · ")]);
 
     const acres = p.acres ? ` &middot; ${Number(p.acres).toLocaleString()} acres` : "";
     const dir = `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}`;
@@ -301,6 +303,9 @@
 
       ${p.status === "unverified"
         ? `<div class="pnote">${statusReason(p)}</div>` : ""}
+      ${(p.attrs && p.attrs.researched)
+        ? `<div class="pchecked">✔︎ Checked by hand${p.attrs.checked
+             ? ` · ${p.attrs.checked}` : ""}</div>` : ""}
 
       <div class="popup-links">
         <a class="primary" href="${dir}" target="_blank" rel="noopener">➜ Directions</a>
@@ -1662,7 +1667,8 @@
     const why = [];
     if (!(p.access === "open" || p.access === "permission"))
       why.push("no confirmed legal right or permission to walk here");
-    if (!(A.trails || A.parking || A.sports || A.playground || A.beach || A.pool))
+    if (!(A.trails || A.parking || A.sports || A.playground || A.beach
+          || A.pool || A.reachable))
       why.push("no mapped trail, parking or facility, so no confirmed way in");
     if (!A.shaped) why.push("no mapped boundary, so its extent is unknown");
     return why.length

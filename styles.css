@@ -450,3 +450,7 @@ a.badge:hover { filter: brightness(1.15); text-decoration: underline; }
 .pblock { padding: 7px 10px; margin-bottom: 4px; }
 
 .popup-links { margin-top: 10px; }
+
+/* Research provenance — this fact was confirmed by a person, not inferred */
+.pchecked { font-size: .7rem; color: #1d6b3f; background: #e8f4ec;
+            border-radius: 6px; padding: 4px 8px; margin-top: 6px; }
