@@ -431,3 +431,22 @@ a.badge:hover { filter: brightness(1.15); text-decoration: underline; }
 
 /* Amber = we can't confirm it's a visitable park */
 .legend-row .sw.unverified { background: rgba(245,179,1,.55); border: 1.5px solid #b8860b; }
+
+/* ---------- Popup fact table ---------- */
+.pfacts { width: 100%; border-collapse: collapse; margin: 8px 0 4px; }
+.pfacts th {
+  text-align: left; font-weight: 600; font-size: .72rem;
+  color: var(--muted); text-transform: uppercase; letter-spacing: .05em;
+  padding: 4px 10px 4px 0; white-space: nowrap; vertical-align: top; width: 1%;
+}
+.pfacts td { font-size: .82rem; padding: 4px 0; color: var(--text); }
+.pfacts tr + tr th, .pfacts tr + tr td { border-top: 1px solid #f0f2f0; }
+
+.pnote { font-size: .74rem; color: #8a5a1b; background: #fdf1e3;
+         border-radius: 6px; padding: 6px 9px; margin: 6px 0 2px; }
+
+/* Status block is now a single line, so tighten it */
+.pblock .pb-head { font-size: .82rem; }
+.pblock { padding: 7px 10px; margin-bottom: 4px; }
+
+.popup-links { margin-top: 10px; }

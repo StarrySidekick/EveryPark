@@ -106,7 +106,7 @@
   // State
   // ------------------------------------------------------------------
   const allParks = [];          // {name, type, lat, lng, town, acres, url, marker}
-  const activeTypes = new Set(["state", "national", "town", "preserve"]);   // cemeteries off by default
+  const activeTypes = new Set(["state", "national", "town", "preserve", "cemetery"]);
   let tilesActive = false;      // true once vector tiles take over the geometry
   let deferredWork = Promise.resolve();   // trail + PAD-US passes, filled in later
   let searchTerm = "";
@@ -241,42 +241,66 @@
 
   const ACCESS_ICON = { open: "✅", permission: "🤝", closed: "⛔", unknown: "❓" };
 
+  // One short row per fact, in a fixed order so every card reads the same
+  // way: can I go, who runs it, does it cost, then what's actually there.
+  // Deliberately terse — the map is for deciding where to go, not for
+  // reading paragraphs.
   function popupHtml(p) {
     if (!p.access) classify(p);
+    const A = p.attrs || {};
+    const rows = [];
+
+    // 1. Can I go?
+    const st = p.status === "unverified"
+      ? { cls: "unknown", icon: "⚠️", label: "Unverified" }
+      : p.access === "open"
+        ? { cls: "open", icon: "✅", label: "Open to all" }
+        : p.access === "permission"
+          ? { cls: "permission", icon: "🤝", label: "Open by permission" }
+          : { cls: "unknown", icon: "⚠️", label: "Access unverified" };
+
+    // 2. Who runs it
+    rows.push(["Maintained by", p.steward]);
+
+    // 3. Does it cost
+    rows.push(["Cost", p.feeState === "paid" ? "Admission charged"
+             : p.feeState === "parking" ? "Free to enter · paid parking"
+             : "Free"]);
+
+    // 4-7. What's there
+    if (A.water) rows.push(["Water", A.waterName || "Yes"]);
+    if (A.trails) rows.push(["Trails", "Mapped trails"]);
+    if (A.sportList && A.sportList.length)
+      rows.push(["Sports", A.sportList.slice(0, 3).join(", ")]);
+    if (A.elev != null)
+      rows.push(["Elevation", `${A.elev} m` +
+        (A.relief != null ? ` · ${terrainLabel(A.relief).toLowerCase()}` : "")]);
+    if (A.cover) rows.push(["Terrain", A.cover +
+      (A.coverTop ? ` · ${A.coverTop.toLowerCase()}` : "")]);
+    if (A.historic) rows.push(["Historic", "Buildings or monuments"]);
+
     const acres = p.acres ? ` &middot; ${Number(p.acres).toLocaleString()} acres` : "";
+    const dir = `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}`;
+
     return `
       <a class="badge ${p.type}" href="#" data-cat="${p.type}"
          title="What does this category mean?">${typeLabel(p)}</a>
       <div class="popup-name">${p.name}</div>
       <div class="popup-sub">${p.town || "Connecticut"}${acres}</div>
 
-      ${p.status === "unverified" ? `
-      <div class="pblock acc-unknown">
-        <div class="pb-head">⚠️ Unverified</div>
-        <div class="pb-body">${statusReason(p)}</div>
-      </div>` : `
-      <div class="pblock acc-${p.access}">
-        <div class="pb-head">${ACCESS_ICON[p.access]} ${p.accessLabel}</div>
-        <div class="pb-body">${p.accessWhy}</div>
-      </div>`}
-      ${p.feeState === "parking" ? `
-      <div class="pblock plain"><div class="pb-head">🅿️ Free to enter, paid parking</div>
-        <div class="pb-body">Walking or cycling in is free. Connecticut-registered
-        vehicles park free under Passport to the Parks; out-of-state vehicles pay.</div>
-      </div>` : ""}
-      ${p.feeState === "paid" ? `
-      <div class="pblock acc-permission"><div class="pb-head">💵 Admission charged</div>
-        <div class="pb-body">This place charges to get in, so it sits outside the
-        free-park category.</div></div>` : ""}
-
-      <div class="pblock plain">
-        <div class="pb-head">Maintained by</div>
-        <div class="pb-body">${p.steward}</div>
+      <div class="pblock acc-${st.cls}">
+        <div class="pb-head">${st.icon} ${st.label}</div>
       </div>
 
-      ${tagsHtml(p)}
-      ${feeHtml(p)}
-      <div class="popup-links">${linksFor(p)}</div>`;
+      <table class="pfacts">${rows.map(([k, v]) =>
+        `<tr><th>${k}</th><td>${v}</td></tr>`).join("")}</table>
+
+      ${p.status === "unverified"
+        ? `<div class="pnote">${statusReason(p)}</div>` : ""}
+
+      <div class="popup-links">
+        <a class="primary" href="${dir}" target="_blank" rel="noopener">➜ Directions</a>
+      </div>`;
   }
 
   function addPark(p) {
