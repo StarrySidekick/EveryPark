@@ -66,8 +66,10 @@ const EveryParkTiles = (() => {
   // Unverified land is drawn amber, not green: we can't confirm you can
   // actually walk it, and saying so is more useful than a confident colour.
   const statusOf = f => {
-    if (!statusBy) return "park";
-    return statusBy.get(normName(nameOf(f))) || "unverified";
+    try {
+      if (!statusBy) return "park";
+      return statusBy.get(normName(nameOf(f))) || "unverified";
+    } catch (e) { return "park"; }
   };
 
   const visible = (dataLayer, f) => {
@@ -278,7 +280,11 @@ const EveryParkTiles = (() => {
     // Hand in the verified/unverified verdict per place name.
     setStatus(lookup) {
       statusBy = lookup;
-      if (layer && layer.rerenderTiles) layer.rerenderTiles();
+      // Redrawing before the first tiles have arrived leaves the layer in a
+      // state where it never paints at all, so defer to the next frame.
+      if (layer && layer.rerenderTiles) {
+        setTimeout(() => { try { layer.rerenderTiles(); } catch (e) {} }, 0);
+      }
     },
 
     // Called when the filter chips change. No refetching — the data is
