@@ -18,6 +18,12 @@ const EveryParkTiles = (() => {
   // geometry and source attributes but not our verdict, so the verdict is
   // handed in from the place list and matched by name.
   let statusBy = null;
+  // Given a feature's name and where it was clicked, hands back the popup
+  // for the actual place record. The tiles carry only geometry and a few
+  // source attributes; everything a visitor wants — access, steward,
+  // what's there, directions — lives on the place, so the polygon and the
+  // pin must resolve to the same thing.
+  let resolvePlace = null;
 
   // Border colour by who owns the land. Same palette as the pins.
   const OWNER = {
@@ -200,6 +206,17 @@ const EveryParkTiles = (() => {
   function onClick(e) {
     const hit = pick(e.latlng);
     if (!hit) return;
+
+    // Same entity, same popup. Falling through to the sparse tile-only
+    // version below is a last resort for shapes with no matching place.
+    if (resolvePlace) {
+      const html = resolvePlace(nameOf(hit.f), e.latlng);
+      if (html) {
+        L.popup({ maxWidth: 300 }).setLatLng(e.latlng).setContent(html).openOn(map);
+        return;
+      }
+    }
+
     const p = hit.f.props || {};
     const acres = Math.round(p.ACRE_GIS || p.GIS_Acres || p.ACRES || 0);
     const kind = p.AV_LEGEND || LABEL[hit.dataLayer] || "Public land";
@@ -254,6 +271,9 @@ const EveryParkTiles = (() => {
       map.on("click", onClick);
       return true;
     },
+
+    // Lets a clicked polygon show the same popup as its pin.
+    setPlaceResolver(fn) { resolvePlace = fn; },
 
     // Hand in the verified/unverified verdict per place name.
     setStatus(lookup) {

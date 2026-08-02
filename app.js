@@ -2461,7 +2461,32 @@
       p._pre = true;           // so addPark doesn't classify a second time
       addPark(p);
     }
-    if (tilesActive) EveryParkTiles.setStatus(statusLookup);
+    if (tilesActive) {
+      EveryParkTiles.setStatus(statusLookup);
+
+      // Clicking a polygon should say exactly what clicking its pin says.
+      // Match on name, and where a name repeats across the state take the
+      // one nearest the click.
+      const byName = new Map();
+      for (const p of allParks) {
+        const k = normNm(p.name);
+        if (!byName.has(k)) byName.set(k, []);
+        byName.get(k).push(p);
+      }
+      EveryParkTiles.setPlaceResolver((name, latlng) => {
+        const cands = byName.get(normNm(name));
+        if (!cands || !cands.length) return null;
+        let best = cands[0];
+        if (cands.length > 1 && latlng) {
+          let bd = Infinity;
+          for (const c of cands) {
+            const d = distM(latlng.lat, latlng.lng, c.lat, c.lng);
+            if (d < bd) { bd = d; best = c; }
+          }
+        }
+        return popupHtml(best);
+      });
+    }
     refresh();
     console.info(`Loaded ${data.places.length.toLocaleString()} precomputed places ` +
                  `(built ${data.built}). No live fetching.`);
