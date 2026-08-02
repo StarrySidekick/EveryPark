@@ -158,6 +158,13 @@ settles hundreds of places at once. Ten rules currently cover ~3,400 places
 **Every entry requires `source` and `checked`.** A claim without a citation is
 a guess, and guesses are what this file exists to replace.
 
+Two verdict flags, the positive and negative of the same research:
+`reachable: true` = cited proof the public can walk in free (settles the
+physical test without a mapped trail). `private: true` = cited proof a
+place is members-only (community beach association, club land) — it fails
+the legal test, hides the pin, and the card explains why. Added 2026-08-02
+when two Candlewood tax-district beaches turned out to be wrongly green.
+
 Deliberately **not** rule-covered: the generic 246-place "Non-profit / land
 trust" bucket. TNC states some preserves are closed to protect at-risk
 species, so blanket-asserting access there would be a confident lie.
