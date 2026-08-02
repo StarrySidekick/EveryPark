@@ -75,6 +75,16 @@ jobs:
           s = re.sub(r'dataVersion:\s*"[^"]*"', f'dataVersion: "{stamp}"', s, count=1)
           open(p, "w").write(s)
           print("dataVersion ->", stamp)
+          # Keep the README headline honest too — generated numbers
+          # belong to the pipeline, not to hand-editing.
+          import json
+          n = len(json.load(open("data/places.json"))["places"])
+          line = f"*{n:,} places · updated {time.strftime('%B %-d, %Y')}*"
+          r = open("README.md").read()
+          r2 = re.sub(r"\*[\d,]+ places · updated [^*]+\*", line, r, count=1)
+          if r2 != r:
+              open("README.md", "w").write(r2)
+              print("README ->", line)
           PY
 
       - name: Report what changed
@@ -93,7 +103,7 @@ jobs:
           git config user.name  "everypark-bot"
           git config user.email "actions@github.com"
           git add data/places.json data/everypark.pmtiles config.js \
-                  data/research-audit.json data/baked.json || true
+                  data/research-audit.json data/baked.json README.md || true
           if git diff --cached --quiet; then
             echo "nothing changed"
           else

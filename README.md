@@ -4,7 +4,9 @@ An interactive map of every publicly accessible outdoor place in Connecticut.
 Live at **[everypark.starrysidekick.com](http://everypark.starrysidekick.com)**.
 Repo `StarrySidekick/EveryPark`, hosted free on GitHub Pages.
 
-*8,766 places · updated July 26, 2026*
+*7,699 places · updated August 1, 2026*
+<!-- The line above is stamped automatically by publish.py and the
+     refresh workflow. Don't edit it by hand. -->
 
 The map answers three questions at a glance:
 
@@ -33,6 +35,14 @@ means changing the wording is a code edit, not a rebuild.
 map tiles across zooms 6–14 and packed into one file. The browser pulls only the
 tiles on screen using HTTP range requests, so panning costs kilobytes.
 
+## Publishing — the one rule
+
+**Data flows only through the Actions.** Edit `data/verified.json` (or code),
+commit, push — `publish.yml` applies it and deploys in about ninety seconds.
+A local deploy must never touch `data/`: it bypasses the workflows'
+concurrency lock and has already clobbered Action-enriched output once.
+If a local push is ever needed, it is for site code (HTML/JS/CSS) only.
+
 ## Rebuilding the data
 
 ```bash
@@ -60,6 +70,10 @@ python3 buildplaces.py --raw <dir with baked.json + ep-padus.geojson> \
 
 The rule: **paid-but-open-to-anyone stays; exclusive-entry goes.** A town beach
 charging non-residents is public. A members-only lake association is not.
+
+**Cemeteries stay** (decided 2026-08-02): they are walkable public green
+space, purple-coded and filterable off. This was a deliberate call — do not
+re-litigate it without a new reason.
 
 Excluded automatically:
 

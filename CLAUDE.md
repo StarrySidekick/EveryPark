@@ -44,6 +44,9 @@ Anything failing a test renders **amber (unverified)**, never green. Amber is
 honest uncertainty, not a defect. Do not make things green by asserting facts
 we have not checked — see "Failure modes" below, this has happened.
 
+**Cemeteries stay in the dataset** (Timothy, 2026-08-02): walkable public
+green space, purple-coded, filterable off. Settled — don't re-litigate.
+
 ---
 
 ## Architecture

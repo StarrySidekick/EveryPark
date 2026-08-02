@@ -99,6 +99,20 @@ def main():
             open("config.js", "w").write(s2)
             print(f"  dataVersion -> {stamp}", flush=True)
 
+    # Keep the README's headline honest. A stale count in the README has
+    # already misled a session into wrong conclusions about the dataset —
+    # generated numbers belong to the pipeline, not to hand-editing.
+    if os.path.exists("README.md"):
+        import re
+        import time
+        s = open("README.md").read()
+        line = (f"*{len(places):,} places · updated "
+                f"{time.strftime('%B %-d, %Y')}*")
+        s2 = re.sub(r"\*[\d,]+ places · updated [^*]+\*", line, s, count=1)
+        if s2 != s:
+            open("README.md", "w").write(s2)
+            print(f"  README -> {line}", flush=True)
+
     # Same guard as the full refresh: research that stops applying is
     # invisible in the output, so it has to fail loudly here too.
     lost = audit.get("unmatched") or []
