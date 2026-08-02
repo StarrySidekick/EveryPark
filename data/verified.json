@@ -150,6 +150,117 @@
       ],
       "checked": "2026-08-02",
       "why": "Avalonia's 46 preserves, over 5,000 acres across nine southeastern Connecticut towns, are open and free to the public dawn to dusk, with trail maps online and posted on site."
+    },
+    {
+      "id": "wyndham",
+      "match": {
+        "agency": "Wyndham Land Trust"
+      },
+      "reachable": true,
+      "trails": true,
+      "fee": "Free",
+      "siteRules": [
+        "Passive recreation",
+        "Some preserves allow bikes or horses \u2014 check the preserve page"
+      ],
+      "source": [
+        "https://www.wyndhamlandtrust.org/preserves/",
+        "https://explorect.org/wyndham-land-trust/"
+      ],
+      "checked": "2026-08-02",
+      "why": "Over 7,500 acres in northeast Connecticut, with about 18 hikeable properties and 16+ miles of trails open to the public. Note: not every Wyndham holding is trailed, so this asserts reachable rather than claiming a trail on each parcel."
+    },
+    {
+      "id": "flanders",
+      "match": {
+        "agency": "Flanders Nature Center"
+      },
+      "reachable": true,
+      "trails": true,
+      "fee": "Free",
+      "siteRules": [
+        "Open dawn to dusk, year round",
+        "No charge",
+        "Passive recreation"
+      ],
+      "source": [
+        "https://flandersnaturecenter.org/hiking/",
+        "https://en.wikipedia.org/wiki/Flanders_Nature_Center_&_Land_Trust"
+      ],
+      "checked": "2026-08-02",
+      "why": "Flanders manages over 2,400 acres in Woodbury and neighbouring towns. Trails at its seven major preserves are open to the public at no charge, dawn to dusk, year round."
+    },
+    {
+      "id": "aspetuck",
+      "match": {
+        "agency": "Aspetuck Land Trust"
+      },
+      "reachable": true,
+      "trails": true,
+      "fee": "Free",
+      "siteRules": [
+        "Open dawn to dusk",
+        "Dog walking permitted",
+        "Fishing by permit only"
+      ],
+      "source": [
+        "https://www.aspetucklandtrust.org/land-use-policies",
+        "https://www.aspetucklandtrust.org/find-preserves-by-town"
+      ],
+      "checked": "2026-08-02",
+      "why": "45 trailed nature preserves across Easton, Weston, Westport, Fairfield, Southport, Norwalk and Bridgeport, all open to walk dawn to dusk."
+    },
+    {
+      "id": "glastonbury",
+      "match": {
+        "agency": "Town of Glastonbury"
+      },
+      "reachable": true,
+      "fee": "Free",
+      "siteRules": [
+        "Town open space, open to residents and visitors"
+      ],
+      "source": [
+        "https://www.glastonburyct.gov/departments/department-directory-a-h/community-development-planning-environmental/town-owned-open-spaces",
+        "https://www.glastonburyct.gov/our-community/local-attractions/hiking-walking"
+      ],
+      "checked": "2026-08-02",
+      "why": "Glastonbury publishes an inventory and map of its town-owned open spaces, many with walking trails. Municipal open space in Connecticut is public; the town cannot exclude non-residents."
+    },
+    {
+      "id": "tnc-ct",
+      "match": {
+        "agency": "The Nature Conservancy"
+      },
+      "reachable": true,
+      "fee": "Free",
+      "siteRules": [
+        "Dawn to dusk",
+        "Passive recreation: hiking, birding, nature study",
+        "A few preserves are closed to protect at-risk species \u2014 check before visiting"
+      ],
+      "source": [
+        "https://www.nature.org/en-us/about-us/where-we-work/united-states/connecticut/stories-in-connecticut/connecticut-places-we-protect/",
+        "https://www.nature.org/content/dam/tnc/nature/en/documents/INFO_Preserve_Guidelines.pdf"
+      ],
+      "checked": "2026-08-02",
+      "why": "Most TNC Connecticut preserves are open free for low-impact recreation. Deliberately not claiming trails, because TNC states some preserves harbouring at-risk species are closed."
+    },
+    {
+      "id": "ct-municipal-openspace",
+      "match": {
+        "agency": "City or town"
+      },
+      "reachable": true,
+      "fee": "Free",
+      "siteRules": [
+        "Municipal open space, open to residents and non-residents alike"
+      ],
+      "source": [
+        "https://law.justia.com/cases/connecticut/supreme-court/2001/257-cr-318-0.html"
+      ],
+      "checked": "2026-08-02",
+      "why": "Land recorded in PAD-US as city or town owned is municipal open space. Under Leydon v. Greenwich (2001) a Connecticut municipality may not close its parks and open space to non-residents, so this land is public by law."
     }
   ]
 }
