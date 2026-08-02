@@ -203,7 +203,12 @@
     if (A.pool) t.push("🏊 Pool");
     if (A.historic) t.push("🏛️ Historic");
     if (A.parking) t.push("🅿️ Parking");
+    if (A.cover) t.push(`${A.cover === "mostly wooded" ? "🌲" :
+                          A.cover === "mostly open" ? "🌾" : "🌗"} ${A.cover}` +
+                        (A.coverTop ? ` (${A.coverTop.toLowerCase()})` : ""));
     if (A.terrain) t.push(`⛰️ ${A.terrain}`);
+    else if (A.elev != null) t.push(`⛰️ ${A.elev} m` +
+      (A.relief != null ? ` · ${terrainLabel(A.relief)}` : ""));
     if (!t.length) return "";
     return `<div class="popup-tags">${t.map(x => `<span class="tag">${x}</span>`).join("")}</div>`;
   }
@@ -304,6 +309,7 @@
   }
 
   async function loadTerrain(p) {
+    if (p.attrs && (p.attrs.terrain || p.attrs.relief != null)) return;
     if (!CONFIG.terrain.enabled || !p.attrs || p.attrs.terrain || p._terrainBusy) return;
     p._terrainBusy = true;
     try {
@@ -1636,6 +1642,14 @@
       : "";
   }
 
+  // Elevation now ships with the data, so the popup no longer has to call
+  // USGS when you open it. That was a live network round trip per click.
+  function terrainFromData(p) {
+    const A = p.attrs || {};
+    if (A.terrain || A.relief == null) return;
+    A.terrain = `${terrainLabel(A.relief)} · ${A.relief} m relief`;
+  }
+
   function scoreAccess(p) {
     const A = p.attrs || (p.attrs = {});
     A.visitable = !!(A.trails || A.parking || A.sports || A.playground || A.beach || A.pool);
@@ -2438,6 +2452,12 @@
       if (p.status) statusLookup.set(normNm(p.name), p.status);
       if (p.attrs && p.attrs.byPermission && !p.note) p.note = PADUS_NOTE;
       scoreAccess(p);          // sets visitable + accessNote, then classifies
+      terrainFromData(p);
+      // Mirror land cover into plain flags so the filter chips, which read
+      // attrs directly, work without special-casing.
+      const A = p.attrs || {};
+      if (A.cover === "mostly wooded") A.wooded = true;
+      else if (A.cover === "mostly open") A.openland = true;
       p._pre = true;           // so addPark doesn't classify a second time
       addPark(p);
     }
