@@ -138,11 +138,12 @@ GEOMETRY_LAYERS = [
      "name,landuse,operator"),
     ("padus", PADUS, "1=1",
      "Unit_Nm,Own_Name,Mang_Name,Pub_Access,Des_Tp,GIS_Acres"),
-    # The protected open-space parcels layer — the one that never made it
-    # through the browser route.
-    ("parcels",
-     DEEP + "Connecticut_Parcels_for_Protected_Open_Space_Mapping/FeatureServer/0/query",
-     "1=1", "TOWN,ACRES"),
+    # NOT fetched: Connecticut_Parcels_for_Protected_Open_Space_Mapping.
+    # Despite the name it is not a layer of protected parcels — it is the
+    # statewide tax parcel layer, 1,020,364 polygons, overwhelmingly private
+    # house lots. It was the input DEEP used *for* open-space mapping, not
+    # the output. Pulling it would mean hundreds of megabytes of private
+    # property, which is the opposite of what this map is for.
     ("trails", OSM6 + "OSM_NA_Trails/FeatureServer/0/query",
      "highway IN ('path','track','bridleway')", "name,highway,surface,access"),
     ("blueblazed", DEEP + "BlueBlazedHikingTrails/FeatureServer/0/query",
