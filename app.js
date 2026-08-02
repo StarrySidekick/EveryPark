@@ -268,7 +268,11 @@
              : "Free"]);
 
     // 4-7. What's there
-    if (A.water) rows.push(["Water", A.waterName || "Yes"]);
+    if (A.water) {
+      const wt = { lake: "Lake", reservoir: "Reservoir", river: "River",
+                   waterfall: "Waterfall" }[A.waterType];
+      rows.push(["Water", (A.waterName || "Yes") + (wt ? ` · ${wt.toLowerCase()}` : "")]);
+    }
     if (A.trails) rows.push(["Trails", "Mapped trails"]);
     if (A.sportList && A.sportList.length)
       rows.push(["Sports", A.sportList.slice(0, 3).join(", ")]);
