@@ -14,12 +14,76 @@ import json
 import os
 from collections import defaultdict
 
-from buildplaces import attach_geometry, verify_all
+from buildplaces import attach_geometry, verify_all, norm
+
+
+# Fields a research entry may set directly on the place attributes.
+VERIFIED_ATTRS = ("trails", "parking", "water", "waterName", "waterType",
+                  "sports", "sportList", "playground", "historic", "beach",
+                  "pool", "dogpark")
+
+
+def apply_verified(places, path):
+    """
+    Overlay hand-researched facts on top of what the GIS could work out.
+
+    The automated sources only know what somebody mapped. Plenty of real
+    town parks have no trail tagged inside them and come out unverified —
+    Clatter Valley in New Milford is 100 acres with hiking trails, a pond
+    and a pavilion, and OpenStreetMap knows none of it. A web search
+    settles it in seconds, so this puts that research back into the data.
+    """
+    if not os.path.exists(path):
+        return 0
+    try:
+        entries = json.load(open(path)).get("places") or []
+    except Exception as e:                          # noqa: BLE001
+        print(f"  verified.json unreadable: {e}", flush=True)
+        return 0
+
+    index = {}
+    for i, p in enumerate(places):
+        index.setdefault((norm(p["name"]), p.get("town")), i)
+        index.setdefault((norm(p["name"]), None), i)
+
+    hits = 0
+    for e in entries:
+        m = e.get("match") or {}
+        i = index.get((norm(m.get("name", "")), m.get("town")))
+        if i is None:
+            i = index.get((norm(m.get("name", "")), None))
+        if i is None:
+            print(f"  no match for verified entry: {m.get('name')!r}", flush=True)
+            continue
+        p = places[i]
+        A = p.setdefault("attrs", {})
+        for k in VERIFIED_ATTRS:
+            if k in e:
+                if e[k] is False:
+                    A.pop(k, None)
+                else:
+                    A[k] = e[k]
+        if e.get("rename"):
+            p["name"] = e["rename"]
+        for k in ("town", "agency", "url", "fee", "note", "acres"):
+            if e.get(k) is not None:
+                p[k] = e[k]
+        # Provenance: the card can say this was checked by a human, and
+        # anyone auditing later can follow the citation.
+        A["researched"] = True
+        if e.get("source"):
+            src = e["source"]
+            A["sources"] = src if isinstance(src, list) else [src]
+        if e.get("checked"):
+            A["checked"] = e["checked"]
+        hits += 1
+    return hits
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--raw", required=True)
+    ap.add_argument("--data", default="data")
     ap.add_argument("--in", dest="src", required=True)
     ap.add_argument("-o", "--out", required=True)
     args = ap.parse_args()
@@ -27,6 +91,10 @@ def main():
     data = json.load(open(args.src))
     places = data["places"]
     print(f"  {len(places):,} places in", flush=True)
+
+    applied = apply_verified(places, os.path.join(args.data, "verified.json"))
+    if applied:
+        print(f"  {applied} places corrected by research", flush=True)
 
     shaped = attach_geometry(places, args.raw)
     print(f"  boundaries matched to {shaped:,} "

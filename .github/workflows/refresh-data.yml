@@ -37,7 +37,7 @@ jobs:
         run: python3 buildplaces.py --raw raw --data data -o data/places.json
 
       - name: Attach real boundaries and verify what counts as a park
-        run: python3 verifyplaces.py --raw raw --in data/places.json -o data/places.json
+        run: python3 verifyplaces.py --raw raw --data data --in data/places.json -o data/places.json
 
       - name: Sample elevation and land cover
         run: python3 enrichraster.py --in data/places.json -o data/places.json

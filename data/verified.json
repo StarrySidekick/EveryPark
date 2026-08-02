@@ -1,0 +1,80 @@
+{
+  "_README": [
+    "Research-confirmed facts about places the automated sources can't see.",
+    "",
+    "The GIS layers only know what someone has mapped. A town park with no",
+    "OpenStreetMap trail tagged inside it comes out 'unverified' even when a",
+    "single web search proves it has trails, parking and a pavilion. This file",
+    "is where that human research lands.",
+    "",
+    "Entries are matched on name + town and applied AFTER the automated pass,",
+    "so they override it. Every entry must carry `source` and `checked` \u2014 a",
+    "claim without a citation is a guess, and guesses are what this file",
+    "exists to replace.",
+    "",
+    "Fields you can set: trails, parking, water, waterName, waterType, sports,",
+    "sportList, playground, historic, beach, pool, dogpark, fee, url, note,",
+    "agency, acres."
+  ],
+  "places": [
+    {
+      "match": {
+        "name": "Town Of New Milford (Clatter Valley)",
+        "town": "Bridgewater"
+      },
+      "rename": "Clatter Valley Park",
+      "town": "New Milford",
+      "agency": "New Milford Parks & Recreation",
+      "url": "https://newmilfordct.myrec.com/info/facilities/details.aspx?FacilityID=14712",
+      "trails": true,
+      "parking": true,
+      "water": true,
+      "waterName": "Clatter Valley Pond",
+      "waterType": "lake",
+      "dogpark": false,
+      "fee": "Free",
+      "note": "Roughly 100 acres of town open space at 158 Town Farm Road. Hiking and unmarked trails, a pond, and a reservable pavilion with picnic tables and grills. Leashed dogs welcome.",
+      "source": [
+        "https://newmilfordct.myrec.com/info/facilities/details.aspx?FacilityID=14712",
+        "https://www.alltrails.com/en-gb/parks/us/connecticut/clatter-valley-park"
+      ],
+      "checked": "2026-08-02"
+    },
+    {
+      "match": {
+        "name": "Devils Den",
+        "town": "Redding"
+      },
+      "rename": "Lucius Pond Ordway \u2013 Devil's Den Preserve",
+      "agency": "The Nature Conservancy",
+      "url": "https://www.nature.org/en-us/get-involved/how-to-help/places-we-protect/lucius-pond-ordwaydevils-den-preserve/",
+      "trails": true,
+      "parking": true,
+      "water": true,
+      "waterName": "Godfrey Pond",
+      "waterType": "lake",
+      "fee": "Free",
+      "note": "1,746 acres across Weston and Redding \u2014 the largest preserve in Fairfield County, with a 20-mile trail system. Open dawn to dusk. Main parking at the end of Pent Road, Weston; small pull-off on Dayton Road, Redding.",
+      "source": [
+        "https://www.nature.org/en-us/get-involved/how-to-help/places-we-protect/lucius-pond-ordwaydevils-den-preserve/",
+        "https://en.wikipedia.org/wiki/Devil's_Den_Preserve"
+      ],
+      "checked": "2026-08-02"
+    },
+    {
+      "match": {
+        "name": "Devil'S Den/Saugatuck Forest",
+        "town": "Redding"
+      },
+      "agency": "The Nature Conservancy",
+      "trails": true,
+      "parking": true,
+      "fee": "Free",
+      "note": "Part of the Devil's Den preserve complex. Open dawn to dusk; trail maps at the Pent Road parking area in Weston.",
+      "source": [
+        "https://www.nature.org/en-us/get-involved/how-to-help/places-we-protect/lucius-pond-ordwaydevils-den-preserve/"
+      ],
+      "checked": "2026-08-02"
+    }
+  ]
+}
