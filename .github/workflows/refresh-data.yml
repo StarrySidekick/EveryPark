@@ -16,6 +16,13 @@ on:
 permissions:
   contents: write
 
+# Shared with the publish workflow so the two can never write to
+# data/ at the same time. A fast publish firing mid-refresh is exactly
+# the race that killed run #4.
+concurrency:
+  group: everypark-data
+  cancel-in-progress: false
+
 jobs:
   refresh:
     runs-on: ubuntu-latest
@@ -85,7 +92,23 @@ jobs:
             echo "nothing changed"
           else
             git commit -m "Refresh data from public sources"
-            git push
+            # This job takes half an hour, and main can move while it
+            # runs — run #4 spent 38 minutes fetching sources and
+            # sampling elevation, then threw all of it away on a
+            # rejected push. Rebase onto whatever landed meanwhile and
+            # retry, so a commit arriving mid-run costs a few seconds
+            # instead of the entire run.
+            for attempt in 1 2 3; do
+              if git push; then
+                echo "pushed on attempt $attempt"
+                exit 0
+              fi
+              echo "push rejected — rebasing onto origin/main and retrying"
+              git pull --rebase --autostash origin main || exit 1
+              sleep 5
+            done
+            echo "could not push after 3 attempts"
+            exit 1
           fi
 
       # Runs AFTER the commit on purpose. If research stopped applying we

@@ -1,0 +1,65 @@
+name: Publish knowledge base
+
+# The fast path. Applies data/verified.json to the dataset that's already
+# committed and pushes the result — about ninety seconds, versus roughly
+# an hour for the full refresh.
+#
+# Use this whenever a *fact* changes: a park's hours, who runs it, whether
+# there's parking. Use "Refresh EveryPark data" only when the sources
+# themselves need re-pulling, which is monthly at most.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "data/verified.json"      # editing the knowledge base publishes it
+
+permissions:
+  contents: write
+
+# Never let two of these overlap, and never fight the monthly refresh.
+concurrency:
+  group: everypark-data
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # No requests, pillow, mercantile or pmtiles — this path touches no
+      # network and builds no tiles. shapely is here because the park
+      # test imports it.
+      - name: Install dependencies
+        run: pip install shapely
+
+      - name: Apply the knowledge base
+        id: apply
+        run: python3 publish.py --data data
+
+      - name: Commit
+        if: always() && steps.apply.outcome != 'cancelled'
+        run: |
+          git config user.name  "everypark-bot"
+          git config user.email "actions@github.com"
+          git add data/places.json data/research-audit.json || true
+          if git diff --cached --quiet; then
+            echo "nothing changed"
+            exit 0
+          fi
+          git commit -m "Publish knowledge base"
+          for attempt in 1 2 3; do
+            if git push; then
+              echo "pushed on attempt $attempt"
+              exit 0
+            fi
+            git pull --rebase --autostash origin main || exit 1
+            sleep 5
+          done
+          exit 1

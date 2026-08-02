@@ -196,8 +196,36 @@ def merge_into(keep, drop):
             keep["aka"].append(n)
 
 
-def dedupe(places, verbose=True):
-    """Merge same-place records. Returns (kept, merged_count)."""
+def dedupe(places, verbose=True, max_passes=6):
+    """
+    Merge same-place records, repeatedly, until nothing more merges.
+
+    One pass is not enough and the reason is subtle: merging renames the
+    surviving record to the better name, and that new name can be related
+    to a third record the old name wasn't. Running once left the data one
+    pass short of settled, so publishing twice produced two different
+    answers — the exact drift this module exists to end.
+
+    Iterating to a fixed point makes the output depend only on the input,
+    not on how many times it has been run.
+    """
+    total = 0
+    for i in range(max_passes):
+        places, n = _dedupe_once(places, verbose=verbose and i == 0)
+        total += n
+        if not n:
+            break
+    else:
+        if verbose:
+            print(f"  !! still merging after {max_passes} passes", flush=True)
+    if verbose and total:
+        print(f"  {total:,} merged in total, {len(places):,} places remain",
+              flush=True)
+    return places, total
+
+
+def _dedupe_once(places, verbose=True):
+    """One merge pass. Returns (kept, merged_count)."""
     # Bucket by a coarse grid so this stays linear rather than comparing
     # 8,771 records against each other.
     grid = {}
@@ -254,10 +282,15 @@ def dedupe(places, verbose=True):
 
     kept = [p for i, p in enumerate(places) if i not in gone]
     for p in kept:
-        p["id"] = place_id(p["name"], p["lat"], p["lng"])
+        # setdefault, not assignment. Research can rename a place — the
+        # verified.json entry for Devil's Den does exactly that — and
+        # recomputing the id from the new name gave it a different
+        # identity on the next run, so the file never settled. An id is
+        # assigned once and then it is simply what that place is.
+        p.setdefault("id", place_id(p["name"], p["lat"], p["lng"]))
 
     if verbose:
-        print(f"  merged {merged:,} duplicate records, {len(kept):,} places remain",
+        print(f"    pass 1: merged {merged:,}",
               flush=True)
         for e in examples:
             print(f"    {e}", flush=True)
