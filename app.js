@@ -2226,7 +2226,7 @@
   });
 
   const layersPanel = document.getElementById("layersPanel");
-  document.getElementById("layersBtn").addEventListener("click", (e) => {
+  (document.getElementById("layersBtn") || {addEventListener(){}}).addEventListener("click", (e) => {
     layersPanel.hidden = !layersPanel.hidden;
     e.currentTarget.classList.toggle("active", !layersPanel.hidden);
   });
@@ -2248,12 +2248,12 @@
   });
 
   let searchTimer;
-  document.getElementById("search").addEventListener("input", (e) => {
+  (document.getElementById("search") || {addEventListener(){}}).addEventListener("input", (e) => {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => { searchTerm = e.target.value.trim().toLowerCase(); refresh(); }, 180);
   });
 
-  document.getElementById("padusToggle").addEventListener("click", async (e) => {
+  (document.getElementById("padusToggle") || {addEventListener(){}}).addEventListener("click", async (e) => {
     const btn = e.currentTarget;
     if (map.hasLayer(padusLayer)) {
       map.removeLayer(padusLayer);
@@ -2274,7 +2274,7 @@
     }
   });
 
-  document.getElementById("parcelToggle").addEventListener("click", async (e) => {
+  (document.getElementById("parcelToggle") || {addEventListener(){}}).addEventListener("click", async (e) => {
     const btn = e.currentTarget;
     if (map.hasLayer(parcelLayer)) {
       map.removeLayer(parcelLayer);
@@ -2292,7 +2292,7 @@
     }
   });
 
-  document.getElementById("bbToggle").addEventListener("click", async (e) => {
+  (document.getElementById("bbToggle") || {addEventListener(){}}).addEventListener("click", async (e) => {
     const btn = e.currentTarget;
     if (map.hasLayer(bbLayer)) {
       map.removeLayer(bbLayer);
@@ -2304,7 +2304,7 @@
     }
   });
 
-  document.getElementById("gapToggle").addEventListener("click", async (e) => {
+  (document.getElementById("gapToggle") || {addEventListener(){}}).addEventListener("click", async (e) => {
     const btn = e.currentTarget;
     if (map.hasLayer(gapLayer)) {
       map.removeLayer(gapLayer);
@@ -2316,7 +2316,7 @@
     }
   });
 
-  document.getElementById("listToggle").addEventListener("click", () => {
+  (document.getElementById("listToggle") || {addEventListener(){}}).addEventListener("click", () => {
     document.getElementById("listPanel").classList.toggle("hidden");
   });
 
