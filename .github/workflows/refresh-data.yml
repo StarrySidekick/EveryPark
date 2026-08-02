@@ -38,7 +38,13 @@ jobs:
         run: pip install requests shapely mercantile mapbox-vector-tile pmtiles pillow
 
       - name: Fetch every source
-        run: python3 fetchsources.py --out raw
+        # --prev lets a flaky endpoint degrade to last refresh's copy of
+        # that one section instead of aborting the whole hour. The fresh
+        # pull is committed back to data/baked.json below so next month
+        # always has something to degrade to.
+        run: |
+          python3 fetchsources.py --out raw --prev data/baked.json
+          cp raw/baked.json data/baked.json
 
       - name: Build the place list
         run: python3 buildplaces.py --raw raw --data data -o data/places.json
@@ -87,7 +93,7 @@ jobs:
           git config user.name  "everypark-bot"
           git config user.email "actions@github.com"
           git add data/places.json data/everypark.pmtiles config.js \
-                  data/research-audit.json || true
+                  data/research-audit.json data/baked.json || true
           if git diff --cached --quiet; then
             echo "nothing changed"
           else

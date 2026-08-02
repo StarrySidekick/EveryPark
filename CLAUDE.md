@@ -79,7 +79,8 @@ data/places.json          the dataset — GENERATED, never hand-edit
 data/verified.json        the knowledge base — HAND-WRITTEN, never generated
 data/research-audit.json  proof the knowledge base applied — generated
 data/everypark.pmtiles    geometry (~14 MB) — generated
-data/baked.json           legacy, unused by the map
+data/baked.json           last refresh's source pull — generated; the
+                          per-section fallback when an endpoint is down
 ```
 
 ### Record shape
@@ -175,7 +176,7 @@ Every one of these produced output that looked fine.
 | Publishing twice gave two answers | merging renames records, creating new matches | iterate to fixed point |
 | Ids drifted between runs | recomputed after research renamed a place | `setdefault`, assign once |
 | Run #4 lost 38 min of work | I pushed to `main` mid-run; push rejected | rebase-and-retry loop |
-| Run #5 died at 12 min | one OSM endpoint returned "Invalid query parameters" | **still open** |
+| Run #5 died at 12 min | one OSM endpoint returned "Invalid query parameters" | per-section guard degrades to last refresh's `data/baked.json`; `::warning::` annotation; fatal only when no fallback exists |
 | Preserves named "Non-profit / land trust" | read `officialOwner` (category) before `agency` (name) | precedence fixed |
 | Reservation shown as "You can go here" | tile-fallback popup asserted access unconditionally | now "Unverified" |
 
@@ -185,8 +186,6 @@ logging — a log nobody reads is the same as no check.
 
 ### Known open issues
 
-- **One flaky source aborts the whole refresh.** `fetch_geometry` catches per
-  layer; `fetch_attributes` does not. Should degrade to last run's data.
 - **Parking coverage ~6%.** OSM has only 687 public parking points statewide;
   that source is exhausted. Would need an NLCD-adjacency heuristic.
 - **~2,900 places still unverified**, mostly 641 with no recorded steward and
@@ -233,4 +232,3 @@ deploy actually reached the browser.
 - Isometric 3D park view on zoom, elevation mapped onto the polygon,
   "like a video game" (elevation is already stored — the prerequisite is done)
 - Timothy's own graphics and UI
-- Make each source failure non-fatal in the refresh
