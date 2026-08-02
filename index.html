@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
   <!-- ?v= is a cache-buster: bump it on every deploy so visitors get fresh code -->
-  <link rel="stylesheet" href="styles.css?v=63">
+  <link rel="stylesheet" href="styles.css?v=64">
 </head>
 <body>
 
@@ -44,24 +44,9 @@
         </div>
       </div>
 
-      <div class="group" title="What's actually there">
-        <span class="glabel">What's there</span>
-        <div class="chips" id="attrChips">
-          <button class="chip attr" data-attr="trails">🥾 Trails</button>
-          <button class="chip attr" data-attr="water">🌊 Water</button>
-          <button class="chip attr" data-attr="sports">🏀 Sports</button>
-          <button class="chip attr" data-attr="playground">🛝 Playground</button>
-          <button class="chip attr" data-attr="historic">🏛️ Historic</button>
-          <button class="chip attr" data-attr="parking">🅿️ Parking</button>
-          <button class="chip attr" data-attr="wooded">🌲 Wooded</button>
-          <button class="chip attr" data-attr="openland">🌾 Open</button>
-        </div>
-      </div>
-
       <span id="buildBadge" title="Site build and dataset date — proof of what you're looking at"></span>
       <button id="guideBtn" title="What the categories mean">? Guide</button>
       <button id="layersBtn" title="Extra map layers">⚙︎ Layers</button>
-      <button id="listToggle">List</button>
     </div>
 
     <div id="layersPanel" hidden>
@@ -100,25 +85,22 @@
 
   <main>
     <div id="map"></div>
-    <aside id="listPanel">
-      <div id="listMeta">Loading…</div>
-      <div id="parkList"></div>
-    </aside>
     <div id="status"></div>
 
     <div id="legend">
       <div class="legend-title">Green = confirmed a park</div>
       <div class="legend-row"><span class="sw fill-open"></span>Verified: legal, reachable, free</div>
       <div class="legend-row"><span class="sw unverified"></span>Unverified — can't confirm you can visit</div>
+      <div class="legend-row"><span class="sw" style="background:#8464c9;opacity:.55"></span>Cemetery grounds (purple fill)</div>
       <div class="legend-note" style="margin-bottom:7px">Unshaded land is private. Amber is public land
         with no mapped way in, or no known boundary — the popup says which test it failed.</div>
 
       <div class="legend-title">Border colour = who owns it</div>
-      <div class="legend-row"><span class="sw ring" style="border-color:#1b5e20"></span>State of Connecticut</div>
-      <div class="legend-row"><span class="sw ring" style="border-color:#6d4c41"></span>Federal</div>
-      <div class="legend-row"><span class="sw ring" style="border-color:#1565c0"></span>Town or city</div>
-      <div class="legend-row"><span class="sw ring" style="border-color:#00838f"></span>Land trust / non-profit</div>
-      <div class="legend-row"><span class="sw ring" style="border-color:#5e35b1"></span>Cemetery</div>
+      <div class="legend-row"><span class="sw ring" style="border-color:#2b8a3e"></span>State of Connecticut</div>
+      <div class="legend-row"><span class="sw ring" style="border-color:#a9662f"></span>Federal</div>
+      <div class="legend-row"><span class="sw ring" style="border-color:#1971c2"></span>Town or city</div>
+      <div class="legend-row"><span class="sw ring" style="border-color:#0c8599"></span>Land trust / non-profit</div>
+      <div class="legend-row"><span class="sw ring" style="border-color:#7048b6"></span>Cemetery</div>
       <div class="legend-note">The icon shows what kind of place it is.</div>
       <div class="legend-padus">
         <div class="legend-title" style="margin-top:8px">Access map (USGS PAD-US)</div>
@@ -136,8 +118,9 @@
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
   <script src="https://unpkg.com/protomaps-leaflet@4.0.1/dist/protomaps-leaflet.js"></script>
-  <script src="config.js?v=63"></script>
-  <script src="vectorlayers.js?v=63"></script>
-  <script src="app.js?v=63"></script>
+  <script src="config.js?v=64"></script>
+  <script src="vectorlayers.js?v=64"></script>
+  <script src="iso.js?v=64"></script>
+  <script src="app.js?v=64"></script>
 </body>
 </html>

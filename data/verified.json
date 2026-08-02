@@ -638,6 +638,538 @@
     "https://www.townofwinchester.org/"
    ],
    "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "5e62ba297c",
+    "name": "Deer Pond Farm",
+    "town": "Sherman",
+    "at": [
+     41.55352,
+     -73.52329
+    ]
+   },
+   "agency": "Connecticut Audubon Society",
+   "url": "https://www.ctaudubon.org/deer-pond-farm-home/",
+   "trails": true,
+   "parking": true,
+   "water": true,
+   "waterType": "pond",
+   "reachable": true,
+   "fee": "Free",
+   "note": "A Connecticut Audubon sanctuary of about 850 acres spanning the Sherman/Pawling line, with roughly 15 miles of trails open dawn to dusk year-round, free of charge. Parking at 57 Wakeman Hill Road. Dogs, bikes and drones are prohibited; a visitor center hosts programs and exhibits.",
+   "source": [
+    "https://www.ctaudubon.org/deer-pond-farm-home/"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "aaae0ea745",
+    "name": "Veterans Memorial Park",
+    "town": "Sherman",
+    "at": [
+     41.57766,
+     -73.49377
+    ]
+   },
+   "agency": "Town of Sherman Park & Recreation Commission",
+   "url": "https://www.shermanct.gov/entities/park-recreation",
+   "trails": true,
+   "sports": true,
+   "reachable": true,
+   "note": "Sherman's town athletic complex at 17 Sawmill Road, known locally as Veterans Field, with a public walking track, pickleball courts and playing fields. The town's public walking group meets here; no fee is indicated for the grounds.",
+   "source": [
+    "https://www.shermanct.gov/entities/park-recreation",
+    "https://www.shermanct.gov/subpages/ongoing-activities"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "4b572549e1",
+    "name": "Appalachian Trail Corridor",
+    "town": "Sherman",
+    "at": [
+     41.6585,
+     -73.51484
+    ]
+   },
+   "rename": "Appalachian National Scenic Trail",
+   "agency": "National Park Service",
+   "url": "https://www.nps.gov/appa/index.htm",
+   "trails": true,
+   "reachable": true,
+   "fee": "Free",
+   "note": "The Appalachian Trail enters Connecticut from New York at Hoyt Road in Sherman, climbing Ten Mile Hill above the Ten Mile River watershed. Free to walk, no permits; the Connecticut AMC chapter maintains this section, and the adjacent Herrick Preserve connects for loop hikes.",
+   "source": [
+    "https://www.nps.gov/appa/index.htm",
+    "https://www.cttrailfinder.com/trails/trail/appalachian-trail"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "128f29a842",
+    "name": "Herrick Preserve",
+    "town": "Sherman",
+    "at": [
+     41.65516,
+     -73.51301
+    ]
+   },
+   "agency": "Northwest Connecticut Land Conservancy",
+   "url": "https://ctland.org/our-trails-detail/herrick-preserve-sherman/",
+   "trails": true,
+   "parking": true,
+   "reachable": true,
+   "note": "A 185-acre NCLC preserve (originally Naromi Land Trust) with gentle trails through hardwood forest to the Housatonic Overlook, about 1.25 miles each way past stone walls and vernal pools. Park on the west side of Evans Hill Road near Route 55; trails connect to the Appalachian Trail.",
+   "source": [
+    "https://ctland.org/our-trails-detail/herrick-preserve-sherman/"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "8b58380257",
+    "name": "Mildred Strauss and James Morrissey Family Nature Preserves",
+    "town": "Sherman",
+    "at": [
+     41.62668,
+     -73.49282
+    ]
+   },
+   "rename": "Strauss Morrissey Preserve",
+   "agency": "Northwest Connecticut Land Conservancy",
+   "url": "https://ctland.org/our-trails-detail/strauss-morrissey-preserve-gaylordsville-and-sherman/",
+   "trails": true,
+   "parking": true,
+   "reachable": true,
+   "note": "A 142-acre NCLC preserve spanning Gaylordsville and Sherman, with a roughly 1.5-mile round-trip trail between trailheads on Gaylord Road and 64 Edmonds Road. A brook fed by underground marble-bedrock channels supports rare plants including orchids. Park at the Gaylord Road pull-out without blocking the gate.",
+   "source": [
+    "https://ctland.org/our-trails-detail/strauss-morrissey-preserve-gaylordsville-and-sherman/"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "359c89d194",
+    "name": "Town Meadows",
+    "town": "Sherman",
+    "at": [
+     41.59842,
+     -73.50321
+    ]
+   },
+   "note": "Not listed among NCLC's public trail preserves or the Town of Sherman's recreation pages; no trail map, trailhead or access policy could be verified. Likely conservation land without formal public trails — check with the town or NCLC before visiting.",
+   "source": [
+    "https://ctland.org/our_trails/",
+    "https://www.shermanct.gov/entities/conservation-commission"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "03da4354ff",
+    "name": "Mallory Preserve",
+    "town": "Sherman",
+    "at": [
+     41.57758,
+     -73.50551
+    ]
+   },
+   "agency": "Northwest Connecticut Land Conservancy",
+   "url": "https://ctland.org/our-trails-detail/mallory-preserve-sherman/",
+   "trails": true,
+   "parking": true,
+   "water": true,
+   "waterName": "Sawmill Brook",
+   "waterType": "river",
+   "reachable": true,
+   "note": "A 120-acre NCLC preserve beside Sherman's town center: a boardwalk through a maple wetland, a rolling loop along Sawmill Brook, and steeper yellow and blue trails up Turner Mountain with seasonal views. Park at the Sherman Town Center lot; the trailhead is near 15 Route 39 North.",
+   "source": [
+    "https://ctland.org/our-trails-detail/mallory-preserve-sherman/"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "b1ac46f0df",
+    "name": "Brookland and Josephson Preserves",
+    "town": "Sherman",
+    "at": [
+     41.60217,
+     -73.48804
+    ]
+   },
+   "agency": "Northwest Connecticut Land Conservancy",
+   "url": "https://ctland.org/our-trails-detail/brookland-and-josephson-preserves-sherman/",
+   "trails": true,
+   "parking": true,
+   "water": true,
+   "waterName": "Naromiyocknowhusunkatankshunk Brook",
+   "waterType": "river",
+   "reachable": true,
+   "fee": "Free",
+   "note": "About 86 acres of hardwood forest where a green-and-white blazed loop of roughly 2.5 miles crosses the Naromiyocknowhusunkatankshunk Brook on stepping stones and footbridges. Trailhead at 18 Crooked Furrows Lane; parking for about 3 cars.",
+   "source": [
+    "https://ctland.org/our-trails-detail/brookland-and-josephson-preserves-sherman/"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "7fc7124c8b",
+    "name": "Towner Hill Preserve",
+    "town": "Sherman",
+    "at": [
+     41.58483,
+     -73.47618
+    ]
+   },
+   "agency": "Northwest Connecticut Land Conservancy",
+   "url": "https://ctland.org/our-trails-detail/towner-hill-preserve-sherman-ct-06784/",
+   "trails": true,
+   "parking": true,
+   "reachable": true,
+   "fee": "Free",
+   "note": "An 81-acre preserve known for massive glacial erratics and a boulder field, with easterly views after leaf-fall and lively vernal pools in spring. Trailhead and gravel parking at 46 CT-37 East. Adjoins Irene's Woods for a longer combined hike.",
+   "source": [
+    "https://ctland.org/our-trails-detail/towner-hill-preserve-sherman-ct-06784/"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "2ab2116a4a",
+    "name": "West Briggs Hill Preserve",
+    "town": "Sherman",
+    "at": [
+     41.56646,
+     -73.51567
+    ]
+   },
+   "agency": "Northwest Connecticut Land Conservancy",
+   "url": "https://ctland.org/our-trails-detail/west-briggs-hill-sherman/",
+   "trails": true,
+   "parking": true,
+   "reachable": true,
+   "fee": "Free",
+   "note": "An 84-acre preserve whose single blazed loop starts with a steep climb, then rolls through forest past historic stone walls and old-growth trees; popular with trail runners and birdwatchers. Roadside parking with a kiosk at 23 Briggs Hill Road. Can be muddy in spring.",
+   "source": [
+    "https://ctland.org/our-trails-detail/west-briggs-hill-sherman/"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "956f12ee55",
+    "name": "Wimisink Preserve",
+    "town": "Sherman",
+    "at": [
+     41.63633,
+     -73.50186
+    ]
+   },
+   "agency": "Northwest Connecticut Land Conservancy",
+   "url": "https://ctland.org/our-trails-detail/wimisink-preserve-sherman/",
+   "trails": true,
+   "parking": true,
+   "water": true,
+   "waterName": "Wimisink Marsh",
+   "reachable": true,
+   "fee": "Free",
+   "note": "Two boardwalks — a 330-foot wheelchair-accessible northern one and a 400-foot southern one — extend into a calcium-rich freshwater marsh with active beavers. A viewing platform overlooks habitat famous for American and Least Bitterns; a designated Important Bird Area. Parking on Route 39 North near Route 55.",
+   "source": [
+    "https://ctland.org/our-trails-detail/wimisink-preserve-sherman/"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "98982d23b5",
+    "name": "Irene's Woods Preserve",
+    "town": "Sherman",
+    "at": [
+     41.57895,
+     -73.47889
+    ]
+   },
+   "agency": "Northwest Connecticut Land Conservancy",
+   "url": "https://ctland.org/our-trails-detail/irenes-woods-sherman/",
+   "trails": true,
+   "parking": true,
+   "reachable": true,
+   "fee": "Free",
+   "note": "Trails lead from Hubbell Mountain Road past vernal pools to a flat-rock overlook, a split rock outcrop, and on to Route 37, with Eagle Scout-built steps through a small stream gorge. Roadside pull-off parking at 15 Hubbell Mountain Road; adjoins Towner Hill Preserve.",
+   "source": [
+    "https://ctland.org/our-trails-detail/irenes-woods-sherman/"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "7b9e993781",
+    "name": "Northwest Connecticut Land Conservancey",
+    "town": "Sherman",
+    "at": [
+     41.54249,
+     -73.52717
+    ]
+   },
+   "agency": "Northwest Connecticut Land Conservancy",
+   "note": "An NCLC-owned conservation parcel in southwestern Sherman that does not match any of the conservancy's publicized trail preserves; no name, trail or access point is documented for it. Conservation land, but no established public access is published.",
+   "source": [
+    "https://ctland.org/our_trails/"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "7c57877f67",
+    "name": "Spring Lake Road",
+    "town": "Sherman",
+    "at": [
+     41.6004,
+     -73.51186
+    ]
+   },
+   "agency": "Northwest Connecticut Land Conservancy",
+   "note": "A former Naromi Land Trust parcel off Spring Lake Road, now NCLC after the trusts' 2020 merger. It is not among NCLC's listed trail preserves and no trailhead or access information is published.",
+   "source": [
+    "https://ctland.org/our_trails/",
+    "https://ctland.org/our-new-name-and-merger-with-naromi-land-trust/"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "fb08eba328",
+    "name": "Hubbell Mountain Farm",
+    "town": "Sherman",
+    "at": [
+     41.56547,
+     -73.47891
+    ]
+   },
+   "agency": "Northwest Connecticut Land Conservancy",
+   "water": true,
+   "waterName": "Candlewood Lake",
+   "waterType": "lake",
+   "note": "A former Naromi Land Trust parcel now held by NCLC; state records show part of its acreage lies under Candlewood Lake. It is not among NCLC's listed trail preserves, so on-the-ground access is unverified — the nearby Irene's Woods preserve does have a public trail.",
+   "source": [
+    "https://ctland.org/our_trails/",
+    "https://ctland.org/our-new-name-and-merger-with-naromi-land-trust/"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "a292081252",
+    "name": "Chapel Hill",
+    "town": "Sherman",
+    "at": [
+     41.54815,
+     -73.50027
+    ]
+   },
+   "agency": "Northwest Connecticut Land Conservancy",
+   "note": "A former Naromi Land Trust holding on Route 37 South, now owned by NCLC. It is not among the conservancy's public trail preserves, so it is likely a sanctuary without formal visitor access; contact NCLC before visiting.",
+   "source": [
+    "https://ctland.org/our_trails/",
+    "https://ctland.org/our-new-name-and-merger-with-naromi-land-trust/"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "2b5e53e1e1",
+    "name": "Wagon Wheel",
+    "town": "Sherman",
+    "at": [
+     41.54281,
+     -73.48566
+    ]
+   },
+   "agency": "Northwest Connecticut Land Conservancy",
+   "note": "A former Naromi Land Trust parcel on Wagon Wheel Road, now owned by NCLC. It does not appear on the conservancy's list of preserves with public hiking trails, so visitor access is unverified.",
+   "source": [
+    "https://ctland.org/our_trails/",
+    "https://ctland.org/our-new-name-and-merger-with-naromi-land-trust/"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "a9c922b078",
+    "name": "Iroquois Gift",
+    "town": "Sherman",
+    "at": [
+     41.62667,
+     -73.49681
+    ]
+   },
+   "agency": "Northwest Connecticut Land Conservancy",
+   "note": "A former Naromi Land Trust parcel off Route 39 North, now owned by NCLC. No marked trails or parking are published for it; NCLC land is customarily open to quiet on-foot visits, but check with the conservancy before making a trip.",
+   "source": [
+    "https://ctland.org/our_trails/",
+    "https://ctland.org/our-new-name-and-merger-with-naromi-land-trust/"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "2d97c72adb",
+    "name": "Wesleyan University land",
+    "town": "Sherman",
+    "at": [
+     41.52639,
+     -73.5262
+    ]
+   },
+   "rename": "Great Hollow Nature Preserve",
+   "agency": "Great Hollow Nature Preserve & Ecological Research Center",
+   "url": "https://greathollow.org/",
+   "trails": true,
+   "parking": true,
+   "reachable": true,
+   "fee": "Free",
+   "note": "The 'Wesleyan University' attribution is decades stale: Wesleyan deeded this parcel away in 1999, and since 2015 it has been part of Great Hollow Nature Preserve & Ecological Research Center — 825 acres free and open sunrise to sunset, with several miles of trails crossing into Sherman. Main parking and trailhead at 225 Route 37, New Fairfield.",
+   "source": [
+    "https://greathollow.org/",
+    "https://greathollow.org/plan-your-visit/"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "a4751536d4",
+    "name": "Valley Brook North",
+    "town": "Sherman",
+    "at": [
+     41.60619,
+     -73.51435
+    ]
+   },
+   "agency": "Northwest Connecticut Land Conservancy",
+   "note": "A former Naromi Land Trust parcel off Spring Lake Road, now owned by NCLC. It does not appear on the conservancy's list of public trail preserves, so visitor access is unverified.",
+   "source": [
+    "https://ctland.org/our_trails/",
+    "https://ctland.org/our-new-name-and-merger-with-naromi-land-trust/"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "4a017846fa",
+    "name": "The Dell",
+    "town": "Sherman",
+    "at": [
+     41.64027,
+     -73.49709
+    ]
+   },
+   "agency": "Northwest Connecticut Land Conservancy",
+   "note": "A small former Naromi Land Trust parcel now held by NCLC. It is not listed among the conservancy's Sherman hiking preserves, and no trailhead, parking or access information has been published.",
+   "source": [
+    "https://ctland.org/our_trails/",
+    "https://ctland.org/our-new-name-and-merger-with-naromi-land-trust/"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "871e5143ed",
+    "name": "Herrick-Howland",
+    "town": "Sherman",
+    "at": [
+     41.64516,
+     -73.50411
+    ]
+   },
+   "agency": "Northwest Connecticut Land Conservancy",
+   "url": "https://ctland.org/herrick-preserve/",
+   "trails": true,
+   "parking": true,
+   "reachable": true,
+   "fee": "Free",
+   "note": "An NCLC tract within the footprint of the 185-acre Herrick Preserve, which is open daily sunrise to sunset with a moderate lollipop loop to Amy's Lookout and the Housatonic Overlook. Limited roadside parking on Evans Hill Road near Route 55; trails connect to the Appalachian Trail.",
+   "source": [
+    "https://ctland.org/herrick-preserve/"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "798413c7db",
+    "name": "Colonial Park",
+    "town": "Sherman",
+    "at": [
+     41.57455,
+     -73.49801
+    ]
+   },
+   "rename": "Sherman Town Park (Center Beach)",
+   "agency": "Town of Sherman",
+   "url": "https://www.shermanct.gov/",
+   "beach": true,
+   "water": true,
+   "waterName": "Candlewood Lake",
+   "waterType": "lake",
+   "parking": true,
+   "note": "Sherman's town park and beach at the north end of Candlewood Lake, off Route 39 at Sawmill Road, with a swimming beach and boat slips. Beach passes are issued to Sherman residents with proof of address, so the beach operates for residents and their guests. 'Colonial Park' is a legacy gazetteer name for this spot.",
+   "source": [
+    "https://www.shermanct.gov/articles/draft---proposed-plans-for-updates-to-sherman-town-park-and-boat-docks"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "45efbded12",
+    "name": "Laurel Beach",
+    "town": "Sherman",
+    "at": [
+     41.55415,
+     -73.46151
+    ]
+   },
+   "agency": "Candlewood Tax District (Candlewood Lake Estates)",
+   "url": "https://www.candlewoodlakeestates.org/",
+   "private": true,
+   "beach": true,
+   "water": true,
+   "waterName": "Green Pond",
+   "waterType": "pond",
+   "note": "A private community beach on Green Pond inside Candlewood Lake Estates, owned by the Candlewood Tax District. District rules require a community beach pass; it is not open to the general public.",
+   "source": [
+    "https://www.candlewoodlakeestates.org/",
+    "https://www.candlewoodlakeestates.org/bylaws.html"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "aa4bb8e438",
+    "name": "Tree Top Beach",
+    "town": "Sherman",
+    "at": [
+     41.5493,
+     -73.46076
+    ]
+   },
+   "agency": "Candlewood Tax District (Candlewood Lake Estates)",
+   "url": "https://www.candlewoodlakeestates.org/",
+   "private": true,
+   "beach": true,
+   "water": true,
+   "waterName": "Green Pond",
+   "waterType": "pond",
+   "note": "A private community beach on Green Pond inside Candlewood Lake Estates, owned by the Candlewood Tax District. District rules require a community beach pass; it is not open to the general public.",
+   "source": [
+    "https://www.candlewoodlakeestates.org/",
+    "https://www.candlewoodlakeestates.org/bylaws.html"
+   ],
+   "checked": "2026-08-02"
   }
  ],
  "rules": [

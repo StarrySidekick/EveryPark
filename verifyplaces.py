@@ -20,9 +20,14 @@ from dedupe import dedupe
 
 
 # Fields a research entry may set directly on the place attributes.
+# `private` is the negative counterpart of `reachable`: a cited finding
+# that a place is members-only (community beach, club land). It fails the
+# legal test in verify_all and hides the pin — the polygon stays, and the
+# card explains. Without it, research proving a place is NOT public had
+# no way to flow into the data.
 VERIFIED_ATTRS = ("trails", "parking", "water", "waterName", "waterType",
                   "sports", "sportList", "playground", "historic", "beach",
-                  "pool", "dogpark", "reachable")
+                  "pool", "dogpark", "reachable", "private")
 
 # How far a coordinate anchor may sit from a place and still be considered
 # the same place, in metres. Generous enough to survive a centroid moving

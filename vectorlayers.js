@@ -25,15 +25,26 @@ const EveryParkTiles = (() => {
   // pin must resolve to the same thing.
   let resolvePlace = null;
 
-  // Border colour by who owns the land. Same palette as the pins.
+  // Border colour by who owns the land. Same palette as the pins —
+  // kept in sync with CONFIG.visual.owner (the source of truth).
   const OWNER = {
-    stateland:  "#1b5e20",
-    townparks:  "#1565c0",
-    landuse:    "#1565c0",
-    preserves:  "#00838f",
-    padus:      "#00838f",
-    cemeteries: "#5e35b1"
+    stateland:  "#2b8a3e",
+    townparks:  "#1971c2",
+    landuse:    "#1971c2",
+    preserves:  "#0c8599",
+    padus:      "#0c8599",
+    cemeteries: "#7048b6"
   };
+
+  // Cemetery polygons FILL purple (their category colour) rather than
+  // park green; the border still answers "who runs it": town-run
+  // cemeteries get the town blue, everything else a neutral slate so the
+  // purple fill does the talking.
+  const CEM_TOWN = /\b(town|city|borough|village)\b/i;
+  function cemeteryBorder(f) {
+    const op = (f.props && f.props.operator) || "";
+    return CEM_TOWN.test(op) ? OWNER.townparks : "#5b6770";
+  }
 
   // Which filter chip governs each tile layer, so the map obeys the
   // same "Who runs it" buttons the pins do.
@@ -102,17 +113,25 @@ const EveryParkTiles = (() => {
       // extra paint rules: adding rules for the same dataLayer stopped the
       // layer loading tiles at all.
       symbolizer: new protomapsL.PolygonSymbolizer({
+        // Cemeteries fill their category purple even when verified — the
+        // green/amber verdict system still applies to everything else.
         fill: (z, f) => keyOf(dataLayer, f) === hoverKey
                       ? (H.fill || "#c8f5cf")
-                      : (statusOf(f) === "park" ? V.publicFill
-                         : V.unverifiedFill || "#f5b301"),
+                      : (statusOf(f) !== "park"
+                          ? V.unverifiedFill || "#f5b301"
+                          : dataLayer === "cemeteries"
+                            ? (V.cemeteryFill || "#8464c9")
+                            : V.publicFill),
         opacity: (z, f) => keyOf(dataLayer, f) === hoverKey
                          ? (H.fillOpacity != null ? H.fillOpacity : 0.62)
                          : V.fillOpen,
         stroke: (z, f) => keyOf(dataLayer, f) === hoverKey
                         ? (H.stroke || "#ffffff")
-                        : (statusOf(f) === "park" ? border
-                           : V.unverifiedBorder || "#b8860b"),
+                        : (statusOf(f) !== "park"
+                            ? V.unverifiedBorder || "#b8860b"
+                            : dataLayer === "cemeteries"
+                              ? cemeteryBorder(f)
+                              : border),
         width: (z, f) => keyOf(dataLayer, f) === hoverKey
                        ? (H.width || 6) : V.borderWeight
       })

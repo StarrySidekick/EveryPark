@@ -495,6 +495,24 @@ def attach_geometry(places, raw_dir):
             moved += 1
         nm = norm(p["name"])
         named = [i for i in cands if meta[i][1] == nm]
+        if not named:
+            # The pin is inside SOMEBODY's polygon — just not its own.
+            # This is the "node separated from its shape" case: the
+            # source centroid landed in a neighbouring parcel, so the
+            # marker floats apart from the boundary it belongs to, and
+            # the acreage below would be measured from the wrong shape.
+            # If this place's own named polygons exist nearby, snap the
+            # pin inside the biggest one and describe THAT land instead.
+            near = [i for i in by_name.get(nm, ())
+                    if dist_m(p["lat"], p["lng"],
+                              polys[i].centroid.y, polys[i].centroid.x) < 8000]
+            if near:
+                big = max(near, key=lambda i: polys[i].area)
+                rp = polys[big].representative_point()
+                p["lat"], p["lng"] = round(rp.y, 5), round(rp.x, 5)
+                moved += 1
+                cands = near
+                named = near
         # DEEP's parcels are the authoritative measure of state land, so
         # prefer them when more than one source describes this place.
         RANK = {"stateland": 0, "townparks": 1, "cemeteries": 2,
@@ -570,7 +588,12 @@ def verify_all(places):
         # recompute it here rather than assuming it survived the round trip.
         if not p.get("access"):
             score_access(p)
-        legal = p.get("access") in ("open", "permission")
+        # A cited `private` finding (members-only beach association, club
+        # land) overrides everything: it fails the legal test no matter
+        # what the automated sources inferred. Mirrored in app.js
+        # classify(), which maps it to access "closed".
+        legal = (p.get("access") in ("open", "permission")
+                 and not A.get("private"))
         # `reachable` is set by a cited category rule — e.g. Connecticut
         # state land is open to walk by regulation, and a cemetery is walk-in
         # daylight public space. Both are genuinely visitable without anyone
@@ -584,7 +607,9 @@ def verify_all(places):
 
         why = []
         if not legal:
-            why.append("no confirmed legal right or permission to walk here")
+            why.append("members-only — not open to the general public"
+                       if A.get("private") else
+                       "no confirmed legal right or permission to walk here")
         if not physical:
             why.append("no mapped trail, parking or facility, so no confirmed way in")
         if not shaped:

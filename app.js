@@ -124,8 +124,7 @@
   let townIndex = null;         // for point-in-polygon town lookup
 
   const statusEl = document.getElementById("status");
-  const listEl = document.getElementById("parkList");
-  const metaEl = document.getElementById("listMeta");
+  const metaEl = document.getElementById("listMeta");   // may be absent
 
   function showStatus(msg) { statusEl.textContent = msg; statusEl.style.display = "block"; }
   function hideStatus() { statusEl.style.display = "none"; }
@@ -278,26 +277,41 @@
              : p.feeState === "parking" ? "Free to enter · paid parking"
              : "Free"]);
 
-    // 4-7. What's there
-    if (A.water) {
-      const wt = { lake: "Lake", reservoir: "Reservoir", river: "River",
-                   waterfall: "Waterfall" }[A.waterType];
-      rows.push(["Water", (A.waterName || "Yes") + (wt ? ` · ${wt.toLowerCase()}` : "")]);
-    }
-    if (A.trails) rows.push(["Trails", "Mapped trails"]);
-    if (A.sportList && A.sportList.length)
-      rows.push(["Sports", A.sportList.slice(0, 3).join(", ")]);
-    if (A.elev != null)
-      rows.push(["Elevation", `${A.elev} m` +
-        (A.relief != null ? ` · ${terrainLabel(A.relief).toLowerCase()}` : "")]);
-    if (A.cover) rows.push(["Terrain", A.cover +
-      (A.coverTop ? ` · ${A.coverTop.toLowerCase()}` : "")]);
-    if (A.historic) rows.push(["Historic", "Buildings or monuments"]);
     if (A.siteRules && A.siteRules.length)
       rows.push(["Rules", A.siteRules.join(" · ")]);
 
+    // 4. What's there — feature chips, staggered in with CSS animation.
+    // Each chip is one thing a visitor cares about; the icon carries it.
+    const feats = [];
+    if (A.trails) feats.push(["🥾", "Trails"]);
+    if (A.water) {
+      const wt = { lake: "Lake", reservoir: "Reservoir", river: "River",
+                   pond: "Pond", waterfall: "Waterfall" }[A.waterType];
+      feats.push(["🌊", A.waterName || wt || "Water"]);
+    }
+    if (A.beach) feats.push(["🏖️", "Beach"]);
+    if (A.pool) feats.push(["🏊", "Pool"]);
+    if (A.sports) feats.push(["🏀", (A.sportList && A.sportList.length)
+                                    ? A.sportList.slice(0, 2).join(", ") : "Sports"]);
+    if (A.playground) feats.push(["🛝", "Playground"]);
+    if (A.dogpark) feats.push(["🐕", "Dog park"]);
+    if (A.historic) feats.push(["🏛️", "Historic"]);
+    if (A.parking) feats.push(["🅿️", "Parking"]);
+    if (A.relief != null) feats.push(["⛰️", `${terrainLabel(A.relief)} · ${A.relief} m`]);
+    if (A.cover) {
+      const c = A.cover.toLowerCase();
+      feats.push([c.includes("wood") ? "🌲" : c.includes("open") ? "🌾" : "🌳", A.cover]);
+    }
+    const chips = feats.map(([ic, label], i) =>
+      `<span class="fchip" style="animation-delay:${45 * i}ms">
+         <span class="fchip-ic">${ic}</span>${label}</span>`).join("");
+
     const acres = p.acres ? ` &middot; ${Number(p.acres).toLocaleString()} acres` : "";
     const dir = `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}`;
+    const iso = (A.relief != null && window.EveryParkIso)
+      ? `<a class="iso-btn" href="#" data-iso="${p.id || ""}"
+           title="Prototype: isometric terrain of this place">⛰ 3D terrain</a>`
+      : "";
 
     return `
       <a class="badge ${p.type}" href="#" data-cat="${p.type}"
@@ -308,6 +322,8 @@
       <div class="pblock acc-${st.cls}">
         <div class="pb-head">${st.icon} ${st.label}</div>
       </div>
+
+      ${chips ? `<div class="fchips">${chips}</div>` : ""}
 
       <table class="pfacts">${rows.map(([k, v]) =>
         `<tr><th>${k}</th><td>${v}</td></tr>`).join("")}</table>
@@ -320,8 +336,20 @@
 
       <div class="popup-links">
         <a class="primary" href="${dir}" target="_blank" rel="noopener">➜ Directions</a>
+        ${iso}
       </div>`;
   }
+
+  // The 3D-terrain button lives inside popup HTML that Leaflet re-creates
+  // constantly, so one delegated listener beats per-popup wiring.
+  document.addEventListener("click", e => {
+    const b = e.target.closest && e.target.closest("[data-iso]");
+    if (!b) return;
+    e.preventDefault();
+    const p = allParks.find(x => x.id === b.dataset.iso)
+           || allParks.find(x => x.name === b.dataset.iso);
+    if (p && window.EveryParkIso) EveryParkIso.open(p);
+  });
 
   function addPark(p) {
     // Precomputed records already carry access, steward and kind, worked
@@ -412,26 +440,9 @@
       if (visible(p)) { batch.push(p.marker); shown.push(p); }
     }
     cluster.addLayers(batch);
-
-    shown.sort((a, b) => a.name.localeCompare(b.name));
-    const frag = document.createDocumentFragment();
-    for (const p of shown.slice(0, 800)) {
-      const div = document.createElement("div");
-      div.className = "park-item";
-      div.innerHTML = `<img src="${iconFor(p).options.iconUrl}" alt="">
-        <div><div class="pi-name">${p.name}</div>
-        <div class="pi-sub">${typeLabel(p)}${p.town ? " · " + p.town : ""}</div>
-        <div class="pi-steward">${ACCESS_ICON[p.access] || ""} ${p.steward || ""}</div></div>`;
-      div.addEventListener("click", () => {
-        map.flyTo([p.lat, p.lng], Math.max(map.getZoom(), 13), { duration: 0.7 });
-        setTimeout(() => { cluster.zoomToShowLayer(p.marker, () => p.marker.openPopup()); }, 750);
-        if (window.innerWidth <= 760) document.getElementById("listPanel").classList.add("hidden");
-      });
-      frag.appendChild(div);
-    }
-    listEl.replaceChildren(frag);
-    metaEl.textContent = `${shown.length.toLocaleString()} parks shown` +
-      (shown.length > 800 ? " (list capped at 800 — use search to narrow)" : "");
+    // The list view was removed 2026-08-02 (it wasn't earning its screen
+    // space); the count moved into the status line's element if present.
+    if (metaEl) metaEl.textContent = `${shown.length.toLocaleString()} parks shown`;
   }
 
   // ------------------------------------------------------------------
@@ -1633,7 +1644,11 @@
     // Official rating wins. Otherwise: state, federal and town land is
     // public by default; land trust land is open by permission, which in
     // Connecticut is the normal arrangement rather than an exception.
-    if (A.officialAccess === "Open")            p.access = "open";
+    // A cited members-only finding beats everything, including the
+    // official rating — mirrored in buildplaces.verify_all, which fails
+    // the legal test on the same flag.
+    if (A.private)                              p.access = "closed";
+    else if (A.officialAccess === "Open")       p.access = "open";
     else if (A.officialAccess === "Closed")     p.access = "closed";
     else if (A.officialAccess === "Restricted") p.access = "permission";
     else if (p.type === "state" || p.type === "national" || p.type === "town")
@@ -1658,7 +1673,9 @@
       : p.access === "permission"
         ? "Privately held but customarily open. You're here by the owner's permission, not by legal right — Connecticut's Recreational Use Statute is what makes this common. Respect posted signs."
       : p.access === "closed"
-        ? "Recorded as closed to public access."
+        ? (A.private
+           ? "A members-only community facility — open to its members and their guests, not the general public."
+           : "Recorded as closed to public access.")
       : "We found no trail, parking or facility here, and no official rating. It may still be open — we just can't confirm it.";
 
     // --- 2. Who maintains it? ---
@@ -2366,9 +2383,7 @@
     }
   });
 
-  (document.getElementById("listToggle") || {addEventListener(){}}).addEventListener("click", () => {
-    document.getElementById("listPanel").classList.toggle("hidden");
-  });
+  // (list toggle removed with the list view, 2026-08-02)
 
   // ------------------------------------------------------------------
   // Baked data first if it's there, then public land — the thing the map

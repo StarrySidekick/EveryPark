@@ -18,6 +18,9 @@ const CONFIG = {
   //   ICON   glyph  = what kind of place it is
   visual: {
     publicFill: "#43a047",        // green: confirmed a park
+    // Cemeteries fill purple — the colour of their category — instead of
+    // park green; the border still says who owns/runs the ground.
+    cemeteryFill: "#8464c9",
     // Amber: public land we can't confirm is visitable — no mapped way in,
     // or no known boundary. Honest uncertainty rather than a confident lie.
     unverifiedFill: "#f5b301",
@@ -26,14 +29,15 @@ const CONFIG = {
     // Open and open-by-permission look identical: for a walker the
     // practical answer is the same, and the popup explains the nuance.
     fillPermission: 0.32,
-    borderWeight: 1.9,
-    // Border colour by owner. These are also the marker ring colours.
+    borderWeight: 3.1,            // thick enough to actually read on imagery
+    // Border colour by owner — brightened so the outline carries at a
+    // glance. These are also the marker ring colours.
     owner: {
-      state:    "#1b5e20",        // deep green
-      national: "#6d4c41",        // brown
-      town:     "#1565c0",        // blue
-      preserve: "#00838f",        // teal
-      cemetery: "#5e35b1"         // purple
+      state:    "#2b8a3e",        // vivid forest green
+      national: "#a9662f",        // warm saddle brown
+      town:     "#1971c2",        // vivid blue
+      preserve: "#0c8599",        // vivid teal
+      cemetery: "#7048b6"         // vivid purple
     }
   },
 
@@ -160,7 +164,7 @@ const CONFIG = {
   // Shown in the top-right corner. Bumped by hand on every code change,
   // so there's visible proof of which build is actually loaded rather
   // than guessing whether a cached copy is being served.
-  siteVersion: "v0.9.2",
+  siteVersion: "v0.10.0",
 
   // ---- VECTOR TILES --------------------------------------------------
   // Every boundary and trail, pre-cut into map tiles and packed into one
