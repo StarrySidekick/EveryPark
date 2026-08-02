@@ -1,284 +1,827 @@
 {
-  "_README": [
-    "Research-confirmed facts about places the automated sources can't see.",
-    "",
-    "The GIS layers only know what someone has mapped. A town park with no",
-    "OpenStreetMap trail tagged inside it comes out 'unverified' even when a",
-    "single web search proves it has trails, parking and a pavilion. This file",
-    "is where that human research lands.",
-    "",
-    "Entries are matched on name + town and applied AFTER the automated pass,",
-    "so they override it. Every entry must carry `source` and `checked` \u2014 a",
-    "claim without a citation is a guess, and guesses are what this file",
-    "exists to replace.",
-    "",
-    "Fields you can set: trails, parking, water, waterName, waterType, sports,",
-    "sportList, playground, historic, beach, pool, dogpark, fee, url, note,",
-    "agency, acres.",
-    "",
-    "`rules` entries match on type/subtype/agency instead of a single name, so one cited regulation can settle hundreds of places at once. Same requirement: source and checked date.",
-    "",
-    "THIS FILE IS NEVER REGENERATED. places.json is rebuilt from scratch every",
-    "month and anything typed into it is destroyed; this file is the only place",
-    "in the pipeline meant to be edited by hand, and the workflow's commit step",
-    "names its files explicitly so it can never touch this one.",
-    "",
-    "Add `at: [lat, lng]` to any match block. Names change upstream — a source",
-    "re-spells a park and the entry silently stops applying — but locations",
-    "don't. If the name lookup fails, the nearest place within 600 m wins, so",
-    "the research survives the rename.",
-    "",
-    "Every run writes data/research-audit.json, and the workflow fails if any",
-    "entry or rule matched nothing. That failure is deliberate: research going",
-    "quietly missing is invisible in the output, because the output still looks",
-    "perfectly fine without it."
-  ],
-  "places": [
-    {
-      "match": {
-        "name": "Town Of New Milford (Clatter Valley)",
-        "town": "Bridgewater",
-        "at": [41.54224, -73.38805]
-      },
-      "rename": "Clatter Valley Park",
-      "town": "New Milford",
-      "agency": "New Milford Parks & Recreation",
-      "url": "https://newmilfordct.myrec.com/info/facilities/details.aspx?FacilityID=14712",
-      "trails": true,
-      "parking": true,
-      "water": true,
-      "waterName": "Clatter Valley Pond",
-      "waterType": "lake",
-      "dogpark": false,
-      "fee": "Free",
-      "note": "Roughly 100 acres of town open space at 158 Town Farm Road. Hiking and unmarked trails, a pond, and a reservable pavilion with picnic tables and grills. Leashed dogs welcome.",
-      "source": [
-        "https://newmilfordct.myrec.com/info/facilities/details.aspx?FacilityID=14712",
-        "https://www.alltrails.com/en-gb/parks/us/connecticut/clatter-valley-park"
-      ],
-      "checked": "2026-08-02"
-    },
-    {
-      "match": {
-        "name": "Devils Den",
-        "town": "Redding",
-        "at": [41.25285, -73.39489]
-      },
-      "rename": "Lucius Pond Ordway \u2013 Devil's Den Preserve",
-      "agency": "The Nature Conservancy",
-      "url": "https://www.nature.org/en-us/get-involved/how-to-help/places-we-protect/lucius-pond-ordwaydevils-den-preserve/",
-      "trails": true,
-      "parking": true,
-      "water": true,
-      "waterName": "Godfrey Pond",
-      "waterType": "lake",
-      "fee": "Free",
-      "note": "1,746 acres across Weston and Redding \u2014 the largest preserve in Fairfield County, with a 20-mile trail system. Open dawn to dusk. Main parking at the end of Pent Road, Weston; small pull-off on Dayton Road, Redding.",
-      "source": [
-        "https://www.nature.org/en-us/get-involved/how-to-help/places-we-protect/lucius-pond-ordwaydevils-den-preserve/",
-        "https://en.wikipedia.org/wiki/Devil's_Den_Preserve"
-      ],
-      "checked": "2026-08-02"
-    },
-    {
-      "match": {
-        "name": "Devil'S Den/Saugatuck Forest",
-        "town": "Redding",
-        "at": [41.26446, -73.38997]
-      },
-      "agency": "The Nature Conservancy",
-      "trails": true,
-      "parking": true,
-      "fee": "Free",
-      "note": "Part of the Devil's Den preserve complex. Open dawn to dusk; trail maps at the Pent Road parking area in Weston.",
-      "source": [
-        "https://www.nature.org/en-us/get-involved/how-to-help/places-we-protect/lucius-pond-ordwaydevils-den-preserve/"
-      ],
-      "checked": "2026-08-02"
-    }
-  ],
-  "rules": [
-    {
-      "id": "ct-state-land",
-      "match": {
-        "type": "state"
-      },
-      "siteRules": [
-        "Open 8am to sunset",
-        "Dogs must be leashed (7 ft max)",
-        "No motor vehicles off designated roads"
-      ],
-      "source": [
-        "https://portal.ct.gov/deep/natural-resources/responsible-recreation",
-        "https://portal.ct.gov/DEEP/State-Parks/Recreation-Information/Recreational-Trail-Use-Information"
-      ],
-      "checked": "2026-08-02",
-      "why": "Connecticut state parks, forests and wildlife management areas are open to the public daily from 8am to sunset by regulation. Walking is permitted throughout, so state land does not need a mapped trail to be reachable.",
-      "reachable": true
-    },
-    {
-      "id": "ct-wma",
-      "match": {
-        "subtype": "Wildlife Management Area"
-      },
-      "siteRules": [
-        "Open 8am to sunset; closed half an hour after sunset to half an hour before sunrise",
-        "Dogs leashed, 7 ft maximum",
-        "No camping",
-        "No ATVs, motorcycles or snowmobiles"
-      ],
-      "source": [
-        "https://www.law.cornell.edu/regulations/connecticut/Regs-Conn-State-Agencies-SS-26-16-3a"
-      ],
-      "checked": "2026-08-02",
-      "why": "Conn. Agencies Regs. 26-16-3a governs public use of state wildlife management areas. Hiking is permitted; these are working conservation land rather than developed parks.",
-      "reachable": true
-    },
-    {
-      "id": "cemetery-daylight",
-      "match": {
-        "type": "cemetery"
-      },
-      "siteRules": [
-        "Open during daylight hours",
-        "Quiet enjoyment; respect burials"
-      ],
-      "checked": "2026-08-02",
-      "source": [],
-      "why": "Municipal and non-profit burying grounds are walk-in public space during daylight. They are not required to have a mapped trail to be visitable.",
-      "reachable": true
-    },
-    {
-      "id": "avalonia",
-      "match": {
-        "agency": "Avalonia Land Conservancy"
-      },
-      "reachable": true,
-      "trails": true,
-      "fee": "Free",
-      "siteRules": [
-        "Open dawn to dusk",
-        "Stay on trails",
-        "Dogs on a leash",
-        "Some preserves restricted for nesting or fragile habitat \u2014 check posted signs"
-      ],
-      "source": [
-        "https://avalonia.org/preserves/",
-        "https://ctconservation.org/land-trusts/avalonia-land-conservancy-inc/"
-      ],
-      "checked": "2026-08-02",
-      "why": "Avalonia's 46 preserves, over 5,000 acres across nine southeastern Connecticut towns, are open and free to the public dawn to dusk, with trail maps online and posted on site."
-    },
-    {
-      "id": "wyndham",
-      "match": {
-        "agency": "Wyndham Land Trust"
-      },
-      "reachable": true,
-      "trails": true,
-      "fee": "Free",
-      "siteRules": [
-        "Passive recreation",
-        "Some preserves allow bikes or horses \u2014 check the preserve page"
-      ],
-      "source": [
-        "https://www.wyndhamlandtrust.org/preserves/",
-        "https://explorect.org/wyndham-land-trust/"
-      ],
-      "checked": "2026-08-02",
-      "why": "Over 7,500 acres in northeast Connecticut, with about 18 hikeable properties and 16+ miles of trails open to the public. Note: not every Wyndham holding is trailed, so this asserts reachable rather than claiming a trail on each parcel."
-    },
-    {
-      "id": "flanders",
-      "match": {
-        "agency": "Flanders Nature Center"
-      },
-      "reachable": true,
-      "trails": true,
-      "fee": "Free",
-      "siteRules": [
-        "Open dawn to dusk, year round",
-        "No charge",
-        "Passive recreation"
-      ],
-      "source": [
-        "https://flandersnaturecenter.org/hiking/",
-        "https://en.wikipedia.org/wiki/Flanders_Nature_Center_&_Land_Trust"
-      ],
-      "checked": "2026-08-02",
-      "why": "Flanders manages over 2,400 acres in Woodbury and neighbouring towns. Trails at its seven major preserves are open to the public at no charge, dawn to dusk, year round."
-    },
-    {
-      "id": "aspetuck",
-      "match": {
-        "agency": "Aspetuck Land Trust"
-      },
-      "reachable": true,
-      "trails": true,
-      "fee": "Free",
-      "siteRules": [
-        "Open dawn to dusk",
-        "Dog walking permitted",
-        "Fishing by permit only"
-      ],
-      "source": [
-        "https://www.aspetucklandtrust.org/land-use-policies",
-        "https://www.aspetucklandtrust.org/find-preserves-by-town"
-      ],
-      "checked": "2026-08-02",
-      "why": "45 trailed nature preserves across Easton, Weston, Westport, Fairfield, Southport, Norwalk and Bridgeport, all open to walk dawn to dusk."
-    },
-    {
-      "id": "glastonbury",
-      "match": {
-        "agency": "Town of Glastonbury"
-      },
-      "reachable": true,
-      "fee": "Free",
-      "siteRules": [
-        "Town open space, open to residents and visitors"
-      ],
-      "source": [
-        "https://www.glastonburyct.gov/departments/department-directory-a-h/community-development-planning-environmental/town-owned-open-spaces",
-        "https://www.glastonburyct.gov/our-community/local-attractions/hiking-walking"
-      ],
-      "checked": "2026-08-02",
-      "why": "Glastonbury publishes an inventory and map of its town-owned open spaces, many with walking trails. Municipal open space in Connecticut is public; the town cannot exclude non-residents."
-    },
-    {
-      "id": "tnc-ct",
-      "match": {
-        "agency": "The Nature Conservancy"
-      },
-      "reachable": true,
-      "fee": "Free",
-      "siteRules": [
-        "Dawn to dusk",
-        "Passive recreation: hiking, birding, nature study",
-        "A few preserves are closed to protect at-risk species \u2014 check before visiting"
-      ],
-      "source": [
-        "https://www.nature.org/en-us/about-us/where-we-work/united-states/connecticut/stories-in-connecticut/connecticut-places-we-protect/",
-        "https://www.nature.org/content/dam/tnc/nature/en/documents/INFO_Preserve_Guidelines.pdf"
-      ],
-      "checked": "2026-08-02",
-      "why": "Most TNC Connecticut preserves are open free for low-impact recreation. Deliberately not claiming trails, because TNC states some preserves harbouring at-risk species are closed."
-    },
-    {
-      "id": "ct-municipal-openspace",
-      "match": {
-        "agency": "City or town"
-      },
-      "reachable": true,
-      "fee": "Free",
-      "siteRules": [
-        "Municipal open space, open to residents and non-residents alike"
-      ],
-      "source": [
-        "https://law.justia.com/cases/connecticut/supreme-court/2001/257-cr-318-0.html"
-      ],
-      "checked": "2026-08-02",
-      "why": "Land recorded in PAD-US as city or town owned is municipal open space. Under Leydon v. Greenwich (2001) a Connecticut municipality may not close its parks and open space to non-residents, so this land is public by law."
-    }
-  ]
+ "_README": [
+  "Research-confirmed facts about places the automated sources can't see.",
+  "",
+  "The GIS layers only know what someone has mapped. A town park with no",
+  "OpenStreetMap trail tagged inside it comes out 'unverified' even when a",
+  "single web search proves it has trails, parking and a pavilion. This file",
+  "is where that human research lands.",
+  "",
+  "Entries are matched on name + town and applied AFTER the automated pass,",
+  "so they override it. Every entry must carry `source` and `checked` — a",
+  "claim without a citation is a guess, and guesses are what this file",
+  "exists to replace.",
+  "",
+  "Fields you can set: trails, parking, water, waterName, waterType, sports,",
+  "sportList, playground, historic, beach, pool, dogpark, fee, url, note,",
+  "agency, acres.",
+  "",
+  "`rules` entries match on type/subtype/agency instead of a single name, so one cited regulation can settle hundreds of places at once. Same requirement: source and checked date.",
+  "",
+  "THIS FILE IS NEVER REGENERATED. places.json is rebuilt from scratch every",
+  "month and anything typed into it is destroyed; this file is the only place",
+  "in the pipeline meant to be edited by hand, and the workflow's commit step",
+  "names its files explicitly so it can never touch this one.",
+  "",
+  "Add `at: [lat, lng]` to any match block. Names change upstream — a source",
+  "re-spells a park and the entry silently stops applying — but locations",
+  "don't. If the name lookup fails, the nearest place within 600 m wins, so",
+  "the research survives the rename.",
+  "",
+  "Every run writes data/research-audit.json, and the workflow fails if any",
+  "entry or rule matched nothing. That failure is deliberate: research going",
+  "quietly missing is invisible in the output, because the output still looks",
+  "perfectly fine without it."
+ ],
+ "places": [
+  {
+   "match": {
+    "name": "Town Of New Milford (Clatter Valley)",
+    "town": "Bridgewater",
+    "at": [
+     41.54224,
+     -73.38805
+    ]
+   },
+   "rename": "Clatter Valley Park",
+   "town": "New Milford",
+   "agency": "New Milford Parks & Recreation",
+   "url": "https://newmilfordct.myrec.com/info/facilities/details.aspx?FacilityID=14712",
+   "trails": true,
+   "parking": true,
+   "water": true,
+   "waterName": "Clatter Valley Pond",
+   "waterType": "lake",
+   "dogpark": false,
+   "fee": "Free",
+   "note": "Roughly 100 acres of town open space at 158 Town Farm Road. Hiking and unmarked trails, a pond, and a reservable pavilion with picnic tables and grills. Leashed dogs welcome.",
+   "source": [
+    "https://newmilfordct.myrec.com/info/facilities/details.aspx?FacilityID=14712",
+    "https://www.alltrails.com/en-gb/parks/us/connecticut/clatter-valley-park"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "name": "Devils Den",
+    "town": "Redding",
+    "at": [
+     41.25285,
+     -73.39489
+    ]
+   },
+   "rename": "Lucius Pond Ordway – Devil's Den Preserve",
+   "agency": "The Nature Conservancy",
+   "url": "https://www.nature.org/en-us/get-involved/how-to-help/places-we-protect/lucius-pond-ordwaydevils-den-preserve/",
+   "trails": true,
+   "parking": true,
+   "water": true,
+   "waterName": "Godfrey Pond",
+   "waterType": "lake",
+   "fee": "Free",
+   "note": "1,746 acres across Weston and Redding — the largest preserve in Fairfield County, with a 20-mile trail system. Open dawn to dusk. Main parking at the end of Pent Road, Weston; small pull-off on Dayton Road, Redding.",
+   "source": [
+    "https://www.nature.org/en-us/get-involved/how-to-help/places-we-protect/lucius-pond-ordwaydevils-den-preserve/",
+    "https://en.wikipedia.org/wiki/Devil's_Den_Preserve"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "name": "Devil'S Den/Saugatuck Forest",
+    "town": "Redding",
+    "at": [
+     41.26446,
+     -73.38997
+    ]
+   },
+   "agency": "The Nature Conservancy",
+   "trails": true,
+   "parking": true,
+   "fee": "Free",
+   "note": "Part of the Devil's Den preserve complex. Open dawn to dusk; trail maps at the Pent Road parking area in Weston.",
+   "source": [
+    "https://www.nature.org/en-us/get-involved/how-to-help/places-we-protect/lucius-pond-ordwaydevils-den-preserve/"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "0678e5e467",
+    "name": "Yale-Myers Forest",
+    "town": "Eastford",
+    "at": [
+     41.95422,
+     -72.13785
+    ]
+   },
+   "agency": "Yale School Forests (Yale School of the Environment)",
+   "url": "https://forests.yale.edu/",
+   "trails": true,
+   "parking": true,
+   "reachable": true,
+   "fee": "Free",
+   "note": "A 7,600-acre working research and teaching forest owned by Yale. The public can hike free of charge on designated routes — notably the blue-blazed Nipmuck Trail loop from Boston Hollow Road and Yale's interpretive trails. The rest of the forest hosts active research and timber operations, so stay on marked trails.",
+   "source": [
+    "https://eastfordct.gov/conservation-and-historic-preservation-commission/echpc-trails-and-recreation/echpc-yale-myers-forest/",
+    "https://thelastgreenvalley.org/member-directory/yale-myers-forest-nipmuck-loop-trail/",
+    "https://forests.yale.edu/resources"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "607052ecba",
+    "name": "Great Mountain Forest",
+    "town": "Norfolk",
+    "at": [
+     41.95949,
+     -73.2284
+    ]
+   },
+   "agency": "Great Mountain Forest",
+   "url": "https://greatmountainforest.org/visit-us/",
+   "trails": true,
+   "parking": true,
+   "water": true,
+   "reachable": true,
+   "fee": "Free",
+   "note": "A private nonprofit working forest open to the public daily from sunrise to sunset, free of charge, with over 13 miles of trails for hiking, skiing, snowshoeing and biking. Parking at the East gate off Windrow Road in Norfolk and the West gate in Falls Village; sign in at the gate kiosks. No swimming in ponds or streams.",
+   "source": [
+    "https://greatmountainforest.org/visit-us/"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "b74deb76ec",
+    "name": "City of New London Public Watershed Lands",
+    "town": "Montville",
+    "at": [
+     41.43975,
+     -72.20231
+    ]
+   },
+   "agency": "City of New London Water Department",
+   "url": "https://newlondonct.gov/utilities",
+   "water": true,
+   "waterName": "Lake Konomoc",
+   "waterType": "lake",
+   "note": "Drinking-water supply watershed lands around Lake Konomoc and associated reservoirs. The city publishes no public-access or recreation policy for these lands; assume entry is not permitted without checking with the New London Department of Public Utilities.",
+   "source": [
+    "https://newlondonct.gov/filestorage/7495/7518/7924/7926/Annual_Water_Quality_Report_2024.pdf"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "bc263ff254",
+    "name": "Eightmile River Macrosite",
+    "town": "Salem",
+    "at": [
+     41.49001,
+     -72.29307
+    ]
+   },
+   "rename": "Walden Preserve",
+   "agency": "The Nature Conservancy",
+   "url": "https://salemlandtrust.org/hike-salem/walden-preserve/",
+   "trails": true,
+   "parking": true,
+   "water": true,
+   "waterName": "Eightmile River",
+   "waterType": "river",
+   "reachable": true,
+   "fee": "Free",
+   "note": "A 400-acre Nature Conservancy preserve managed by the Salem Land Trust, open to the public with about 6 miles of trails through meadows, woods and wetlands near the East Branch of the Eightmile River. Parking at 119 Hagen Road; catch-and-release fishing allowed, dogs must be leashed. Part of TNC's larger Eightmile River conservation area.",
+   "source": [
+    "https://salemlandtrust.org/hike-salem/walden-preserve/"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "7e170afcf4",
+    "name": "West Thompson Road Open Space",
+    "town": "Thompson",
+    "at": [
+     41.94936,
+     -71.93402
+    ]
+   },
+   "rename": "West Thompson Lake",
+   "agency": "U.S. Army Corps of Engineers",
+   "url": "https://www.nae.usace.army.mil/Missions/Recreation/West-Thompson-Lake/",
+   "trails": true,
+   "parking": true,
+   "water": true,
+   "waterName": "West Thompson Lake",
+   "waterType": "lake",
+   "reachable": true,
+   "fee": "Free day use; camping fees apply",
+   "note": "Army Corps of Engineers flood-control land along the Quinebaug River with a 200-acre lake, over 9 miles of marked hiking trails, a boat ramp, canoe launch, free disc golf course, picnicking and a seasonal campground. Day use is free.",
+   "source": [
+    "https://www.nae.usace.army.mil/Missions/Recreation/West-Thompson-Lake/"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "42944ef400",
+    "name": "Maromas Wildlife Mangement Area",
+    "town": "Middletown",
+    "at": [
+     41.50982,
+     -72.57633
+    ]
+   },
+   "rename": "Maromas Cooperative Wildlife Management Area",
+   "agency": "Eversource / CT DEEP (Cooperative Wildlife Management Area)",
+   "url": "https://www.eversource.com/content/residential/about/doing-business-with-us/real-estate/land-management/our-land/maromas",
+   "trails": true,
+   "parking": true,
+   "water": true,
+   "waterName": "Connecticut River",
+   "waterType": "river",
+   "reachable": true,
+   "fee": "Free",
+   "note": "A large forested tract on the west bank of the Connecticut River with about 2.5 miles of blue-blazed trails (Mattabesett and Scovill Loop), Hubbard Brook and a small river beach. Open for hiking, birding and fishing at no charge; trailhead parking off River Road. The River Beach Trail crosses an active rail line at a designated crossing only.",
+   "source": [
+    "https://www.eversource.com/content/residential/about/doing-business-with-us/real-estate/land-management/our-land/maromas",
+    "https://www.cttrailfinder.com/trails/trail/scovill"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "9773eb04f7",
+    "name": "Robbins Swamp Wildlife Area",
+    "town": "North Canaan",
+    "at": [
+     42.01414,
+     -73.33553
+    ]
+   },
+   "rename": "Robbins Swamp Wildlife Management Area",
+   "agency": "Connecticut DEEP",
+   "url": "https://portal.ct.gov/deep-public-hunting-areas",
+   "parking": true,
+   "water": true,
+   "waterName": "Hollenbeck River",
+   "waterType": "river",
+   "reachable": true,
+   "note": "A state Wildlife Management Area protecting Connecticut's largest freshwater wetland, along the Hollenbeck River near Falls Village. Parking off Route 126; open for hunting, wildlife observation and passive recreation, with no formal trail network — expect wet, unmarked terrain and active hunting in season.",
+   "source": [
+    "https://portal.ct.gov/-/media/deep/wildlife/pdf_files/maps/maps_hunting_area/robbins-swamp-pheasant-map.pdf",
+    "https://portal.ct.gov/deep-public-hunting-areas"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "707cf9a182",
+    "name": "South Meadows Greenway at Goodwin University",
+    "town": "Glastonbury",
+    "at": [
+     41.72179,
+     -72.64208
+    ]
+   },
+   "agency": "Goodwin University",
+   "url": "https://www.cttrailfinder.com/trails/trail/south-meadows-greenway-trail",
+   "trails": true,
+   "parking": true,
+   "water": true,
+   "waterName": "Connecticut River",
+   "waterType": "river",
+   "reachable": true,
+   "fee": "Free",
+   "note": "A roughly 3-mile riverside trail along the Connecticut River, maintained by Goodwin University and designated an official Connecticut Greenway. Free and open for walking, biking and cross-country skiing, with accessible parking at the northern trailhead on South Meadow Lane in East Hartford.",
+   "source": [
+    "https://www.cttrailfinder.com/trails/trail/south-meadows-greenway-trail",
+    "https://www.goodwin.edu/enews/greenways-council-presents-19th-annual-greenways-awards/"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "660fee49bf",
+    "name": "McKinney NWR — Calf Island Unit",
+    "town": "Greenwich",
+    "at": [
+     40.99233,
+     -73.64015
+    ]
+   },
+   "agency": "U.S. Fish and Wildlife Service",
+   "url": "https://www.fws.gov/refuge/stewart-b-mckinney/visit-us",
+   "trails": true,
+   "beach": true,
+   "water": true,
+   "waterName": "Long Island Sound",
+   "note": "A roughly 30-acre island off Greenwich's Byram shore, part of Stewart B. McKinney National Wildlife Refuge. Open daily from 30 minutes before sunrise to 30 minutes after sunset with beach and trail access — but there is no ferry or dock, so visitors must arrive by private boat (kayaks may land on designated beaches). Obey posted habitat closures.",
+   "source": [
+    "https://www.fws.gov/refuge/stewart-b-mckinney/visit-us"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "df80967058",
+    "name": "Thomaston Reservoir",
+    "town": "Harwinton",
+    "at": [
+     41.71511,
+     -73.07622
+    ]
+   },
+   "rename": "Thomaston Dam",
+   "agency": "U.S. Army Corps of Engineers",
+   "url": "https://www.nae.usace.army.mil/Missions/Recreation/Thomaston-Dam/",
+   "trails": true,
+   "parking": true,
+   "water": true,
+   "waterName": "Naugatuck River",
+   "waterType": "river",
+   "reachable": true,
+   "fee": "Free",
+   "note": "Flood-control project land along the Naugatuck River spanning Thomaston, Harwinton, Litchfield and Plymouth. Open for hiking, fishing, picnicking, cross-country skiing and snowshoeing, with designated seasonal trail-bike routes; parking and a picnic area near the dam off Route 222. Portions close when the flood pool is holding water.",
+   "source": [
+    "https://www.nae.usace.army.mil/Missions/Recreation/Thomaston-Dam/",
+    "https://www.thomastonct.gov/culture-recreation/thomaston-dam"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "252ca280ad",
+    "name": "Ehrich Woods",
+    "town": "Winchester",
+    "at": [
+     41.91602,
+     -73.14028
+    ]
+   },
+   "agency": "Winchester Land Trust",
+   "url": "https://winchesterlandtrust.org/land-and-maps/",
+   "trails": true,
+   "parking": true,
+   "water": true,
+   "waterName": "Rugg Brook",
+   "waterType": "river",
+   "reachable": true,
+   "note": "A 234-acre Winchester Land Trust sanctuary near Winchester Center, open to the public with marked trails past the Rugg Brook headwaters, a beaver marsh and a small waterfall. Park at the end of Preston Road (room for 3-4 cars) or at Hurlbut Field. Dogs on leash; no hunting.",
+   "source": [
+    "https://winchesterlandtrust.org/land-and-maps/",
+    "https://winchesterlandtrust.org/wp-content/uploads/2026/01/2024_-_ehrich_woods_1.pdf"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "e9b7bcee4b",
+    "name": "Dennis Farm Preserve Site",
+    "town": "Pomfret",
+    "at": [
+     41.87119,
+     -72.01996
+    ]
+   },
+   "rename": "Dennis Farm Preserve",
+   "agency": "The Nature Conservancy",
+   "url": "https://www.nature.org/en-us/get-involved/how-to-help/places-we-protect/dennis-farm-preserve/",
+   "trails": true,
+   "parking": true,
+   "reachable": true,
+   "fee": "Free",
+   "note": "A 380-acre Nature Conservancy preserve on former farmland in Pomfret's Quiet Corner, open free of charge from dawn to dusk. A roughly two-mile hiking route follows an old farm road; park at the head of Old Kings Highway. Passive recreation only — no pets, bikes, hunting or camping.",
+   "source": [
+    "https://www.nature.org/en-us/get-involved/how-to-help/places-we-protect/dennis-farm-preserve/"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "288b9337db",
+    "name": "Town Open Space",
+    "town": "Portland",
+    "at": [
+     41.56924,
+     -72.60962
+    ]
+   },
+   "rename": "Portland Reservoir",
+   "agency": "Town of Portland Parks & Recreation",
+   "url": "https://portland.recdesk.com/Community/Facility/Detail?facilityId=59",
+   "trails": true,
+   "water": true,
+   "waterName": "Portland Reservoir",
+   "waterType": "lake",
+   "reachable": true,
+   "note": "Town-owned reservoir property at the end of Old Marlborough Turnpike, bordering Meshomasic State Forest. The town lists the Portland Reservoir Rim Trail as a public facility open 8 a.m. to 5 p.m. daily; a well-used loop trail circles the reservoir.",
+   "source": [
+    "https://portland.recdesk.com/Community/Facility/Detail?facilityId=59"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "6396250aaf",
+    "name": "Turkey Hill Preserve",
+    "town": "Orange",
+    "at": [
+     41.27662,
+     -73.06011
+    ]
+   },
+   "agency": "Town of Orange Conservation Commission",
+   "url": "https://www.orangectconservationcommission.com/",
+   "trails": true,
+   "parking": true,
+   "water": true,
+   "reachable": true,
+   "note": "Town open space maintained by the Orange Conservation Commission for passive recreation. A blue-blazed loop trail starts at the parking lot off Derby-Milford Road at the Turkey Hill Road intersection; visitors are asked to stay on marked trails to protect wetlands and vernal pools.",
+   "source": [
+    "https://www.orangectconservationcommission.com/"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "bccf32ec3b",
+    "name": "Colebrook River Lake",
+    "town": "Colebrook",
+    "at": [
+     42.02628,
+     -73.04754
+    ]
+   },
+   "agency": "U.S. Army Corps of Engineers",
+   "url": "https://www.nae.usace.army.mil/Missions/Recreation/Colebrook-River-Lake/",
+   "trails": true,
+   "parking": true,
+   "water": true,
+   "waterName": "Colebrook River Lake",
+   "waterType": "lake",
+   "reachable": true,
+   "fee": "Free",
+   "note": "A 700-acre seasonal flood-control reservoir off Route 8 north of Winsted, open to the public at no charge during daylight hours. Boat launch, trout and bass fishing, and wildlife viewing; foot access is allowed year-round, though areas can close on short notice for flood control.",
+   "source": [
+    "https://www.nae.usace.army.mil/Missions/Recreation/Colebrook-River-Lake/"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "d432bb04aa",
+    "name": "Miles Wildlife Sanctuary",
+    "town": "Sharon",
+    "at": [
+     41.88062,
+     -73.40934
+    ]
+   },
+   "rename": "Emily Winthrop Miles Wildlife Sanctuary",
+   "agency": "National Audubon Society (Sharon Audubon Center)",
+   "url": "https://www.audubon.org/miles",
+   "trails": true,
+   "water": true,
+   "waterName": "Miles Pond",
+   "waterType": "pond",
+   "reachable": true,
+   "fee": "Free",
+   "note": "An Audubon sanctuary open daily sunrise to sunset; the Pond Loop Trail circles Miles Pond, known for wildlife viewing. Buildings are not open to the public, and pets, bicycles, swimming and off-trail travel are prohibited.",
+   "source": [
+    "https://www.audubon.org/miles"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "6353896e4d",
+    "name": "Fenton–Ruby Park and Wildlife Preserve",
+    "town": "Willington",
+    "at": [
+     41.89811,
+     -72.22578
+    ]
+   },
+   "agency": "Town of Willington",
+   "url": "https://www.willingtonct.gov/1272/Trails---Fenton-Ruby-Park-Wildlife-Prese",
+   "trails": true,
+   "parking": true,
+   "water": true,
+   "waterName": "Taylor Pond",
+   "waterType": "pond",
+   "reachable": true,
+   "note": "A roughly 305-acre town preserve of forest, wetlands and ponds on Burma Road. Blazed loop trails (Weigold, Taylor Pond, Julia's, Ruby) start from the parking area at Moose Meadow and Burma Roads; Taylor Pond and the Fenton River are highlights.",
+   "source": [
+    "https://www.willingtonct.gov/1272/Trails---Fenton-Ruby-Park-Wildlife-Prese"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "373dc4355c",
+    "name": "Silvio O. Conte National Fish and Wildlife Refuge",
+    "town": "East Hampton",
+    "at": [
+     41.53019,
+     -72.51747
+    ]
+   },
+   "rename": "Silvio O. Conte NFWR — Salmon River Division",
+   "agency": "U.S. Fish and Wildlife Service",
+   "url": "https://www.fws.gov/refuge/silvio-o-conte/connecticut-divisions-and-units",
+   "water": true,
+   "waterName": "Salmon River",
+   "waterType": "river",
+   "reachable": true,
+   "note": "Part of the four-state Silvio O. Conte refuge, protecting tidal marsh and floodplain forest where the Salmon River meets the Connecticut River. Open daily dawn to dusk for wildlife observation, photography, hunting and fishing — but facilities are minimal, with no marked trails or lots, and one parcel is reachable only by water.",
+   "source": [
+    "https://www.fws.gov/refuge/silvio-o-conte/connecticut-divisions-and-units",
+    "https://www.fws.gov/refuge/silvio-o-conte/visit-us"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "a473ea131c",
+    "name": "Appalachian Trail Corridor",
+    "town": "Kent",
+    "at": [
+     41.75315,
+     -73.44779
+    ]
+   },
+   "agency": "National Park Service",
+   "url": "https://www.nps.gov/appa/planyourvisit/fees.htm",
+   "trails": true,
+   "parking": true,
+   "water": true,
+   "waterName": "Housatonic River",
+   "waterType": "river",
+   "reachable": true,
+   "fee": "Free",
+   "note": "The Appalachian Trail follows the Housatonic River through Kent, including the St. Johns Ledges climb and the River Walk. The trail is free to walk with no fees or permits; trailhead parking on River Road via CT 341 and Skiff Mountain Road.",
+   "source": [
+    "https://www.nps.gov/appa/planyourvisit/fees.htm",
+    "https://appalachiantrail.org/hikes/st-johns-ledges-and-calebs-peak/"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "a0fe9018d5",
+    "name": "Nehantic Nature Preserve",
+    "town": "East Lyme",
+    "at": [
+     41.43199,
+     -72.23917
+    ]
+   },
+   "agency": "East Lyme Land Trust",
+   "url": "https://cfect.org/news/east-lyme-land-trust-closes-on-301-acre-property-for-1-58-million",
+   "water": true,
+   "waterName": "Cranberry Meadow Brook",
+   "waterType": "river",
+   "note": "A 301-acre mostly forested preserve with wetlands and Cranberry Meadow Brook, acquired by the East Lyme Land Trust in 2022. Trailheads on Holmes Road and Grassy Hill Road were planned at purchase, but current trail and access status could not be verified; hunting is permitted on the property. This is not Nehantic State Forest.",
+   "source": [
+    "https://cfect.org/news/east-lyme-land-trust-closes-on-301-acre-property-for-1-58-million"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "aea45c4fc1",
+    "name": "Audubon Society",
+    "town": "Redding",
+    "at": [
+     41.30661,
+     -73.43822
+    ]
+   },
+   "note": "This 731-acre attribution appears to be a mapping error: neither National Audubon nor Connecticut Audubon lists a sanctuary of this size in Redding — the only Audubon holding in the town's open-space plan is the 54-acre Edward Steichen Memorial Preserve. Treat this record with caution until the source data is corrected.",
+   "source": [
+    "https://www.townofreddingct.org/document-center/boards-commissions/conservation-commission/open-space-plan/1447-2018-open-space-plan-final/file.html"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "ab28effb09",
+    "name": "Marshepaug Forest",
+    "town": "Litchfield",
+    "at": [
+     41.75123,
+     -73.28007
+    ]
+   },
+   "note": "Records suggest this is deed-restricted private forest land (a private club is registered under a similar name in Litchfield), not public open space. No public access policy or managing agency could be found — do not assume walking access.",
+   "source": [
+    "https://www.litchfieldct.gov/board-assessment-appeals"
+   ],
+   "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "ffd8e157e0",
+    "name": "Mountainside Open Space",
+    "town": "Winchester",
+    "at": [
+     41.93661,
+     -73.04883
+    ]
+   },
+   "note": "No public open space by this name could be verified in Winchester. The town's similarly named Mountainside Drive parcel (about 118 acres) was offered for sale for development in 2023 and is far smaller than this record claims. Access unconfirmed — treat with caution.",
+   "source": [
+    "https://www.townofwinchester.org/"
+   ],
+   "checked": "2026-08-02"
+  }
+ ],
+ "rules": [
+  {
+   "id": "ct-state-land",
+   "match": {
+    "type": "state"
+   },
+   "siteRules": [
+    "Open 8am to sunset",
+    "Dogs must be leashed (7 ft max)",
+    "No motor vehicles off designated roads"
+   ],
+   "source": [
+    "https://portal.ct.gov/deep/natural-resources/responsible-recreation",
+    "https://portal.ct.gov/DEEP/State-Parks/Recreation-Information/Recreational-Trail-Use-Information"
+   ],
+   "checked": "2026-08-02",
+   "why": "Connecticut state parks, forests and wildlife management areas are open to the public daily from 8am to sunset by regulation. Walking is permitted throughout, so state land does not need a mapped trail to be reachable.",
+   "reachable": true
+  },
+  {
+   "id": "ct-wma",
+   "match": {
+    "subtype": "Wildlife Management Area"
+   },
+   "siteRules": [
+    "Open 8am to sunset; closed half an hour after sunset to half an hour before sunrise",
+    "Dogs leashed, 7 ft maximum",
+    "No camping",
+    "No ATVs, motorcycles or snowmobiles"
+   ],
+   "source": [
+    "https://www.law.cornell.edu/regulations/connecticut/Regs-Conn-State-Agencies-SS-26-16-3a"
+   ],
+   "checked": "2026-08-02",
+   "why": "Conn. Agencies Regs. 26-16-3a governs public use of state wildlife management areas. Hiking is permitted; these are working conservation land rather than developed parks.",
+   "reachable": true
+  },
+  {
+   "id": "cemetery-daylight",
+   "match": {
+    "type": "cemetery"
+   },
+   "siteRules": [
+    "Open during daylight hours",
+    "Quiet enjoyment; respect burials"
+   ],
+   "checked": "2026-08-02",
+   "source": [],
+   "why": "Municipal and non-profit burying grounds are walk-in public space during daylight. They are not required to have a mapped trail to be visitable.",
+   "reachable": true
+  },
+  {
+   "id": "avalonia",
+   "match": {
+    "agency": "Avalonia Land Conservancy"
+   },
+   "reachable": true,
+   "trails": true,
+   "fee": "Free",
+   "siteRules": [
+    "Open dawn to dusk",
+    "Stay on trails",
+    "Dogs on a leash",
+    "Some preserves restricted for nesting or fragile habitat — check posted signs"
+   ],
+   "source": [
+    "https://avalonia.org/preserves/",
+    "https://ctconservation.org/land-trusts/avalonia-land-conservancy-inc/"
+   ],
+   "checked": "2026-08-02",
+   "why": "Avalonia's 46 preserves, over 5,000 acres across nine southeastern Connecticut towns, are open and free to the public dawn to dusk, with trail maps online and posted on site."
+  },
+  {
+   "id": "wyndham",
+   "match": {
+    "agency": "Wyndham Land Trust"
+   },
+   "reachable": true,
+   "trails": true,
+   "fee": "Free",
+   "siteRules": [
+    "Passive recreation",
+    "Some preserves allow bikes or horses — check the preserve page"
+   ],
+   "source": [
+    "https://www.wyndhamlandtrust.org/preserves/",
+    "https://explorect.org/wyndham-land-trust/"
+   ],
+   "checked": "2026-08-02",
+   "why": "Over 7,500 acres in northeast Connecticut, with about 18 hikeable properties and 16+ miles of trails open to the public. Note: not every Wyndham holding is trailed, so this asserts reachable rather than claiming a trail on each parcel."
+  },
+  {
+   "id": "flanders",
+   "match": {
+    "agency": "Flanders Nature Center"
+   },
+   "reachable": true,
+   "trails": true,
+   "fee": "Free",
+   "siteRules": [
+    "Open dawn to dusk, year round",
+    "No charge",
+    "Passive recreation"
+   ],
+   "source": [
+    "https://flandersnaturecenter.org/hiking/",
+    "https://en.wikipedia.org/wiki/Flanders_Nature_Center_&_Land_Trust"
+   ],
+   "checked": "2026-08-02",
+   "why": "Flanders manages over 2,400 acres in Woodbury and neighbouring towns. Trails at its seven major preserves are open to the public at no charge, dawn to dusk, year round."
+  },
+  {
+   "id": "aspetuck",
+   "match": {
+    "agency": "Aspetuck Land Trust"
+   },
+   "reachable": true,
+   "trails": true,
+   "fee": "Free",
+   "siteRules": [
+    "Open dawn to dusk",
+    "Dog walking permitted",
+    "Fishing by permit only"
+   ],
+   "source": [
+    "https://www.aspetucklandtrust.org/land-use-policies",
+    "https://www.aspetucklandtrust.org/find-preserves-by-town"
+   ],
+   "checked": "2026-08-02",
+   "why": "45 trailed nature preserves across Easton, Weston, Westport, Fairfield, Southport, Norwalk and Bridgeport, all open to walk dawn to dusk."
+  },
+  {
+   "id": "glastonbury",
+   "match": {
+    "agency": "Town of Glastonbury"
+   },
+   "reachable": true,
+   "fee": "Free",
+   "siteRules": [
+    "Town open space, open to residents and visitors"
+   ],
+   "source": [
+    "https://www.glastonburyct.gov/departments/department-directory-a-h/community-development-planning-environmental/town-owned-open-spaces",
+    "https://www.glastonburyct.gov/our-community/local-attractions/hiking-walking"
+   ],
+   "checked": "2026-08-02",
+   "why": "Glastonbury publishes an inventory and map of its town-owned open spaces, many with walking trails. Municipal open space in Connecticut is public; the town cannot exclude non-residents."
+  },
+  {
+   "id": "tnc-ct",
+   "match": {
+    "agency": "The Nature Conservancy"
+   },
+   "reachable": true,
+   "fee": "Free",
+   "siteRules": [
+    "Dawn to dusk",
+    "Passive recreation: hiking, birding, nature study",
+    "A few preserves are closed to protect at-risk species — check before visiting"
+   ],
+   "source": [
+    "https://www.nature.org/en-us/about-us/where-we-work/united-states/connecticut/stories-in-connecticut/connecticut-places-we-protect/",
+    "https://www.nature.org/content/dam/tnc/nature/en/documents/INFO_Preserve_Guidelines.pdf"
+   ],
+   "checked": "2026-08-02",
+   "why": "Most TNC Connecticut preserves are open free for low-impact recreation. Deliberately not claiming trails, because TNC states some preserves harbouring at-risk species are closed."
+  },
+  {
+   "id": "ct-municipal-openspace",
+   "match": {
+    "agency": "City or town"
+   },
+   "reachable": true,
+   "fee": "Free",
+   "siteRules": [
+    "Municipal open space, open to residents and non-residents alike"
+   ],
+   "source": [
+    "https://law.justia.com/cases/connecticut/supreme-court/2001/257-cr-318-0.html"
+   ],
+   "checked": "2026-08-02",
+   "why": "Land recorded in PAD-US as city or town owned is municipal open space. Under Leydon v. Greenwich (2001) a Connecticut municipality may not close its parks and open space to non-residents, so this land is public by law."
+  }
+ ]
 }
