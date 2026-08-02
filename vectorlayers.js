@@ -226,8 +226,15 @@ const EveryParkTiles = (() => {
     L.popup({ maxWidth: 260 })
       .setLatLng(e.latlng)
       .setContent(
-        `<div class="pblock acc-open"><div class="pb-head">You can go here</div>
-           <div class="pb-body">Public land. Check posted signs for hours.</div></div>
+        // A shape with no place record has been through none of the
+        // verification the rest of the map depends on. This used to say
+        // "You can go here", which asserted public access for anything
+        // that happened to be drawn — including tribal reservation land
+        // that is explicitly not open. Unverified is the honest label,
+        // and it matches what a place record with no evidence would show.
+        `<div class="pblock acc-unknown"><div class="pb-head">⚠️ Unverified</div>
+           <div class="pb-body">Mapped boundary with no place record. We can't
+             confirm this is open to the public.</div></div>
          <div class="popup-name">${nameOf(hit.f)}</div>
          <div class="popup-sub">${kind}${acres ? " &middot; " + acres.toLocaleString() + " acres" : ""}</div>
          ${who ? `<div class="pi-steward">${who}</div>` : ""}`)

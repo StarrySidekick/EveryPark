@@ -16,13 +16,29 @@
     "sportList, playground, historic, beach, pool, dogpark, fee, url, note,",
     "agency, acres.",
     "",
-    "`rules` entries match on type/subtype/agency instead of a single name, so one cited regulation can settle hundreds of places at once. Same requirement: source and checked date."
+    "`rules` entries match on type/subtype/agency instead of a single name, so one cited regulation can settle hundreds of places at once. Same requirement: source and checked date.",
+    "",
+    "THIS FILE IS NEVER REGENERATED. places.json is rebuilt from scratch every",
+    "month and anything typed into it is destroyed; this file is the only place",
+    "in the pipeline meant to be edited by hand, and the workflow's commit step",
+    "names its files explicitly so it can never touch this one.",
+    "",
+    "Add `at: [lat, lng]` to any match block. Names change upstream — a source",
+    "re-spells a park and the entry silently stops applying — but locations",
+    "don't. If the name lookup fails, the nearest place within 600 m wins, so",
+    "the research survives the rename.",
+    "",
+    "Every run writes data/research-audit.json, and the workflow fails if any",
+    "entry or rule matched nothing. That failure is deliberate: research going",
+    "quietly missing is invisible in the output, because the output still looks",
+    "perfectly fine without it."
   ],
   "places": [
     {
       "match": {
         "name": "Town Of New Milford (Clatter Valley)",
-        "town": "Bridgewater"
+        "town": "Bridgewater",
+        "at": [41.54224, -73.38805]
       },
       "rename": "Clatter Valley Park",
       "town": "New Milford",
@@ -45,7 +61,8 @@
     {
       "match": {
         "name": "Devils Den",
-        "town": "Redding"
+        "town": "Redding",
+        "at": [41.25285, -73.39489]
       },
       "rename": "Lucius Pond Ordway \u2013 Devil's Den Preserve",
       "agency": "The Nature Conservancy",
@@ -66,7 +83,8 @@
     {
       "match": {
         "name": "Devil'S Den/Saugatuck Forest",
-        "town": "Redding"
+        "town": "Redding",
+        "at": [41.26446, -73.38997]
       },
       "agency": "The Nature Conservancy",
       "trails": true,

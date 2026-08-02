@@ -11,6 +11,17 @@
   document.getElementById("siteTitle").textContent = CONFIG.siteTitle;
   document.getElementById("tagline").textContent = CONFIG.tagline;
 
+  // Build badge. Shows the code version and the dataset date together,
+  // because "did my change actually ship?" and "is this a cached copy?"
+  // are otherwise guesswork.
+  const badge = document.getElementById("buildBadge");
+  if (badge) {
+    const d = String(CONFIG.dataVersion || "");
+    const pretty = d.length === 8
+      ? `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}` : d;
+    badge.innerHTML = `<b>${CONFIG.siteVersion || "dev"}</b> · data ${pretty}`;
+  }
+
   const rootStyle = document.documentElement.style;
   rootStyle.setProperty("--state", CONFIG.colors.state);
   rootStyle.setProperty("--national", CONFIG.colors.national);
@@ -1651,7 +1662,12 @@
       : "We found no trail, parking or facility here, and no official rating. It may still be open — we just can't confirm it.";
 
     // --- 2. Who maintains it? ---
-    p.steward = A.officialOwner || p.agency || STEWARD_BY_TYPE[p.type] || "Unknown";
+    // agency first. It holds the actual organisation — "Northwest
+    // Connecticut Land Conservancy" — whereas officialOwner is PAD-US's
+    // ownership *category*, "Non-profit / land trust". Reading the
+    // category first meant every preserve named its bucket instead of
+    // its steward, hiding a name we already had.
+    p.steward = p.agency || A.officialOwner || STEWARD_BY_TYPE[p.type] || "Unknown";
 
     // --- 3. What kind of place? ---
     p.kind = p.subtype || { state: "State Park", national: "Federal Land",

@@ -79,10 +79,40 @@ jobs:
         run: |
           git config user.name  "everypark-bot"
           git config user.email "actions@github.com"
-          git add data/places.json data/everypark.pmtiles config.js || true
+          git add data/places.json data/everypark.pmtiles config.js \
+                  data/research-audit.json || true
           if git diff --cached --quiet; then
             echo "nothing changed"
           else
             git commit -m "Refresh data from public sources"
             git push
           fi
+
+      # Runs AFTER the commit on purpose. If research stopped applying we
+      # still want the refreshed data live rather than a month-old site —
+      # but the run must go red so the failure email actually arrives.
+      # Silent loss is the only failure this pipeline can't spot by
+      # looking at its own output: the file still looks perfectly fine.
+      - name: Guard the research overlay
+        run: |
+          python3 - <<'PY'
+          import json, sys
+          a = json.load(open("data/research-audit.json"))
+          print(f"{a['matched']}/{a['entries']} researched places matched, "
+                f"{a['rule_hits']:,} settled by {a['rules']} rules, "
+                f"{a.get('researched_places', 0):,} carry provenance")
+          bad = False
+          for u in a.get("unmatched", []):
+              print(f"::error::Research LOST — no place matches "
+                    f"{u['name']!r} ({u.get('town')}). Add an `at` "
+                    f"coordinate anchor to its match block.")
+              bad = True
+          for r in a.get("dead_rules", []):
+              print(f"::error::Rule {r['id']!r} matched nothing — the "
+                    f"field it keys on has changed: {r['match']}")
+              bad = True
+          if a.get("error"):
+              print(f"::error::verified.json problem: {a['error']}")
+              bad = True
+          sys.exit(1 if bad else 0)
+          PY

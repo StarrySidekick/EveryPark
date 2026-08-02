@@ -157,6 +157,11 @@ const CONFIG = {
   // keep serving the copy they already have.
   dataVersion: "20260801",
 
+  // Shown in the top-right corner. Bumped by hand on every code change,
+  // so there's visible proof of which build is actually loaded rather
+  // than guessing whether a cached copy is being served.
+  siteVersion: "v0.9.1",
+
   // ---- VECTOR TILES --------------------------------------------------
   // Every boundary and trail, pre-cut into map tiles and packed into one
   // file. The map reads only the tiles for what's on screen, using HTTP
