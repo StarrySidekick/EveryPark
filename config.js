@@ -155,7 +155,7 @@ const CONFIG = {
   //
   // Bump dataVersion whenever you regenerate it, otherwise browsers will
   // keep serving the copy they already have.
-  dataVersion: "3",
+  dataVersion: "20260801",
 
   // ---- VECTOR TILES --------------------------------------------------
   // Every boundary and trail, pre-cut into map tiles and packed into one
