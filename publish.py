@@ -85,6 +85,20 @@ def main():
                   separators=(",", ":"))
     print(f"  -> {out} ({os.path.getsize(out)/1024/1024:.2f} MB)", flush=True)
 
+    # Bump dataVersion, or browsers keep serving the copy they already
+    # have and the publish is invisible. The badge reads this too, so a
+    # stale date in the corner is the tell that this step didn't run.
+    if os.path.exists("config.js"):
+        import re
+        import time
+        s = open("config.js").read()
+        stamp = time.strftime("%Y%m%d")
+        s2 = re.sub(r'dataVersion:\s*"[^"]*"', f'dataVersion: "{stamp}"',
+                    s, count=1)
+        if s2 != s:
+            open("config.js", "w").write(s2)
+            print(f"  dataVersion -> {stamp}", flush=True)
+
     # Same guard as the full refresh: research that stops applying is
     # invisible in the output, so it has to fail loudly here too.
     lost = audit.get("unmatched") or []

@@ -456,14 +456,21 @@ a.badge:hover { filter: brightness(1.15); text-decoration: underline; }
             border-radius: 6px; padding: 4px 8px; margin-top: 6px; }
 
 /* Build badge — visible proof of which code and data are loaded. */
+/* Pinned to the actual top-right corner of the header. Sitting inline
+   with the filter chips, it read as one more control and was invisible
+   as a status indicator — which defeated the point of having it. */
 #buildBadge {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  z-index: 30;
   font: 600 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
-  color: #5c6b62;
-  background: rgba(255,255,255,.72);
-  border: 1px solid rgba(0,0,0,.10);
+  color: rgba(255,255,255,.82);
+  background: rgba(0,0,0,.22);
+  border: 1px solid rgba(255,255,255,.22);
   border-radius: 999px;
   padding: 4px 9px;
   white-space: nowrap;
-  align-self: center;
 }
+header { position: relative; }
 #buildBadge b { color: #1b5e20; font-weight: 700; }
