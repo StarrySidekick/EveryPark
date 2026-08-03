@@ -84,38 +84,56 @@
     return "default";
   }
 
+  // Six plain marks — what KIND of outdoors this is, nothing more.
+  // No ring, no badge: the polygon says where it is and whether you can
+  // go; the mark sits inset in the middle of it and stays out of the way.
+  const MARK = {
+    wooded:   "M32 8 L44 30 H38 L48 50 H16 L26 30 H20 Z M29 50 h6 v8 h-6 z",
+    field:    "M8 44 C20 34 26 46 34 38 C40 32 50 40 56 34 M8 52 h48",
+    mountain: "M6 50 L24 20 L36 38 L44 26 L58 50 Z",
+    sports:   "M32 10 a22 22 0 1 0 0 44 a22 22 0 1 0 0-44 M10 32 h44 M32 10 v44",
+    beach:    "M6 44 c7-5 13-5 20 0 s13 5 20 0 s13-5 12 0 M40 12 a12 12 0 0 0-24 0 z M40 12 v22",
+    grave:    "M32 8 c-9 0-14 7-14 15 v33 h28 V23 c0-8-5-15-14-15 M28 20 h8 v6 h6 v8 h-6 v10 h-8 V34 h-6 v-8 h6 z"
+  };
+  const OUTLINE = { field: 1, sports: 1 };
+
+  function markFor(p) {
+    const A = p.attrs || {};
+    if (p.type === "cemetery") return "grave";
+    if (A.beach || A.pool) return "beach";
+    if (A.sports || A.playground) return "sports";
+    if ((A.relief || 0) >= 45) return "mountain";
+    const c = String(A.cover || "").toLowerCase();
+    if (c.includes("open")) return "field";
+    return "wooded";
+  }
+
   const iconCache = new Map();
   function iconFor(p) {
-    const glyph = glyphFor(p);
-    const ring = CONFIG.visual.owner[p.type] || CONFIG.visual.owner.preserve;
-    const key = glyph + ring;
-    if (iconCache.has(key)) return iconCache.get(key);
+    const m = markFor(p);
+    if (iconCache.has(m)) return iconCache.get(m);
+    const stroke = OUTLINE[m];
     const svg =
-      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="30" height="30">
-         <circle cx="32" cy="32" r="29" fill="${ring}" stroke="#fff" stroke-width="4"/>
-         <g fill="#fff" stroke="#fff" stroke-width="${glyph === "field" || glyph === "trail" ? 4 : 0}"
-            stroke-linecap="round" fill-rule="evenodd">
-           <path d="${GLYPH[glyph]}" ${glyph === "field" || glyph === "trail" ? 'fill="none"' : ""}/>
-         </g>
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="26" height="26">
+         <path d="${MARK[m]}" fill="${stroke ? "none" : "currentColor"}"
+               stroke="currentColor" stroke-width="${stroke ? 6 : 0}"
+               stroke-linecap="round" stroke-linejoin="round"/>
        </svg>`;
-    const icon = L.icon({
-      iconUrl: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg),
-      iconSize: [30, 30], iconAnchor: [15, 15], popupAnchor: [0, -15]
+    const icon = L.divIcon({
+      className: "ep-mark ep-mark-" + m,
+      html: svg,
+      iconSize: [26, 26], iconAnchor: [13, 13]
     });
-    iconCache.set(key, icon);
+    iconCache.set(m, icon);
     return icon;
   }
 
-  const cluster = L.markerClusterGroup({
-    maxClusterRadius: 46,
-    showCoverageOnHover: false,
-    iconCreateFunction: (c) => L.divIcon({
-      html: `<div class="cluster-icon" style="width:${34 + Math.min(c.getChildCount(), 60) / 4}px;height:${34 + Math.min(c.getChildCount(), 60) / 4}px">${c.getChildCount()}</div>`,
-      className: "",
-      iconSize: null
-    })
-  });
-  map.addLayer(cluster);
+  // Marks are drawn only where they can mean something: from the zoom
+  // where boundaries are visible, and only for what's on screen. No
+  // clustering, no 7,700 markers built at load — that was most of the
+  // startup cost, and the polygons are what you click now anyway.
+  const MARK_ZOOM = 12, MARK_CAP = 260;
+  const markLayer = L.layerGroup().addTo(map);
 
   // ------------------------------------------------------------------
   // State
@@ -366,9 +384,9 @@
         if (al.why) p.akaNote = al.why;
       }
     }
-    p.marker = L.marker([p.lat, p.lng], { icon: iconFor(p), title: p.name })
-      .bindPopup(popupHtml(p));
-    p.marker.on("popupopen", () => loadTerrain(p));
+    // No marker and no popup HTML until something actually needs them:
+    // building 7,700 popups up front cost seconds of load for markup
+    // nobody had asked to see.
     allParks.push(p);
   }
 
@@ -404,7 +422,6 @@
       if (vals.length >= 3) {
         const relief = Math.round(Math.max(...vals) - Math.min(...vals));
         p.attrs.terrain = `${terrainLabel(relief)} · ${relief} m relief`;
-        p.marker.setPopupContent(popupHtml(p));
       }
     } catch (e) { /* terrain is a nicety; ignore failures */ }
     p._terrainBusy = false;
@@ -435,19 +452,60 @@
     return p._hay.includes(searchTerm);
   }
 
+  // Open a place's card without needing a marker to hang it on.
+  function openPlace(p) {
+    if (!p) return;
+    L.popup({ maxWidth: 300, autoPan: true })
+      .setLatLng([p.lat, p.lng])
+      .setContent(popupHtml(p))
+      .openOn(map);
+    loadTerrain(p);
+  }
+
+  function paintMarks() {
+    markLayer.clearLayers();
+    if (map.getZoom() < MARK_ZOOM) return;
+    const b = map.getBounds();
+    let n = 0;
+    for (const p of allParks) {
+      if (n >= MARK_CAP) break;
+      if (p.lat < b.getSouth() || p.lat > b.getNorth()
+          || p.lng < b.getWest() || p.lng > b.getEast()) continue;
+      if (!visible(p)) continue;
+      // Marks are decoration: the polygon underneath takes the click.
+      markLayer.addLayer(L.marker([p.lat, p.lng],
+        { icon: iconFor(p), interactive: false, keyboard: false }));
+      n++;
+    }
+  }
+
   function refresh() {
     if (tilesActive) EveryParkTiles.refresh(activeTypes);
-    const shown = [];
-    cluster.clearLayers();
-    const batch = [];
-    for (const p of allParks) {
-      if (visible(p)) { batch.push(p.marker); shown.push(p); }
-    }
-    cluster.addLayers(batch);
-    // The list view was removed 2026-08-02 (it wasn't earning its screen
-    // space); the count moved into the status line's element if present.
-    if (metaEl) metaEl.textContent = `${shown.length.toLocaleString()} parks shown`;
+    let shown = 0;
+    for (const p of allParks) if (visible(p)) shown++;
+    paintMarks();
+    if (metaEl) metaEl.textContent = `${shown.toLocaleString()} parks shown`;
   }
+  map.on("moveend zoomend", paintMarks);
+
+  // A place with no mapped boundary has no polygon to click, so fall
+  // back to the nearest one when a click hits bare ground.
+  map.on("click", e => {
+    setTimeout(() => {
+      if (document.querySelector(".leaflet-popup")) return;
+      const z = map.getZoom();
+      if (z < MARK_ZOOM) return;
+      let best = null, bestD = 40;                 // pixels
+      const cp = map.latLngToContainerPoint(e.latlng);
+      for (const p of allParks) {
+        if (!visible(p)) continue;
+        const q = map.latLngToContainerPoint([p.lat, p.lng]);
+        const d = Math.hypot(q.x - cp.x, q.y - cp.y);
+        if (d < bestD) { bestD = d; best = p; }
+      }
+      if (best) openPlace(best);
+    }, 60);
+  });
 
   // ------------------------------------------------------------------
   // Data loading
@@ -1333,7 +1391,6 @@
         // historic
         if (HISTORIC_RE.test(p.name) || /Historic/i.test(p.subtype || "")) A.historic = true;
 
-        p.marker.setPopupContent(popupHtml(p));
       }
       hideStatus();
       refresh();
@@ -1528,7 +1585,6 @@
         if (word === "Open") { A.visitable = true; A.accessNote = "Open to the public (USGS PAD-US)"; }
         else if (word === "Closed") { A.visitable = false; A.accessNote = "Closed to public access (USGS PAD-US)"; }
         else if (word === "Restricted") { A.accessNote = "Restricted access (USGS PAD-US) — check before visiting"; }
-        p.marker.setPopupContent(popupHtml(p));
         tagged++;
       }
       hideStatus();
@@ -1744,7 +1800,6 @@
         const A = p.attrs || (p.attrs = {});
         if (trailNear(p.lat, p.lng, parkRadiusM(p) + 150, trailSet)) A.trails = true;
         scoreAccess(p);
-        p.marker.setPopupContent(popupHtml(p));
       }
       hideStatus();
       refresh();
@@ -2307,14 +2362,14 @@
 
   // 🎲 Random park: fly somewhere that passes the current filters.
   (document.getElementById("randomBtn") || {addEventListener(){}}).addEventListener("click", () => {
-    const pool = allParks.filter(visible);
-    if (!pool.length) return;
-    const p = pool[Math.floor(Math.random() * pool.length)];
+    // Only somewhere with terrain to look at — the whole point of the
+    // dice is landing somewhere you can immediately fly around in 3D.
+    const pool = allParks.filter(p => visible(p) && (p.attrs || {}).relief != null);
+    const use = pool.length ? pool : allParks.filter(visible);
+    if (!use.length) return;
+    const p = use[Math.floor(Math.random() * use.length)];
     map.flyTo([p.lat, p.lng], Math.max(map.getZoom(), 14), { duration: 0.9 });
-    setTimeout(() => {
-      try { cluster.zoomToShowLayer(p.marker, () => p.marker.openPopup()); }
-      catch (e) { p.marker.openPopup(); }
-    }, 950);
+    setTimeout(() => openPlace(p), 1000);
   });
 
   // Filters dropdown: the access + owner chip groups live in one panel.

@@ -598,57 +598,28 @@ const EveryParkIso = (() => {
 
   // ---- Sky: gradient + sun / low sun / moon & stars per mode ------
   function drawSky(ctx, W, Hh, mode) {
-    let g;
-    if (mode === 0) {                                  // day
-      g = ctx.createLinearGradient(0, 0, 0, Hh);
+    // Just the gradient — the sun, moon and stars were more distraction
+    // than atmosphere once the terrain got detailed.
+    const g = ctx.createLinearGradient(0, 0, 0, Hh);
+    if (mode === 0) {
       g.addColorStop(0, "#8ec9ec"); g.addColorStop(.6, "#cde7f4");
       g.addColorStop(1, "#10161a");
-    } else if (mode === 1) {                           // sunset
-      g = ctx.createLinearGradient(0, 0, 0, Hh);
+    } else if (mode === 1) {
       g.addColorStop(0, "#2c2350"); g.addColorStop(.45, "#b0526b");
       g.addColorStop(.72, "#f0924f"); g.addColorStop(1, "#140f1c");
-    } else {                                           // night
-      g = ctx.createLinearGradient(0, 0, 0, Hh);
+    } else {
       g.addColorStop(0, "#050a1c"); g.addColorStop(.7, "#0b1230");
       g.addColorStop(1, "#02040a");
     }
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, Hh);
-
-    if (mode === 0) {                                  // sun, high right
-      const sx = W * .84, sy = Hh * .13;
-      const glow = ctx.createRadialGradient(sx, sy, 4, sx, sy, 70);
-      glow.addColorStop(0, "rgba(255,246,200,.95)");
-      glow.addColorStop(.35, "rgba(255,232,150,.45)");
-      glow.addColorStop(1, "rgba(255,232,150,0)");
-      ctx.fillStyle = glow; ctx.fillRect(sx - 70, sy - 70, 140, 140);
-      ctx.fillStyle = "#fff6d0";
-      ctx.beginPath(); ctx.arc(sx, sy, 17, 0, 7); ctx.fill();
-    } else if (mode === 1) {                           // fat low sun
-      const sx = W * .5, sy = Hh * .30;
-      const glow = ctx.createRadialGradient(sx, sy, 8, sx, sy, 110);
-      glow.addColorStop(0, "rgba(255,180,90,.9)");
-      glow.addColorStop(.4, "rgba(255,140,80,.35)");
-      glow.addColorStop(1, "rgba(255,140,80,0)");
-      ctx.fillStyle = glow; ctx.fillRect(sx - 110, sy - 110, 220, 220);
-      ctx.fillStyle = "#ffcf8a";
-      ctx.beginPath(); ctx.arc(sx, sy, 26, 0, 7); ctx.fill();
-    } else {                                           // stars + crescent
-      for (let i = 0; i < 140; i++) {
-        const x = hash(i, 7) * W, y = hash(i, 13) * Hh * .75;
-        ctx.fillStyle = `rgba(255,255,255,${.25 + .6 * hash(i, 31)})`;
-        ctx.fillRect(x, y, hash(i, 3) > .9 ? 2 : 1, hash(i, 3) > .9 ? 2 : 1);
-      }
-      const mx = W * .82, my = Hh * .14;
-      ctx.fillStyle = "#e8ecf5";
-      ctx.beginPath(); ctx.arc(mx, my, 16, 0, 7); ctx.fill();
-      ctx.fillStyle = "#0b1230";
-      ctx.beginPath(); ctx.arc(mx + 7, my - 4, 14, 0, 7); ctx.fill();
-    }
   }
 
   // ---- Drawing ----------------------------------------------------
   function coverPalette(p) {
+    // Graveyards get their own cold, drained ground — a colder green
+    // going grey-violet in the hollows.
+    if (p.type === "cemetery") return { lo: [58, 62, 74], hi: [128, 138, 132] };
     const c = ((p.attrs || {}).cover || "").toLowerCase();
     if (c.includes("wood")) return { lo: [52, 96, 62], hi: [140, 182, 118] };
     if (c.includes("open")) return { lo: [128, 138, 76], hi: [212, 203, 130] };
@@ -769,6 +740,7 @@ const EveryParkIso = (() => {
     // Flat ribbons lying on the ground: yellow dashed trails, solid grey
     // roads. Butt caps — round caps on every segment were what made them
     // read as strings of cylinders.
+    const deferred = [];        // facility marks, painted above the ways
     const trailCol = (() => { const c = tod(232, 196, 74); return `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`; })();
     const roadCol  = (() => { const c = tod(158, 162, 168); return `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`; })();
     const roadEdge = (() => { const c = tod(96, 100, 106); return `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`; })();
@@ -907,11 +879,9 @@ const EveryParkIso = (() => {
       }
 
       const sp = spriteAt && spriteAt.get(i);
-      if (sp) {
-        ctx.font = `${Math.min(30, Math.max(10, s * 3.6)) | 0}px system-ui`;
-        ctx.textAlign = "center";
-        ctx.fillText(sp, X, Y - s * .9);
-      }
+      // Facility marks are drawn after the ways, so a court's icon is
+      // never painted over by the road running past it.
+      if (sp) deferred.push([X, Y, sp]);
       // Trees stay in satellite mode too — the drape is the ground, the
       // sprites are the forest standing on it.
       if (!sp && !isWater && !isBuild && !trailM[i] && !roadM[i]
@@ -939,6 +909,76 @@ const EveryParkIso = (() => {
         ctx.lineTo(X + jx + half * .72, Y - th * .72);
         ctx.closePath(); ctx.fill();
       }
+
+      // Headstones instead of pines: little pale slabs in rows, with a
+      // couple of bare crooked trees. Cemeteries should feel like
+      // cemeteries.
+      else if (p.type === "cemetery" && !sp && !isWater && !isBuild
+               && !trailM[i] && !roadM[i] && !parkM[i]
+               && hash(gx * 2, gy) < 0.20) {
+        const stoneH = s * (.7 + .35 * hash(gx, gy + 5));
+        const stoneW = s * .42;
+        let [gr2, gg2, gb2] = tod(198, 200, 196);
+        ctx.fillStyle = `rgb(${gr2 | 0},${gg2 | 0},${gb2 | 0})`;
+        ctx.beginPath();
+        ctx.moveTo(X - stoneW / 2, Y);
+        ctx.lineTo(X - stoneW / 2, Y - stoneH * .68);
+        ctx.quadraticCurveTo(X, Y - stoneH * 1.12, X + stoneW / 2, Y - stoneH * .68);
+        ctx.lineTo(X + stoneW / 2, Y);
+        ctx.closePath(); ctx.fill();
+        if (hash(gx + 9, gy + 9) < 0.14) {           // a bare crooked tree
+          let [br, bg2, bb] = tod(58, 52, 48);
+          ctx.strokeStyle = `rgb(${br | 0},${bg2 | 0},${bb | 0})`;
+          ctx.lineWidth = Math.max(1, s * .16);
+          ctx.beginPath();
+          ctx.moveTo(X, Y);
+          ctx.lineTo(X + s * .2, Y - s * 1.5);
+          ctx.moveTo(X + s * .12, Y - s * .9);
+          ctx.lineTo(X - s * .5, Y - s * 1.35);
+          ctx.moveTo(X + s * .17, Y - s * 1.15);
+          ctx.lineTo(X + s * .8, Y - s * 1.6);
+          ctx.stroke();
+        }
+      }
+
+      // Boulders: same scatter as trees, but only where the ground is
+      // genuinely steep — Connecticut's outcrops sit on the slopes, and
+      // seeding them off gradient keeps them off lawns and meadows.
+      else if (!sp && !isWater && !isBuild && !trailM[i] && !roadM[i]
+               && !courtM[i] && !parkM[i]) {
+        const grad = Math.abs(h - nb)
+                   + Math.abs(h - H[Math.max(0, i - GRID)]);
+        if (grad > (S.mPerBlock || 10) * 0.30
+            && hash(gx + 31, gy + 17) < 0.055) {
+          const rx2 = (hash(gx + 5, gy + 11) - .5) * w * .5;
+          const rs = s * (.5 + .5 * hash(gx + 3, gy + 9));
+          const v = 26 * hash(gx + 13, gy + 2);
+          let [kr, kg, kb] = tod(126 + v, 122 + v, 114 + v);
+          ctx.fillStyle = `rgb(${kr | 0},${kg | 0},${kb | 0})`;
+          ctx.beginPath();
+          ctx.moveTo(X + rx2 - rs, Y);
+          ctx.lineTo(X + rx2 - rs * .55, Y - rs * .95);
+          ctx.lineTo(X + rx2 + rs * .35, Y - rs * 1.05);
+          ctx.lineTo(X + rx2 + rs, Y - rs * .2);
+          ctx.closePath(); ctx.fill();
+          let [sr, sg, sb] = tod(92, 89, 84);
+          ctx.fillStyle = `rgb(${sr | 0},${sg | 0},${sb | 0})`;
+          ctx.beginPath();
+          ctx.moveTo(X + rx2 + rs * .35, Y - rs * 1.05);
+          ctx.lineTo(X + rx2 + rs, Y - rs * .2);
+          ctx.lineTo(X + rx2 + rs * .2, Y);
+          ctx.closePath(); ctx.fill();
+        }
+      }
+    }
+
+    // A low mist over graveyards.
+    if (p.type === "cemetery") {
+      const mist = ctx.createLinearGradient(0, Hh * .45, 0, Hh);
+      mist.addColorStop(0, "rgba(198,206,214,0)");
+      mist.addColorStop(1, "rgba(198,206,214,.30)");
+      ctx.fillStyle = mist;
+      ctx.fillRect(0, Hh * .45, W, Hh * .55);
     }
 
     // Ways in, drawn last so nothing hides them: trees, buildings and
@@ -951,6 +991,12 @@ const EveryParkIso = (() => {
       (depth(a[0][0], a[0][1]) + depth(a[0][2], a[0][3]))
       - (depth(b[0][0], b[0][1]) + depth(b[0][2], b[0][3])));
     for (const [pc, kind] of ways) drawRibbon(pc, kind);
+
+    ctx.textAlign = "center";
+    for (const [X, Y, sp] of deferred) {
+      ctx.font = `${Math.min(30, Math.max(10, s * 3.6)) | 0}px system-ui`;
+      ctx.fillText(sp, X, Y - s * .9);
+    }
 
     if (S.hikePath && S.hikePath.length > 3) {
       const path = S.hikePath;
@@ -1075,6 +1121,7 @@ const EveryParkIso = (() => {
                 useSat: false, tex: null, tod: 0, zoom: 1, cellM: 10,
                 smooth: false, mPerBlock: 10, sides: 0, treeMask: null,
                 season: 0 };
+    if (p.type === "cemetery") S.tod = 1;      // dusk suits them
     const baseSub = boundary ? `boundary: ${boundary.label}`
                              : "no boundary found — square sample";
     sub.textContent = baseSub + " · fetching trails, roads, buildings…";
@@ -1112,7 +1159,7 @@ const EveryParkIso = (() => {
     // Toolbar: time of day, satellite drape, export.
     const todBtn = document.createElement("button");
     todBtn.className = "iso-tool";
-    todBtn.textContent = "☀️ Day";
+    todBtn.textContent = `${TOD[S.tod].icon} ${TOD[S.tod].label}`;
     todBtn.addEventListener("click", () => {
       S.tod = (S.tod + 1) % TOD.length;
       todBtn.textContent = `${TOD[S.tod].icon} ${TOD[S.tod].label}`;
@@ -1225,13 +1272,25 @@ const EveryParkIso = (() => {
       S.zoom = Math.min(3, Math.max(.5, S.zoom * (e.deltaY < 0 ? 1.1 : 0.9)));
     }, { passive: false });
 
+    const spinBtn = document.createElement("button");
+    spinBtn.className = "iso-tool iso-spin-btn active";
+    spinBtn.title = "Pause / resume the turntable";
+    spinBtn.textContent = "⏸";
+    spinBtn.addEventListener("click", () => {
+      S.spin = !S.spin;
+      spinBtn.textContent = S.spin ? "⏸" : "▶";
+      spinBtn.classList.toggle("active", S.spin);
+    });
+    tools.appendChild(spinBtn);
+    S.spin = true;
+
     let yaw = 0, target = 0, dragging = false, lastX = 0;
     canvas.addEventListener("pointerdown", e => { dragging = true; lastX = e.clientX; canvas.setPointerCapture(e.pointerId); });
     canvas.addEventListener("pointermove", e => { if (dragging) { target += (e.clientX - lastX) * .008; lastX = e.clientX; } });
     canvas.addEventListener("pointerup", () => dragging = false);
     const loop = () => {
       if (!document.getElementById("isoOverlay")) return;
-      if (!dragging) target += 0.0012;
+      if (!dragging && S.spin) target += 0.0012;
       yaw += (target - yaw) * .15;
       // Walking pace: ~1.3 m/s of real ground, whatever the block size.
       if (S.hikePath) {

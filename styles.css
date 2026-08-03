@@ -592,3 +592,129 @@ header h1 { margin-right: 4px; }
 /* THE dropdown bug: display:flex on #filtersPanel overrode the UA's
    [hidden]{display:none}, so .hidden=true never visually closed it. */
 #filtersPanel[hidden] { display: none !important; }
+
+
+/* ============================================================
+   EVERYPARK STYLE GUIDE  —  "retro field guide", green
+   Derived from starrysidekick.com's warm, playful, retro-digital
+   feel: animated-GIF whimsy, cassette-era warmth, celestial motifs.
+   Translated here as: deep forest ink, aged-paper cream, a brass
+   accent, monospaced micro-labels, and hard 2-3px corners.
+   Every token lives here — restyle the site by editing this block.
+   ============================================================ */
+:root {
+  /* Ink & paper */
+  --ep-ink:        #0d2a1e;   /* deepest forest — headers, chrome   */
+  --ep-ink-2:      #14402d;   /* raised surfaces on ink             */
+  --ep-ink-3:      #1d5540;   /* hover on ink                       */
+  --ep-paper:      #f5f2e6;   /* aged cream — panels, cards         */
+  --ep-paper-2:    #ebe6d4;   /* sunken paper                       */
+  --ep-line:       #cfc9b2;   /* hairline on paper                  */
+  /* Life */
+  --ep-moss:       #3f7d52;   /* the friendly green                 */
+  --ep-brass:      #d9a441;   /* the accent: trail blaze, focus     */
+  --ep-brass-dim:  #b8862f;
+  --ep-rust:       #b2593c;   /* warnings, closed things            */
+  --ep-text:       #17251d;
+  --ep-muted:      #5d6b60;
+  /* Form */
+  --ep-radius:     2px;
+  --ep-radius-lg:  3px;
+  --ep-hair:       1px solid var(--ep-line);
+  --ep-shadow:     0 2px 0 rgba(13,42,30,.16), 0 6px 22px rgba(13,42,30,.14);
+  --ep-mono: ui-monospace, "SFMono-Regular", "Roboto Mono", Menlo, monospace;
+}
+
+/* --- chrome ------------------------------------------------- */
+body { background: var(--ep-paper-2); color: var(--ep-text); }
+header { background: var(--ep-ink); box-shadow: var(--ep-shadow); gap: 12px; }
+header h1 {
+  font-weight: 800; letter-spacing: .04em; color: var(--ep-paper);
+  text-transform: uppercase; font-size: 1.02rem;
+}
+/* the brass rule under the header is the one flourish */
+header { border-bottom: 2px solid var(--ep-brass); }
+
+#search {
+  background: var(--ep-paper); color: var(--ep-text);
+  border: 1px solid rgba(255,255,255,.14); border-radius: var(--ep-radius);
+  font-size: .86rem;
+}
+#search:focus { outline: 2px solid var(--ep-brass); outline-offset: 0; }
+
+#filtersBtn, #randomBtn, #guideBtn {
+  background: var(--ep-ink-2); color: var(--ep-paper);
+  border: 1px solid rgba(245,242,230,.18); border-radius: var(--ep-radius);
+  font-family: var(--ep-mono); font-size: .74rem; letter-spacing: .04em;
+  text-transform: uppercase; padding: 7px 12px;
+}
+#filtersBtn:hover, #randomBtn:hover, #guideBtn:hover,
+#filtersBtn.active { background: var(--ep-ink-3); border-color: var(--ep-brass); }
+
+#filtersPanel { background: var(--ep-ink); border: 1px solid var(--ep-brass); }
+.glabel { font-family: var(--ep-mono); letter-spacing: .12em; opacity: .7; }
+.chip { border-radius: var(--ep-radius); border-width: 1px; font-weight: 600; }
+.chip.active { background: var(--ep-paper); color: var(--ep-ink); border-color: var(--ep-paper); }
+
+#buildBadge {
+  font-family: var(--ep-mono); background: rgba(0,0,0,.26);
+  border: 1px solid rgba(217,164,65,.4); color: rgba(245,242,230,.8);
+}
+#buildBadge b { color: var(--ep-brass); }
+
+/* --- paper surfaces ----------------------------------------- */
+.leaflet-popup-content-wrapper, #legend, #guide {
+  background: var(--ep-paper); color: var(--ep-text);
+  border: var(--ep-hair); border-radius: var(--ep-radius-lg);
+  box-shadow: var(--ep-shadow);
+}
+.legend-title, .popup-sub, .pfacts th {
+  font-family: var(--ep-mono); text-transform: uppercase;
+  letter-spacing: .08em; font-size: .64rem; color: var(--ep-muted);
+}
+.popup-name { font-weight: 800; letter-spacing: .01em; }
+.badge {
+  font-family: var(--ep-mono); text-transform: uppercase; letter-spacing: .09em;
+  border-radius: var(--ep-radius); font-size: .6rem;
+}
+.fchip {
+  background: var(--ep-paper-2); border: var(--ep-hair);
+  border-radius: var(--ep-radius); color: var(--ep-text);
+}
+.popup-links .primary {
+  background: var(--ep-ink); color: var(--ep-paper) !important;
+  border-radius: var(--ep-radius); font-family: var(--ep-mono);
+  text-transform: uppercase; letter-spacing: .06em; font-size: .7rem;
+}
+.iso-btn {
+  background: var(--ep-brass); color: var(--ep-ink) !important;
+  border-radius: var(--ep-radius); font-family: var(--ep-mono);
+  text-transform: uppercase; letter-spacing: .06em; font-size: .7rem;
+}
+.iso-btn:hover { background: var(--ep-brass-dim); }
+.pchecked { color: var(--ep-moss); font-family: var(--ep-mono); font-size: .64rem; }
+
+/* --- the marks: subtle, inset, non-interactive --------------- */
+.ep-mark {
+  color: rgba(245,242,230,.92);
+  filter: drop-shadow(0 1px 1.5px rgba(0,0,0,.75));
+  pointer-events: none;
+}
+.ep-mark svg { display: block; }
+.ep-mark-grave { color: rgba(226,214,240,.94); }
+
+/* --- iso panel inherits the guide ---------------------------- */
+#isoPanel { background: var(--ep-ink); border: 1px solid var(--ep-brass); }
+.iso-tool {
+  background: var(--ep-ink-2); border: 1px solid rgba(245,242,230,.16);
+  font-family: var(--ep-mono); text-transform: uppercase;
+  letter-spacing: .05em; font-size: .68rem; border-radius: var(--ep-radius);
+}
+.iso-tool:hover { background: var(--ep-ink-3); }
+.iso-tool.active { background: var(--ep-brass); color: var(--ep-ink); border-color: var(--ep-brass); }
+#isoClose {
+  background: var(--ep-paper); color: var(--ep-ink); border-radius: var(--ep-radius);
+  font-family: var(--ep-mono); text-transform: uppercase; letter-spacing: .06em;
+}
+.iso-sub, #isoPanel .iso-foot { font-family: var(--ep-mono); font-size: .68rem; }
+.iso-spin { border-top-color: var(--ep-brass); }
