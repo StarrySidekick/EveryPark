@@ -1658,9 +1658,12 @@
     else                                        p.access = "unknown";
 
     // Somewhere with no trail, no parking and no facilities is a place we
-    // can't vouch for, whoever owns it.
+    // can't vouch for, whoever owns it — unless a cited rule or field
+    // check says it's reachable (mirrors verify_all's physical test;
+    // skipping reachable here demoted rule-verified land on its own card).
     A.visitable = !!(A.trails || A.parking || A.sports || A.playground || A.beach || A.pool);
-    if (!A.visitable && p.access !== "closed" && !A.officialAccess) p.access = "unknown";
+    if (!A.visitable && !A.reachable && p.access !== "closed" && !A.officialAccess)
+      p.access = "unknown";
 
     p.accessLabel = { open: "Open to all", permission: "Open by permission",
                       closed: "Closed to the public", unknown: "Access unverified" }[p.access];
@@ -2516,13 +2519,22 @@
     for (const p of data.places) {
       if (p.attrs && p.attrs.byPermission && !p.note) p.note = PADUS_NOTE;
       scoreAccess(p);          // sets visitable + accessNote, then classifies
-      // Verdict tier for the tile layer: open / permission / unverified /
-      // fee — the fill colour system. aka names are registered too, so a
-      // polygon carrying an upstream name still resolves after a rename.
+      // Verdict tier for the fill colour (Timothy's system, 2026-08-03):
+      //   open     GREEN  — verified you can go. Includes by-permission
+      //            land: that distinction is a technicality for the card,
+      //            not a reason to colour a walkable preserve differently.
+      //   probably AMBER  — public-ish land (legal basis exists) but our
+      //            research can't 100% confirm a way in yet.
+      //   unknown  GREY   — no data either way: no legal basis known.
+      // aka names are registered too, so a polygon carrying an upstream
+      // name still resolves after a rename.
       if (p.status) {
-        const tier = p.status === "park"
-          ? (p.access === "permission" ? "permission" : "open")
-          : p.status;
+        const A2 = p.attrs || {};
+        const tier =
+          (p.status === "park" || p.status === "fee") ? "open"
+          : (!A2.private && (p.access === "open" || p.access === "permission"))
+            ? "probably"
+            : "unknown";
         statusLookup.set(normNm(p.name), tier);
         for (const alt of p.aka || [])
           if (!statusLookup.has(normNm(alt))) statusLookup.set(normNm(alt), tier);

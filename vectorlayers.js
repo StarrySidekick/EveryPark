@@ -76,13 +76,13 @@ const EveryParkTiles = (() => {
   const normName = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
   // Three honest tiers (Timothy's colour system, 2026-08-03):
-  //   green  = verified open, just go
-  //   amber  = you can probably go — by the owner's permission (or paid)
-  //   grey   = unverified: we have no data either way
+  //   open     green — verified you can go (incl. by-permission land)
+  //   probably amber — public-ish land we can't 100% confirm yet
+  //   unknown  grey  — no data either way
   const statusOf = f => {
     try {
       if (!statusBy) return "open";
-      return statusBy.get(normName(nameOf(f))) || "unverified";
+      return statusBy.get(normName(nameOf(f))) || "unknown";
     } catch (e) { return "open"; }
   };
 
@@ -132,9 +132,9 @@ const EveryParkTiles = (() => {
         fill: (z, f) => {
           if (keyOf(dataLayer, f) === hoverKey) return H.fill || "#c8f5cf";
           const s = statusOf(f);
-          if (s === "unverified") return V.unverifiedFill || "#8e9a93";
+          if (s === "unknown") return V.unverifiedFill || "#8e9a93";
           if (dataLayer === "cemeteries") return V.cemeteryFill || "#8464c9";
-          if (s === "permission" || s === "fee") return V.permissionFill || "#e8a33d";
+          if (s === "probably") return V.probablyFill || "#e8a33d";
           return V.publicFill;
         },
         opacity: (z, f) => keyOf(dataLayer, f) === hoverKey
@@ -142,7 +142,7 @@ const EveryParkTiles = (() => {
                          : V.fillOpen,
         stroke: (z, f) => {
           if (keyOf(dataLayer, f) === hoverKey) return H.stroke || "#ffffff";
-          if (statusOf(f) === "unverified") return V.unverifiedBorder || "#66716b";
+          if (statusOf(f) === "unknown") return V.unverifiedBorder || "#66716b";
           return dataLayer === "cemeteries" ? cemeteryBorder(f) : border;
         },
         width: (z, f) => keyOf(dataLayer, f) === hoverKey

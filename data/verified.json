@@ -761,13 +761,27 @@
      -73.50321
     ]
    },
-   "note": "Despite the “nature preserve” label in source data, parcel records show this is Town of Sherman property at 43 Route 39 North — the public-works town garage and its surrounding undeveloped wet meadow. It has no trails, parking or recreational designation and does not appear in Sherman's hiking guide.",
-   "source": [
-    "https://data.ct.gov/resource/rny9-6ak2.json?$where=link%20like%20'68310-023-015%25'",
-    "https://municipal-documents.s3.amazonaws.com/uploads/sherman-ct/conservation-commission/documents/generals/125153/ShermanHikingGuide.pdf"
+   "rename": "Volunteer Park",
+   "town": "Sherman",
+   "agency": "Town of Sherman Park & Recreation",
+   "url": "https://shermanct.com/article/do/2025/2025-0329-pickleball-court",
+   "trails": true,
+   "parking": true,
+   "sports": true,
+   "sportList": [
+    "pickleball"
    ],
-   "checked": "2026-08-02",
-   "agency": "Town of Sherman"
+   "reachable": true,
+   "fee": "Free",
+   "note": "Sherman's town-owned open space at 43 Route 39 North — also called Volunteer Fields in town records, and 'Town Meadows' in older map data. Roughly 115 acres of meadows with mowed walking paths, an uphill stretch with a view, and four pickleball courts completed in 2024. A favorite local spot for walking dogs (leash ordinance applies); roadside parking off Route 39.",
+   "source": [
+    "https://shermanct.com/article/do/2025/2025-0329-pickleball-court",
+    "https://municipal-documents.s3.amazonaws.com/uploads/sherman-ct/planning-zoning/documents/minutes/78722/2024_06_06_PZ_rmm_D.docx-2.pdf",
+    "https://www.google.com/maps/place/Volunteer+Park/@41.597487,-73.5013068,16z"
+   ],
+   "checked": "2026-08-03",
+   "type": "town",
+   "subtype": "Town Park"
   },
   {
    "match": {
@@ -1172,6 +1186,25 @@
     "https://www.candlewoodlakeestates.org/bylaws.html"
    ],
    "checked": "2026-08-02"
+  },
+  {
+   "match": {
+    "id": "e5ee96ea6d",
+    "name": "Upland Pastures",
+    "town": "Sherman",
+    "at": [
+     41.58848,
+     -73.48474
+    ]
+   },
+   "agency": "Northwest Connecticut Land Conservancy",
+   "reachable": true,
+   "note": "NCLC conservation land off Upland Pastures Road (former Osborne family farmland, deeded to Naromi Land Trust). Not on NCLC's formal trail-preserve list, but in regular local use for quiet walking — confirmed first-hand. The adjacent Towner Hill Preserve trailhead connects the area.",
+   "source": [
+    "https://ctland.org/our_lands/",
+    "Field-verified in person by the site maintainer (Sherman resident), 2026-08-03"
+   ],
+   "checked": "2026-08-03"
   }
  ],
  "rules": [

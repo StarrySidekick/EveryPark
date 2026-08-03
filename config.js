@@ -17,10 +17,12 @@ const CONFIG = {
   //   BORDER colour = who owns and maintains it
   //   ICON   glyph  = what kind of place it is
   visual: {
-    publicFill: "#43a047",        // green: verified open — just go
-    // Amber: you can probably go — open by the owner's permission (or
-    // paid). Matches the PAD-US "restricted" amber in the access layer.
-    permissionFill: "#e8a33d",
+    publicFill: "#43a047",        // green: verified — you can go. Includes
+                                  // by-permission land; that nuance lives
+                                  // on the card, not in the colour.
+    // Amber: probably — public or land-trust ground with a legal basis
+    // for access, but our research can't 100% confirm a way in yet.
+    probablyFill: "#e8a33d",
     // Cemeteries fill purple — the colour of their category — instead of
     // park green; the border still says who owns/runs the ground.
     cemeteryFill: "#8464c9",
@@ -168,7 +170,7 @@ const CONFIG = {
   // Shown in the top-right corner. Bumped by hand on every code change,
   // so there's visible proof of which build is actually loaded rather
   // than guessing whether a cached copy is being served.
-  siteVersion: "v0.11.0",
+  siteVersion: "v0.12.0",
 
   // ---- VECTOR TILES --------------------------------------------------
   // Every boundary and trail, pre-cut into map tiles and packed into one

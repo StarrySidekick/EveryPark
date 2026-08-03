@@ -159,9 +159,22 @@ def apply_verified(places, path):
                     A.pop(k, None)
                 else:
                     A[k] = e[k]
+        # Keep every name a place has ever worn: the tile geometry still
+        # carries the upstream name, so if a rename discards it the
+        # polygon can no longer find its own record and falls back to
+        # the unverified tile card. match.name preserves the original
+        # even for renames applied in earlier runs.
+        for old in (m.get("name"), e.get("rename") and p["name"]):
+            if (old and e.get("rename") and norm(old) != norm(e["rename"])
+                    and old not in (p.get("aka") or [])):
+                p.setdefault("aka", []).append(old)
         if e.get("rename"):
             p["name"] = e["rename"]
-        for k in ("town", "agency", "url", "fee", "note", "acres"):
+        # type/subtype included so research can correct a miscategorised
+        # place — e.g. Volunteer Park arrived typed "Nature Preserve" and
+        # rendered "by permission" when it's town land, public by right.
+        for k in ("town", "agency", "url", "fee", "note", "acres",
+                  "type", "subtype"):
             if e.get(k) is not None:
                 p[k] = e[k]
         # Provenance: the card can say this was checked by a human, and
