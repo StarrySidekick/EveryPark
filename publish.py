@@ -28,9 +28,56 @@ import json
 import os
 import sys
 
-from buildplaces import verify_all
+from buildplaces import verify_all, norm
 from dedupe import dedupe
 from verifyplaces import apply_verified
+
+
+def merge_additions(places, data_dir):
+    """
+    Fold hand-added places (data/additions.json) into the dataset.
+
+    Creating a place needs no network, no rasters and no tiles, so it
+    belongs on the fast path — before this, a hand-added place waited up
+    to a month for the full refresh to exist at all. The refresh still
+    merges additions itself; when it does, dedupe finds this record
+    already here (same name, same spot, same deterministic id) and the
+    two collapse into one. What the fast path canNOT provide is a
+    boundary (`shaped`) or elevation — those still arrive with the next
+    full refresh, so a place added here may honestly sit amber with
+    "no mapped boundary" until then.
+    """
+    path = os.path.join(data_dir, "additions.json")
+    if not os.path.exists(path):
+        return 0
+    try:
+        doc = json.load(open(path))
+    except Exception as e:                          # noqa: BLE001
+        print(f"  additions.json unreadable: {e}", flush=True)
+        return 0
+    have = {(norm(p["name"]), p.get("town")) for p in places}
+    added = 0
+    for a in doc.get("places") or []:
+        if (norm(a["n"]), a.get("town")) in have:
+            continue
+        attrs = {"trails": bool(a.get("trails")), "parking": bool(a.get("parking")),
+                 "manual": True}
+        if a.get("source"):
+            attrs["researched"] = True
+            attrs["sources"] = a["source"]
+        if a.get("checked"):
+            attrs["checked"] = a["checked"]
+        rec = {"name": a["n"], "type": a.get("type", "preserve"),
+               "subtype": a.get("t"), "lat": a["lat"], "lng": a["lng"],
+               "town": a.get("town"), "attrs": attrs}
+        for src_k, dst_k in (("a", "acres"), ("url", "url"), ("fee", "fee"),
+                             ("agency", "agency"), ("note", "note")):
+            if a.get(src_k) is not None:
+                rec[dst_k] = a[src_k]
+        places.append(rec)
+        added += 1
+        print(f"  + hand-added place: {a['n']} ({a.get('town')})", flush=True)
+    return added
 
 # Rebuilt in the browser from the source facts, so they don't belong in
 # the file. Same list verifyplaces strips — kept in sync deliberately.
@@ -53,9 +100,12 @@ def main():
 
     before = sum(1 for p in places if p.get("status") == "park")
 
+    merge_additions(places, args.data)
+
     # Dedup needs no network and no rasters — it works purely on the
     # records in hand, so it belongs on the fast path. Idempotent: once
     # the duplicates are merged, later runs find nothing to do.
+    # It also stamps ids on anything merge_additions just appended.
     places, merged = dedupe(places)
 
     audit = apply_verified(places, os.path.join(args.data, "verified.json"))

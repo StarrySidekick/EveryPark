@@ -13,6 +13,7 @@ on:
     branches: [main]
     paths:
       - "data/verified.json"      # editing the knowledge base publishes it
+      - "data/additions.json"     # so do hand-added places
 
 permissions:
   contents: write
