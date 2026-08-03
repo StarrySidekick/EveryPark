@@ -169,24 +169,56 @@ const EveryParkIso = (() => {
     return H;
   }
 
+  // Imagery, in preference order:
+  // 1. USGS NAIP — one consistent LEAF-ON summer survey across all of
+  //    Connecticut (public domain). A season is a property of the whole
+  //    dataset, so trees read as trees everywhere.
+  // 2. Esri World Imagery tiles — sharper but a mixed-season mosaic.
   async function fetchSatSample(bbox) {
     const [w, s, e, n] = bbox;
+    try {
+      const url = "https://imagery.nationalmap.gov/arcgis/rest/services/" +
+        "USGSNAIPImagery/ImageServer/exportImage?f=image&format=jpgpng" +
+        `&bbox=${w},${s},${e},${n}&bboxSR=4326&imageSR=4326&size=768,768`;
+      const im = await loadImage(url);
+      const cv = document.createElement("canvas");
+      cv.width = im.width; cv.height = im.height;
+      const cx = cv.getContext("2d", { willReadFrequently: true });
+      cx.drawImage(im, 0, 0);
+      const px = cx.getImageData(0, 0, cv.width, cv.height).data;
+      // A failed export can come back as a tiny black png — reject it.
+      let lit = 0;
+      for (let i = 0; i < px.length; i += 4 * 97) if (px[i] + px[i + 1] + px[i + 2] > 30) lit++;
+      if (lit < 10) throw new Error("blank NAIP export");
+      return { mode: "linear", px, w: cv.width, h: cv.height, bbox,
+               label: "NAIP (leaf-on)" };
+    } catch (e) { /* fall through to Esri */ }
     const spanM = Math.max((e - w) * 111320 * Math.cos(s * Math.PI / 180),
                            (n - s) * 111320);
     const z = Math.max(13, Math.min(17, Math.round(17 - Math.log2(spanM / 700))));
-    return sampleTiles(bbox, (zz, tx, ty) =>
+    const t = await sampleTiles(bbox, (zz, tx, ty) =>
       "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/" +
       `MapServer/tile/${zz}/${ty}/${tx}`, 20, z);
+    t.mode = "tile"; t.label = "Esri imagery";
+    return t;
   }
 
   function satTexFrom(t, bbox) {
     const tex = new Uint8ClampedArray(GRID * GRID * 3);
     for (let gy = 0; gy < GRID; gy++)
       for (let gx = 0; gx < GRID; gx++) {
-        const [lng, lat] = gridToLL(bbox, gx, gy);
-        const tt = tileXY(lat, lng, t.zoom);
-        const ix = Math.min(t.w - 1, Math.max(0, Math.round((tt.x - t.x0) * 256)));
-        const iy = Math.min(t.h - 1, Math.max(0, Math.round((tt.y - t.y0) * 256)));
+        let ix, iy;
+        if (t.mode === "linear") {
+          const [w, s2, e2, n2] = t.bbox;
+          const [lng, lat] = gridToLL(bbox, gx, gy);
+          ix = Math.min(t.w - 1, Math.max(0, Math.round((lng - w) / (e2 - w) * (t.w - 1))));
+          iy = Math.min(t.h - 1, Math.max(0, Math.round((n2 - lat) / (n2 - s2) * (t.h - 1))));
+        } else {
+          const [lng, lat] = gridToLL(bbox, gx, gy);
+          const tt = tileXY(lat, lng, t.zoom);
+          ix = Math.min(t.w - 1, Math.max(0, Math.round((tt.x - t.x0) * 256)));
+          iy = Math.min(t.h - 1, Math.max(0, Math.round((tt.y - t.y0) * 256)));
+        }
         const k = (iy * t.w + ix) * 4, o = (gy * GRID + gx) * 3;
         tex[o] = t.px[k]; tex[o + 1] = t.px[k + 1]; tex[o + 2] = t.px[k + 2];
       }
@@ -448,6 +480,31 @@ const EveryParkIso = (() => {
     return { trailM, waterM, roadM, buildM, parkM, courtM, sprites, hikePath };
   }
 
+  // ---- Seasons (prototype) ----------------------------------------
+  // Ground and tree colours transform per season; winter also frosts
+  // the high ground. Applied before time-of-day.
+  const SEASONS = [
+    { icon: "🌞", label: "Summer",
+      ground: (r, g, b) => [r, g, b],
+      canopy: h2 => [30 + 24 * h2, 96 + 24 * h2, 46 + 19 * h2] },
+    { icon: "🍂", label: "Fall",
+      ground: (r, g, b) => [Math.min(255, r * 1.14 + 14), g * .92, b * .62],
+      canopy: h2 => h2 < .45
+        ? [172 + 60 * h2, 84 + 40 * h2, 26]           // maples turning
+        : [40 + 20 * h2, 88 + 20 * h2, 44] },          // pines stay
+    { icon: "❄️", label: "Winter",
+      ground: (r, g, b) => {
+        const m = .68;                                  // frost mix
+        return [r * (1 - m) + 226 * m, g * (1 - m) + 232 * m, b * (1 - m) + 238 * m];
+      },
+      canopy: h2 => [26 + 14 * h2, 58 + 16 * h2, 40 + 12 * h2] },
+    { icon: "🌸", label: "Spring",
+      ground: (r, g, b) => [r * .92, Math.min(255, g * 1.08 + 8), b * .9],
+      canopy: h2 => h2 < .3
+        ? [214, 160 + 40 * h2, 190]                     // blossom
+        : [66 + 30 * h2, 140 + 30 * h2, 70 + 20 * h2] }
+  ];
+
   // ---- Time of day ------------------------------------------------
   const TOD = [
     { icon: "☀️", label: "Day",    fn: (r, g, b) => [r, g, b] },
@@ -527,14 +584,27 @@ const EveryParkIso = (() => {
     return Math.min(1, (mPerBlock / spacing) ** 2);
   }
 
-  // Canopy from imagery: dark vegetated pixels read as tree cover.
-  function treeMaskFrom(tex) {
+  // Canopy from imagery, with ADAPTIVE thresholds: vegetation is any
+  // pixel where green leads, and "tree" is the darker 65% of the
+  // vegetated pixels on THIS island — canopy is darker than lawn in
+  // any season's imagery, so the split survives exposure differences
+  // that broke a fixed magic-number cut.
+  function treeMaskFrom(tex, inside) {
     const M = new Uint8Array(GRID * GRID);
+    const veg = [], brightness = [];
     for (let i = 0; i < GRID * GRID; i++) {
+      if (inside && !inside[i]) continue;
       const r = tex[i * 3], g = tex[i * 3 + 1], b = tex[i * 3 + 2];
       const bright = (r + g + b) / 3;
-      if (g > 56 && g >= r * 1.02 && g > b * 1.05 && bright < 138) M[i] = 1;
+      if (bright > 18 && g >= r * 0.96 && g >= b * 0.96) {
+        veg.push(i); brightness.push(bright);
+      }
     }
+    if (veg.length < 20) return null;                 // imagery unusable
+    const sorted = [...brightness].sort((a, b) => a - b);
+    const cut = sorted[Math.floor(sorted.length * 0.65)];
+    for (let k = 0; k < veg.length; k++)
+      if (brightness[k] <= cut) M[veg[k]] = 1;
     return M;
   }
 
@@ -581,6 +651,11 @@ const EveryParkIso = (() => {
 
     const w = s * 1.62, hgt = s * .92;
     const smooth = !!S.smooth;
+    // Solid mode: every wall ends on ONE horizontal line just below the
+    // island's deepest projected point — a level display-stand hem, the
+    // same whichever way the island is rotated.
+    const maxRy = order.length ? order[order.length - 1][0] : 0;
+    const slabY = cy + maxRy * s * .8 + hgt * 2 + s * 1.2;
     for (const [ry, rx, gx, gy] of order) {
       const i = gy * GRID + gx;
       let h = H[i];
@@ -626,6 +701,8 @@ const EveryParkIso = (() => {
         b = pal.lo[2] + (pal.hi[2] - pal.lo[2]) * t;
         r += sh; g += sh; b += sh;
       }
+      if (!useSat && !isWater && !courtM[i] && !parkM[i] && !roadM[i] && !isBuild)
+        [r, g, b] = SEASONS[S.season || 0].ground(r, g, b);
       [r, g, b] = tod(r, g, b);
 
       const sides = S.sides == null ? 0 : S.sides;   // 0 solid, 1 skirt, 2 none
@@ -646,23 +723,31 @@ const EveryParkIso = (() => {
         // hairline stroke of the same colour hides seam cracks
         ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = 1; ctx.stroke();
         if (edge[i] && sides !== 2) {
-          // Side wall down to the island's base plane: a clean straight
-          // hem instead of the ragged terrain-following fringe.
-          const baseY = t * zScale + s * 1.6;          // distance to min-elevation plane
+          // Wall to the level slab line (solid) or a fixed ribbon
+          // (skirt). Drawn as a rect over the quad's full x-span so it
+          // works whichever direction the edge faces after rotation.
+          const xs = [p00[0], p10[0], p11[0], p01[0]];
+          const ys = [p00[1], p10[1], p11[1], p01[1]];
+          const x0 = Math.min(...xs), x1 = Math.max(...xs);
+          const yTop = Math.min(...ys);
+          const yBot = sides === 0 ? slabY
+                     : Math.max(...ys) + zScale * .12 + s * 2.4;
           ctx.fillStyle = `rgb(${r * .5 | 0},${g * .5 | 0},${b * .5 | 0})`;
+          ctx.fillRect(x0 - .5, yTop, x1 - x0 + 1, Math.max(0, yBot - yTop));
+          // then repaint the top so the wall sits behind it
+          ctx.fillStyle = `rgb(${r | 0},${g | 0},${b | 0})`;
           ctx.beginPath();
-          ctx.moveTo(p01[0], p01[1]); ctx.lineTo(p11[0], p11[1]);
-          ctx.lineTo(p11[0], p11[1] + (sides === 0 ? baseY : zScale * .12 + s * 2.4));
-          ctx.lineTo(p01[0], p01[1] + (sides === 0 ? baseY : zScale * .12 + s * 2.4));
+          ctx.moveTo(p00[0], p00[1]); ctx.lineTo(p10[0], p10[1]);
+          ctx.lineTo(p11[0], p11[1]); ctx.lineTo(p01[0], p01[1]);
           ctx.closePath(); ctx.fill();
         }
       } else {
-        // Sides: 0 = solid wall to the base elevation plane (clean flat
-        // hem), 1 = neighbour-drop skirt (old look), 2 = top faces only.
+        // Sides: 0 = solid wall down to one level slab line, 1 =
+        // neighbour-drop skirt (old look), 2 = top faces only.
         if (sides !== 2) {
-          const toBase = t * zScale + s * 1.6;
           const skirt = sides === 0
-            ? (edge[i] ? toBase : (dropM[i] / span) * zScale + 1.6)
+            ? (edge[i] ? Math.max(0, slabY - Y)
+                       : (dropM[i] / span) * zScale + 1.6)
             : (dropM[i] / span) * zScale
               + (edge[i] ? zScale * .12 + s * 2.4 : 1.6);
           ctx.fillStyle = `rgb(${r * .55 | 0},${g * .55 | 0},${b * .55 | 0})`;
@@ -685,9 +770,10 @@ const EveryParkIso = (() => {
         const jx = (hash(gx + 7, gy) - .5) * w * .6;
         const th = s * (1.5 + hash(gx, gy + 3));
         const half = s * .55;
-        const shade = 24 * hash(gx + 1, gy + 1);
+        const h2 = hash(gx + 1, gy + 1);
+        const shade = 24 * h2;
         let tr = 58 + shade, tg2 = 44 + shade * .6, tb = 30;
-        let cr = 30 + shade, cg = 96 + shade, cb = 46 + shade * .8;
+        let [cr, cg, cb] = SEASONS[S.season || 0].canopy(h2);
         [tr, tg2, tb] = tod(tr, tg2, tb); [cr, cg, cb] = tod(cr, cg, cb);
         ctx.fillStyle = `rgb(${tr | 0},${tg2 | 0},${tb | 0})`;
         ctx.fillRect(X + jx - s * .08, Y - th * .35, s * .16, th * .4);
@@ -829,7 +915,8 @@ const EveryParkIso = (() => {
                 buildM: empty(), parkM: empty(), courtM: empty(),
                 spriteAt: new Map(), hikePath: null, hikeT: 0,
                 useSat: false, tex: null, tod: 0, zoom: 1, cellM: 10,
-                smooth: false, mPerBlock: 10, sides: 0, treeMask: null };
+                smooth: false, mPerBlock: 10, sides: 0, treeMask: null,
+                season: 0 };
     const baseSub = boundary ? `boundary: ${boundary.label}`
                              : "no boundary found — square sample";
     sub.textContent = baseSub + " · fetching trails, roads, buildings…";
@@ -860,7 +947,7 @@ const EveryParkIso = (() => {
     fetchSatSample(bbox).then(t => {
       satSample = t;
       S.tex = satTexFrom(t, bbox);
-      S.treeMask = treeMaskFrom(S.tex);
+      S.treeMask = treeMaskFrom(S.tex, S.inside);
     }).catch(() => { /* uniform cover fallback */ });
 
     // Toolbar: time of day, satellite drape, export.
@@ -881,7 +968,7 @@ const EveryParkIso = (() => {
         try {
           satSample = await fetchSatSample(bbox);
           S.tex = satTexFrom(satSample, bbox);
-          S.treeMask = treeMaskFrom(S.tex);
+          S.treeMask = treeMaskFrom(S.tex, S.inside);
         }
         catch (e) { satBtn.textContent = "🛰 unavailable"; return; }
         satBtn.textContent = "🛰 Satellite";
@@ -934,7 +1021,7 @@ const EveryParkIso = (() => {
         for (const sp of d2.sprites) S.spriteAt.set(sp.gy * GRID + sp.gx, sp.emoji);
       }
       S.tex = satSample ? satTexFrom(satSample, bbox) : null;
-      S.treeMask = S.tex ? treeMaskFrom(S.tex) : null;
+      S.treeMask = S.tex ? treeMaskFrom(S.tex, S.inside) : null;
       if (!S.tex) S.useSat = false;
       labelBlocks();
     };
@@ -944,6 +1031,14 @@ const EveryParkIso = (() => {
       S.cellM = +slider.value;
       clearTimeout(sliderTimer);
       sliderTimer = setTimeout(rebuild, 160);
+    });
+
+    const seasonBtn = document.createElement("button");
+    seasonBtn.className = "iso-tool";
+    seasonBtn.textContent = "🌞 Summer";
+    seasonBtn.addEventListener("click", () => {
+      S.season = (S.season + 1) % SEASONS.length;
+      seasonBtn.textContent = `${SEASONS[S.season].icon} ${SEASONS[S.season].label}`;
     });
 
     const SIDES_LABELS = ["🧱 Solid", "🪜 Skirt", "▭ Tops"];
@@ -963,7 +1058,7 @@ const EveryParkIso = (() => {
       smoothBtn.classList.toggle("active", S.smooth);
     });
 
-    tools.append(todBtn, satBtn, smoothBtn, sidesBtn, shotBtn, sliderWrap);
+    tools.append(todBtn, seasonBtn, satBtn, smoothBtn, sidesBtn, shotBtn, sliderWrap);
 
     // Scroll to zoom, centred on the island.
     canvas.addEventListener("wheel", e => {
