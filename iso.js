@@ -417,6 +417,32 @@ const EveryParkIso = (() => {
     return out;
   }
 
+  // Cut a polyline into short ribbon pieces (<= half a block each) in
+  // GRID space, dropping the gaps of a dash pattern. Short pieces are
+  // what stop a long road being clipped by terrain drawn after it, and
+  // grid space is what lets each piece be draped on the ground later.
+  function pathPieces(lines, dash) {
+    const out = [];
+    for (const line of lines || [])
+      for (let k = 0; k + 1 < line.length; k++) {
+        const [x1, y1, c1] = line[k], [x2, y2] = line[k + 1];
+        const len = Math.hypot(x2 - x1, y2 - y1);
+        if (len < 1e-6) continue;
+        const steps = Math.max(1, Math.ceil(len / 0.5));
+        for (let t = 0; t < steps; t++) {
+          const f0 = t / steps, f1 = (t + 1) / steps;
+          if (dash) {
+            const phase = ((c1 || 0) + len * f0) % (dash[0] + dash[1]);
+            if (phase >= dash[0]) continue;
+          }
+          out.push([x1 + (x2 - x1) * f0, y1 + (y2 - y1) * f0,
+                    x1 + (x2 - x1) * f1, y1 + (y2 - y1) * f1]);
+          if (out.length > 9000) return out;
+        }
+      }
+    return out;
+  }
+
   function buildDressing(raw, bbox, inside) {
     const trailM = new Uint8Array(GRID * GRID);
     rasterisePaths(raw.trailFeats, bbox, trailM);
@@ -502,9 +528,12 @@ const EveryParkIso = (() => {
       }
       if (hikePath.length < 6) hikePath = null;
     }
+    const trailLines = linesFrom(raw.trailFeats, bbox, inside);
+    const roadLines = linesFrom(raw.roads, bbox, inside);
     return { trailM, waterM, roadM, buildM, parkM, courtM, sprites, hikePath,
-             trailLines: linesFrom(raw.trailFeats, bbox, inside),
-             roadLines: linesFrom(raw.roads, bbox, inside) };
+             trailLines, roadLines,
+             trailPieces: pathPieces(trailLines, [1.5, 1.1]),
+             roadPieces: pathPieces(roadLines, null) };
   }
 
   // ---- Seasons (prototype) ----------------------------------------
@@ -693,16 +722,13 @@ const EveryParkIso = (() => {
         const rx = (gx - GRID / 2) * cos - (gy - GRID / 2) * sin;
         order.push([depth(gx, gy), rx, gx, gy]);
       }
-    const pushLines = (lines, kind) => {
-      for (const line of lines || [])
-        for (let k = 0; k + 1 < line.length; k++) {
-          const a = line[k], b = line[k + 1];
-          order.push([(depth(a[0], a[1]) + depth(b[0], b[1])) / 2,
-                      -1, { a, b, kind }, null]);
-        }
+    const pushPieces = (pieces, kind) => {
+      for (const pc of pieces || [])
+        order.push([(depth(pc[0], pc[1]) + depth(pc[2], pc[3])) / 2,
+                    -1, { pc, kind }, null]);
     };
-    pushLines(S.trailLines, "trail");
-    pushLines(S.roadLines, "road");
+    pushPieces(S.trailPieces, "trail");
+    pushPieces(S.roadPieces, "road");
     order.sort((a, b) => a[0] - b[0]);
 
     const w = s * 1.62, hgt = s * .92;
@@ -711,6 +737,10 @@ const EveryParkIso = (() => {
     for (const e2 of order) if (e2[0] > maxRy) maxRy = e2[0];
     const slabY = cy + maxRy * s * .8 + hgt * 2 + s * 1.2;
     const sides = S.sides == null ? 0 : S.sides;   // 0 solid 1 infinite 2 skirt 3 tops
+    // A fixed-width wall rect leaves vertical gaps as the island turns:
+    // the projected footprint of a cell is widest at 45 degrees. Walls
+    // are one colour, so overlapping them is free.
+    const wallW = s * 1.55 * (Math.abs(cos) + Math.abs(sin)) + 1.2;
     const [wr, wg, wb] = tod(WALL[0], WALL[1], WALL[2]);
     const wallFill = `rgb(${wr | 0},${wg | 0},${wb | 0})`;
     const ribbon = zScale * .12 + s * 2.4;
@@ -726,33 +756,30 @@ const EveryParkIso = (() => {
     for (const entry of order) {
       // --- a path segment ---
       if (entry[1] === -1) {
-        const { a, b, kind } = entry[2];
-        // Lifted a touch off the ground so the ribbon reads as lying on
-        // the surface rather than buried in it.
-        const lift = s * .45;
-        const pa = project(a[0], a[1], heightAtCell(a[0], a[1]));
-        const pb = project(b[0], b[1], heightAtCell(b[0], b[1]));
-        ctx.lineCap = "butt"; ctx.lineJoin = "round";
-        if (kind === "road") {
-          ctx.setLineDash([]);
-          ctx.strokeStyle = roadEdge;
-          ctx.lineWidth = Math.max(2.2, s * 1.35);
+        // A ribbon DRAPED on the ground: both ends widened perpendicular
+        // in grid space, then all four corners projected at their own
+        // terrain height, so it hugs the slope instead of hovering.
+        const { pc, kind } = entry[2];
+        const [x1, y1, x2, y2] = pc;
+        const dx = x2 - x1, dy = y2 - y1;
+        const L = Math.hypot(dx, dy) || 1;
+        const lift = s * .1;
+        const hA = heightAtCell(x1, y1), hB = heightAtCell(x2, y2);
+        const band = (hw, fill) => {
+          const nx = -dy / L * hw, ny = dx / L * hw;
+          const q1 = project(x1 + nx, y1 + ny, hA);
+          const q2 = project(x2 + nx, y2 + ny, hB);
+          const q3 = project(x2 - nx, y2 - ny, hB);
+          const q4 = project(x1 - nx, y1 - ny, hA);
+          ctx.fillStyle = fill;
           ctx.beginPath();
-          ctx.moveTo(pa[0], pa[1] - lift); ctx.lineTo(pb[0], pb[1] - lift);
-          ctx.stroke();
-          ctx.strokeStyle = roadCol;
-          ctx.lineWidth = Math.max(1.4, s * .95);
-        } else {
-          const dash = Math.max(2.4, s * 1.5), gap = Math.max(2, s * 1.15);
-          ctx.setLineDash([dash, gap]);
-          ctx.lineDashOffset = -(a[2] || 0) * pxPerGrid;
-          ctx.strokeStyle = trailCol;
-          ctx.lineWidth = Math.max(1.3, s * .62);
-        }
-        ctx.beginPath();
-        ctx.moveTo(pa[0], pa[1] - lift); ctx.lineTo(pb[0], pb[1] - lift);
-        ctx.stroke();
-        ctx.setLineDash([]);
+          ctx.moveTo(q1[0], q1[1] - lift); ctx.lineTo(q2[0], q2[1] - lift);
+          ctx.lineTo(q3[0], q3[1] - lift); ctx.lineTo(q4[0], q4[1] - lift);
+          ctx.closePath(); ctx.fill();
+          ctx.strokeStyle = fill; ctx.lineWidth = 1; ctx.stroke();
+        };
+        if (kind === "road") { band(0.62, roadEdge); band(0.42, roadCol); }
+        else band(0.26, trailCol);
         continue;
       }
 
@@ -852,7 +879,7 @@ const EveryParkIso = (() => {
                                    : (dropM[i] / span) * zScale + 1.6)
                         : (dropM[i] / span) * zScale + (edge[i] ? ribbon : 1.6);
           ctx.fillStyle = wallFill;
-          ctx.fillRect(X - w / 2, Y, w + .7,
+          ctx.fillRect(X - wallW / 2, Y, wallW,
                        drop + hgt + (isBuild ? 7 / span * zScale : 0));
         }
         ctx.fillStyle = topFill;
@@ -1012,7 +1039,7 @@ const EveryParkIso = (() => {
     const S = { H, inside, dropM, edge, p,
                 trailM: empty(), waterM: empty(), roadM: empty(),
                 buildM: empty(), parkM: empty(), courtM: empty(),
-                trailLines: [], roadLines: [],
+                trailLines: [], roadLines: [], trailPieces: [], roadPieces: [],
                 spriteAt: new Map(), hikePath: null, hikeT: 0,
                 useSat: false, tex: null, tod: 0, zoom: 1, cellM: 10,
                 smooth: false, mPerBlock: 10, sides: 0, treeMask: null,
