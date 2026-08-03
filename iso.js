@@ -405,8 +405,12 @@ const EveryParkIso = (() => {
           const gy = (bbox[3] - y) / (bbox[3] - bbox[1]) * (GRID - 1);
           const cx = Math.round(gx), cy = Math.round(gy);
           if (cx >= 0 && cy >= 0 && cx < GRID && cy < GRID
-              && inside[cy * GRID + cx]) run.push([gx, gy]);
-          else { if (run.length > 1) out.push(run); run = []; }
+              && inside[cy * GRID + cx]) {
+            const prev = run[run.length - 1];
+            const cum = prev
+              ? prev[2] + Math.hypot(gx - prev[0], gy - prev[1]) : 0;
+            run.push([gx, gy, cum]);
+          } else { if (run.length > 1) out.push(run); run = []; }
         }
         if (run.length > 1) out.push(run);
       }
@@ -711,23 +715,44 @@ const EveryParkIso = (() => {
     const wallFill = `rgb(${wr | 0},${wg | 0},${wb | 0})`;
     const ribbon = zScale * .12 + s * 2.4;
 
-    const trailCol = (() => { const c = tod(196, 168, 122); return `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`; })();
-    const roadCol  = (() => { const c = tod(150, 154, 160); return `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`; })();
+    // Flat ribbons lying on the ground: yellow dashed trails, solid grey
+    // roads. Butt caps — round caps on every segment were what made them
+    // read as strings of cylinders.
+    const trailCol = (() => { const c = tod(232, 196, 74); return `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`; })();
+    const roadCol  = (() => { const c = tod(158, 162, 168); return `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`; })();
+    const roadEdge = (() => { const c = tod(96, 100, 106); return `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`; })();
+    const pxPerGrid = s * 1.55;
 
     for (const entry of order) {
       // --- a path segment ---
       if (entry[1] === -1) {
         const { a, b, kind } = entry[2];
+        // Lifted a touch off the ground so the ribbon reads as lying on
+        // the surface rather than buried in it.
+        const lift = s * .45;
         const pa = project(a[0], a[1], heightAtCell(a[0], a[1]));
         const pb = project(b[0], b[1], heightAtCell(b[0], b[1]));
-        ctx.strokeStyle = kind === "road" ? roadCol : trailCol;
-        ctx.lineWidth = kind === "road" ? Math.max(2, s * 1.7)
-                                        : Math.max(1.4, s * 1.0);
-        ctx.lineCap = "round"; ctx.lineJoin = "round";
+        ctx.lineCap = "butt"; ctx.lineJoin = "round";
+        if (kind === "road") {
+          ctx.setLineDash([]);
+          ctx.strokeStyle = roadEdge;
+          ctx.lineWidth = Math.max(2.2, s * 1.35);
+          ctx.beginPath();
+          ctx.moveTo(pa[0], pa[1] - lift); ctx.lineTo(pb[0], pb[1] - lift);
+          ctx.stroke();
+          ctx.strokeStyle = roadCol;
+          ctx.lineWidth = Math.max(1.4, s * .95);
+        } else {
+          const dash = Math.max(2.4, s * 1.5), gap = Math.max(2, s * 1.15);
+          ctx.setLineDash([dash, gap]);
+          ctx.lineDashOffset = -(a[2] || 0) * pxPerGrid;
+          ctx.strokeStyle = trailCol;
+          ctx.lineWidth = Math.max(1.3, s * .62);
+        }
         ctx.beginPath();
-        ctx.moveTo(pa[0], pa[1] - s * .18);
-        ctx.lineTo(pb[0], pb[1] - s * .18);
+        ctx.moveTo(pa[0], pa[1] - lift); ctx.lineTo(pb[0], pb[1] - lift);
         ctx.stroke();
+        ctx.setLineDash([]);
         continue;
       }
 
