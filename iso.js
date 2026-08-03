@@ -38,6 +38,23 @@ const EveryParkIso = (() => {
   const hexRgb = h => [parseInt(h.slice(1, 3), 16),
                        parseInt(h.slice(3, 5), 16),
                        parseInt(h.slice(5, 7), 16)];
+  // `rgb(...)` template literals were being built tens of thousands of
+  // times a frame. The terrain palette is small and repeats heavily, so
+  // memoising the strings removes most of that allocation churn.
+  const colCache = new Map();
+  const rgbStr = (r, g, b) => {
+    const k = (((r < 0 ? 0 : r > 255 ? 255 : r) | 0) << 16)
+            | (((g < 0 ? 0 : g > 255 ? 255 : g) | 0) << 8)
+            | ((b < 0 ? 0 : b > 255 ? 255 : b) | 0);
+    let v = colCache.get(k);
+    if (v === undefined) {
+      if (colCache.size > 8192) colCache.clear();
+      v = `rgb(${(k >> 16) & 255},${(k >> 8) & 255},${k & 255})`;
+      colCache.set(k, v);
+    }
+    return v;
+  };
+
   const hash = (gx, gy) => {
     let h = (gx * 73856093) ^ (gy * 19349663);
     h = (h ^ (h >> 13)) * 1274126177;
@@ -740,6 +757,45 @@ const EveryParkIso = (() => {
     ctx.restore();
   }
 
+  // Trees are the densest thing on screen — thousands of them, each
+  // formerly three filled paths per frame. They are baked once into a
+  // little atlas of variants and blitted after that, which is the
+  // difference between redrawing geometry and copying pixels.
+  let treeAtlas = null, treeAtlasKey = "";
+  const TREE_W = 44, TREE_H = 74, TREE_N = 4;
+  function treeSprites(season, todIdx, tod) {
+    const key = season + "|" + todIdx;
+    if (treeAtlasKey === key && treeAtlas) return treeAtlas;
+    const cv = document.createElement("canvas");
+    cv.width = TREE_W * TREE_N; cv.height = TREE_H;
+    const c2 = cv.getContext("2d");
+    for (let v = 0; v < TREE_N; v++) {
+      const h2 = (v + .5) / TREE_N;
+      const ox = v * TREE_W + TREE_W / 2;
+      const base = TREE_H - 2;
+      const th = TREE_H * (.72 + .2 * h2);
+      const half = TREE_W * .42;
+      const shade = 24 * h2;
+      let [tr, tg2, tb] = tod(58 + shade, 44 + shade * .6, 30);
+      let [cr, cg, cb] = tod(...SEASONS[season].canopy(h2));
+      c2.fillStyle = `rgb(${tr | 0},${tg2 | 0},${tb | 0})`;
+      c2.fillRect(ox - TREE_W * .06, base - th * .32, TREE_W * .12, th * .34);
+      c2.fillStyle = `rgb(${cr | 0},${cg | 0},${cb | 0})`;
+      c2.beginPath();
+      c2.moveTo(ox, base - th * .74);
+      c2.lineTo(ox - half, base - th * .22);
+      c2.lineTo(ox + half, base - th * .22);
+      c2.closePath(); c2.fill();
+      c2.beginPath();
+      c2.moveTo(ox, base - th);
+      c2.lineTo(ox - half * .72, base - th * .53);
+      c2.lineTo(ox + half * .72, base - th * .53);
+      c2.closePath(); c2.fill();
+    }
+    treeAtlas = cv; treeAtlasKey = key;
+    return cv;
+  }
+
   // ---- Sky: gradient only -----------------------------------------
   function drawSky(ctx, W, Hh, mode) {
     // Just the gradient — the sun, moon and stars were more distraction
@@ -811,7 +867,7 @@ const EveryParkIso = (() => {
   // wall shading made the hem look noisy and flickery as it rotated.
   const WALL = [88, 76, 60];
 
-  function draw(canvas, S, yaw) {
+  function renderScene(canvas, S, yaw) {
     const { H, inside, trailM, waterM, roadM, buildM, parkM, courtM,
             dropM, edge, p, spriteAt, tex } = S;
     const useSat = S.useSat && tex;
@@ -829,7 +885,8 @@ const EveryParkIso = (() => {
     if (min === Infinity) { min = 0; max = 1; }
     const span = Math.max(max - min, 8);
     const pal = coverPalette(p);
-    const density = treeProb(p, S.mPerBlock || 10, !!S.treeMask);
+    const density = Math.min(1, treeProb(p, S.mPerBlock || 10, !!S.treeMask)
+                                * (S.lod || 1) * (S.lod || 1));
     let waterLevel = Infinity;
     for (let i = 0; i < H.length; i++)
       if (inside[i] && waterM[i] && H[i] < waterLevel) waterLevel = H[i];
@@ -845,6 +902,7 @@ const EveryParkIso = (() => {
               cy + ry * s * .8 - (h - min) / span * zScale];
     };
     const depth = (fgx, fgy) => (fgx - GRID / 2) * sin + (fgy - GRID / 2) * cos;
+    S._proj = { project, s, min, span, zScale, cx, cy, cos, sin, tod };
 
     // Terrain height a path or sprite should sit on.
     const heightAtCell = (fgx, fgy) => {
@@ -856,21 +914,30 @@ const EveryParkIso = (() => {
       return h;
     };
 
-    // Painter's order: terrain cells AND path segments together, so a
-    // trail disappears behind a ridge instead of floating over it.
-    const order = [];
-    for (let gy = 0; gy < GRID; gy++)
-      for (let gx = 0; gx < GRID; gx++) {
-        if (!inside[gy * GRID + gx]) continue;
-        const rx = (gx - GRID / 2) * cos - (gy - GRID / 2) * sin;
-        order.push([depth(gx, gy), rx, gx, gy]);
-      }
-    order.sort((a, b) => a[0] - b[0]);
+    // Painter's order without building or sorting 50,000 entries every
+    // frame. Depth rises monotonically with gx along sin and gy along
+    // cos, so walking each axis in the sign of its term visits cells
+    // back-to-front by construction — the standard isometric traversal.
+    // While turning, step the grid coarsely: the cost here is per COLUMN,
+    // not per pixel, so halving the grid quarters the work. Settling
+    // re-renders once at full detail.
+    const st = Math.max(1, S.lod || 1);
+    const dirX = sin >= 0 ? 1 : -1, dirY = cos >= 0 ? 1 : -1;
+    const stepX = dirX * st, stepY = dirY * st;
+    const gxA = dirX > 0 ? 0 : GRID - 1;
+    const gyA = dirY > 0 ? 0 : GRID - 1;
+    const inX = gx => dirX > 0 ? gx < GRID : gx >= 0;
+    const inY = gy => dirY > 0 ? gy < GRID : gy >= 0;
+    const half = st / 2;
 
-    const w = s * 1.62, hgt = s * .92;
+    const w = s * 1.62 * st, hgt = s * .92 * st;
     // Infinite mode: one level line below the island's deepest point.
+    // Deepest projected row, from the grid corners rather than a scan.
     let maxRy = -Infinity;
-    for (const e2 of order) if (e2[0] > maxRy) maxRy = e2[0];
+    for (const [ax, ay] of [[0, 0], [GRID, 0], [0, GRID], [GRID, GRID]]) {
+      const d2 = (ax - GRID / 2) * sin + (ay - GRID / 2) * cos;
+      if (d2 > maxRy) maxRy = d2;
+    }
     const slabY = cy + maxRy * s * .8 + hgt * 2 + s * 1.2;
     const sides = S.sides == null ? 0 : S.sides;   // 0 solid 1 infinite 2 skirt 3 tops
     // A fixed-width wall rect leaves vertical gaps as the island turns:
@@ -885,6 +952,7 @@ const EveryParkIso = (() => {
     // roads. Butt caps — round caps on every segment were what made them
     // read as strings of cylinders.
     const deferred = [];        // facility marks, painted above the ways
+    const atlas = treeSprites(S.season || 0, S.tod, tod);
     const trailCol = (() => { const c = tod(232, 196, 74); return `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`; })();
     const roadCol  = (() => { const c = tod(146, 148, 150); return `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`; })();
     const roadEdge = (() => { const c = tod(104, 104, 104); return `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`; })();
@@ -918,9 +986,12 @@ const EveryParkIso = (() => {
       }
     };
 
-    for (const entry of order) {
-      const [ry, rx, gx, gy] = entry;
+    for (let gy = gyA; inY(gy); gy += stepY)
+    for (let gx = gxA; inX(gx); gx += stepX) {
       const i = gy * GRID + gx;
+      if (!inside[i]) continue;
+      const rx = (gx - GRID / 2) * cos - (gy - GRID / 2) * sin;
+      const ry = (gx - GRID / 2) * sin + (gy - GRID / 2) * cos;
       let h = H[i];
       const isWater = waterM[i] && (h <= waterLevel + 4);
       const isBuild = buildM[i] && !isWater;
@@ -961,7 +1032,7 @@ const EveryParkIso = (() => {
       if (!useSat && !isWater && !courtM[i] && !parkM[i] && !isBuild)
         [r, g, b] = SEASONS[S.season || 0].ground(r, g, b);
       [r, g, b] = tod(r, g, b);
-      const topFill = `rgb(${r | 0},${g | 0},${b | 0})`;
+      const topFill = rgbStr(r, g, b);
 
       if (smooth) {
         // Every inside cell gets a quad — no blocky fallback at the
@@ -1014,8 +1085,8 @@ const EveryParkIso = (() => {
         // cell's footprint, and the two side faces that actually point
         // at the camera are drawn as quads, each at its own shade: the
         // three-tone top/left/right split is what reads as a cube.
-        const P00 = project(gx - .5, gy - .5, h), P10 = project(gx + .5, gy - .5, h),
-              P11 = project(gx + .5, gy + .5, h), P01 = project(gx - .5, gy + .5, h);
+        const P00 = project(gx - half, gy - half, h), P10 = project(gx + half, gy - half, h),
+              P11 = project(gx + half, gy + half, h), P01 = project(gx - half, gy + half, h);
         const nH = (ax, ay) => {
           if (ax < 0 || ay < 0 || ax >= GRID || ay >= GRID) return null;
           const j = ay * GRID + ax;
@@ -1036,22 +1107,25 @@ const EveryParkIso = (() => {
                                : pt[1] + ribbon;
           };
           const face = (pa, pb, ax, ay, bx, by, nh, shade) => {
+            // Hidden-face culling: a neighbour at or above this block
+            // covers the whole wall, so there is nothing to draw. This
+            // is most of the geometry on gentle ground.
+            if (nh != null && nh >= h - 0.05) return;
             const ya = botFor(pa, ax, ay, nh), yb = botFor(pb, bx, by, nh);
             if (ya <= pa[1] + .5 && yb <= pb[1] + .5) return;
             ctx.fillStyle = (nh == null && edge[i]) ? wallFill
-              : `rgb(${r * shade | 0},${g * shade | 0},${b * shade | 0})`;
+              : rgbStr(r * shade, g * shade, b * shade);
             ctx.beginPath();
             ctx.moveTo(pa[0], pa[1]); ctx.lineTo(pb[0], pb[1]);
             ctx.lineTo(pb[0], yb); ctx.lineTo(pa[0], ya);
             ctx.closePath(); ctx.fill();
-            ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = 1; ctx.stroke();
           };
           // Only the camera-facing pair: which two those are follows the
           // rotation, so the lit and shaded sides swap as you spin.
-          if (cos > 0) face(P01, P11, gx - .5, gy + .5, gx + .5, gy + .5, nH(gx, gy + 1), .58);
-          else         face(P00, P10, gx - .5, gy - .5, gx + .5, gy - .5, nH(gx, gy - 1), .58);
-          if (sin > 0) face(P10, P11, gx + .5, gy - .5, gx + .5, gy + .5, nH(gx + 1, gy), .76);
-          else         face(P00, P01, gx - .5, gy - .5, gx - .5, gy + .5, nH(gx - 1, gy), .76);
+          if (cos > 0) face(P01, P11, gx - half, gy + half, gx + half, gy + half, nH(gx, gy + st), .58);
+          else         face(P00, P10, gx - half, gy - half, gx + half, gy - half, nH(gx, gy - st), .58);
+          if (sin > 0) face(P10, P11, gx + half, gy - half, gx + half, gy + half, nH(gx + st, gy), .76);
+          else         face(P00, P01, gx - half, gy - half, gx - half, gy + half, nH(gx - st, gy), .76);
         }
         ctx.fillStyle = topFill;
         ctx.beginPath();
@@ -1071,26 +1145,11 @@ const EveryParkIso = (() => {
           && !courtM[i] && !parkM[i] && hash(gx, gy) < density
           && (!S.treeMask || S.treeMask[i])) {
         const jx = (hash(gx + 7, gy) - .5) * w * .6;
-        const th = s * (1.5 + hash(gx, gy + 3));
-        const half = s * .55;
-        const h2 = hash(gx + 1, gy + 1);
-        const shade = 24 * h2;
-        let tr = 58 + shade, tg2 = 44 + shade * .6, tb = 30;
-        let [cr, cg, cb] = SEASONS[S.season || 0].canopy(h2);
-        [tr, tg2, tb] = tod(tr, tg2, tb); [cr, cg, cb] = tod(cr, cg, cb);
-        ctx.fillStyle = `rgb(${tr | 0},${tg2 | 0},${tb | 0})`;
-        ctx.fillRect(X + jx - s * .08, Y - th * .35, s * .16, th * .4);
-        ctx.fillStyle = `rgb(${cr | 0},${cg | 0},${cb | 0})`;
-        ctx.beginPath();
-        ctx.moveTo(X + jx, Y - th);
-        ctx.lineTo(X + jx - half, Y - th * .3);
-        ctx.lineTo(X + jx + half, Y - th * .3);
-        ctx.closePath(); ctx.fill();
-        ctx.beginPath();
-        ctx.moveTo(X + jx, Y - th * 1.35);
-        ctx.lineTo(X + jx - half * .72, Y - th * .72);
-        ctx.lineTo(X + jx + half * .72, Y - th * .72);
-        ctx.closePath(); ctx.fill();
+        const th = s * st * (1.5 + hash(gx, gy + 3)) * 1.35;
+        const tw = th * (TREE_W / TREE_H);
+        const v = (hash(gx + 1, gy + 1) * TREE_N) | 0;
+        ctx.drawImage(atlas, v * TREE_W, 0, TREE_W, TREE_H,
+                      X + jx - tw / 2, Y - th, tw, th);
       }
 
       // Headstones instead of pines: little pale slabs in rows, with a
@@ -1178,7 +1237,47 @@ const EveryParkIso = (() => {
     for (const [X, Y, sp] of deferred)
       facilitySprite(ctx, sp, X, Y - s * 1.5, Math.min(11, Math.max(4.5, s * 1.5)), tod);
 
-    if (S.hikePath && S.hikePath.length > 3) {
+    ctx.fillStyle = "rgba(255,255,255,.75)";
+    ctx.font = "11px system-ui";
+    ctx.textAlign = "left";
+    ctx.fillText(`${Math.round(min)}\u2013${Math.round(max)} m`, 10, Hh - 10);
+  }
+
+  // The scene only changes when the view or the settings change, but the
+  // hiker moves every frame. Bake the terrain once per distinct view into
+  // an offscreen canvas, blit it, and draw only the walker on top — so a
+  // paused turntable costs one copy per frame instead of a full rebuild.
+  function draw(canvas, S, yaw) {
+    const ctx = canvas.getContext("2d");
+    const W = canvas.width, Hh = canvas.height;
+    // While the view is turning, render the scene at a fraction of the
+    // resolution and scale it up: motion hides the softness, and it is
+    // the cheapest way to keep a turntable of 25,000 columns fluid. The
+    // moment it settles, one full-resolution pass replaces it.
+    S.lod = S.moving ? 2 : 1;
+    const q = S.moving ? 0.7 : 1;
+    const cw = Math.max(2, Math.round(W * q)), ch = Math.max(2, Math.round(Hh * q));
+    const sig = [Math.round(yaw * 500), S.lod, S.tod, S.season, S.sides,
+                 S.smooth ? 1 : 0, S.useSat ? 1 : 0, GRID,
+                 Math.round((S.zoom || 1) * 200), cw, ch,
+                 S.trailPieces ? S.trailPieces.length : 0,
+                 S.roadPieces ? S.roadPieces.length : 0].join(",");
+    if (!S._cache || S._cache.width !== cw || S._cache.height !== ch) {
+      S._cache = document.createElement("canvas");
+      S._cache.width = cw; S._cache.height = ch;
+      S._sig = null;
+    }
+    if (S._sig !== sig) {
+      renderScene(S._cache, S, yaw);
+      S._sig = sig;
+    }
+    ctx.clearRect(0, 0, W, Hh);
+    ctx.imageSmoothingEnabled = q !== 1;
+    ctx.drawImage(S._cache, 0, 0, cw, ch, 0, 0, W, Hh);
+
+    // The walker, painted fresh over the baked scene.
+    const P = S._proj, inv = P ? (W / S._cache.width) : 1;
+    if (P && S.hikePath && S.hikePath.length > 3) {
       const path = S.hikePath;
       const tt = S.hikeT < 0.5 ? S.hikeT * 2 : (1 - S.hikeT) * 2;
       const fi = tt * (path.length - 1);
@@ -1186,16 +1285,13 @@ const EveryParkIso = (() => {
       const fr = fi - i0;
       const fgx = path[i0][0] + (path[i0 + 1][0] - path[i0][0]) * fr;
       const fgy = path[i0][1] + (path[i0 + 1][1] - path[i0][1]) * fr;
-      const [hx, hy] = project(fgx, fgy, heightAtCell(fgx, fgy));
+      const gx2 = Math.min(GRID - 1, Math.max(0, Math.round(fgx)));
+      const gy2 = Math.min(GRID - 1, Math.max(0, Math.round(fgy)));
+      const [hx0, hy0] = P.project(fgx, fgy, S.H[gy2 * GRID + gx2]);
       const bob = Math.sin(S.hikeT * 240) * 1.5;
-      hikerSprite(ctx, hx, hy - s * 1.1 + bob,
-                  Math.min(9, Math.max(3.6, s * 1.2)), tod, S.hikeT * 100);
+      hikerSprite(ctx, hx0 * inv, (hy0 - P.s * 1.1 + bob) * inv,
+                  Math.min(9, Math.max(3.6, P.s * 1.2)) * inv, P.tod, S.hikeT * 100);
     }
-
-    ctx.fillStyle = "rgba(255,255,255,.75)";
-    ctx.font = "11px system-ui";
-    ctx.textAlign = "left";
-    ctx.fillText(`${Math.round(min)}\u2013${Math.round(max)} m`, 10, Hh - 10);
   }
 
   // ---- Open --------------------------------------------------------
@@ -1273,8 +1369,10 @@ const EveryParkIso = (() => {
     // A block IS a distance: spanM / GRID metres on the ground. The
     // slider asks for a block size; the grid is clamped for sanity and
     // the label reports the EFFECTIVE size, so it never lies.
+    // 176 a side is ~31,000 columns — about as much geometry as a canvas
+    // turntable stays fluid with.
     const gridFor = cellM =>
-      Math.max(48, Math.min(240, Math.round(spanM / cellM)));
+      Math.max(48, Math.min(176, Math.round(spanM / cellM)));
 
     let heightSample = null;
     try { heightSample = await fetchHeightSample(bbox); } catch (e) { /* */ }
@@ -1304,7 +1402,7 @@ const EveryParkIso = (() => {
       return { inside, H, dropM, edge };
     };
 
-    GRID = gridFor(Math.max(10, Math.ceil(spanM / 240 / 2) * 2));  // default ≈ 10 m
+    GRID = gridFor(Math.max(10, Math.ceil(spanM / 176 / 2) * 2));  // default ≈ 10 m
     const { inside, H, dropM, edge } = buildTerrain();
 
     // TERRAIN FIRST. Trails/roads/buildings/courts stream in after —
@@ -1401,7 +1499,7 @@ const EveryParkIso = (() => {
     // Big parks clamp at 240 cells per side, so a fixed 4-20 m range
     // left the slider dead there (every value clamped to the same grid).
     // The range now starts at the smallest ACHIEVABLE block size.
-    const minCell = Math.max(4, Math.ceil(spanM / 240 / 2) * 2);
+    const minCell = Math.max(4, Math.ceil(spanM / 176 / 2) * 2);
     const defCell = Math.max(10, minCell);
     const sliderWrap = document.createElement("label");
     sliderWrap.className = "iso-slider";
@@ -1526,7 +1624,9 @@ const EveryParkIso = (() => {
     const loop = () => {
       if (!document.getElementById("isoOverlay")) return;
       if (!dragging && S.spin) target += 0.0012;
+      const prev = yaw;
       yaw += (target - yaw) * .15;
+      S.moving = dragging || S.spin || Math.abs(yaw - prev) > 1e-4;
       // Walking pace: ~1.3 m/s of real ground, whatever the block size.
       if (S.hikePath) {
         const mPerBlock = S.mPerBlock || 10;
