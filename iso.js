@@ -55,18 +55,18 @@ const EveryParkIso = (() => {
 
   // ---- Sport courts: colour code + emoji per sport ----------------
   const SPORT = [
-    [/baseball|softball/, 2, "#d9c186", "⚾"],
-    [/basketball/,        3, "#6b7d99", "🏀"],
-    [/tennis/,            4, "#b85c48", "🎾"],
-    [/pickleball/,        5, "#4f9d8b", "🏓"],
-    [/soccer|football/,   6, "#5c9e57", "⚽"],
-    [/volleyball/,        7, "#c9a86b", "🏐"],
-    [/./,                 8, "#7fa06f", "🏃"]
+    [/baseball|softball/, 2, "#d9c186", "baseball"],
+    [/basketball/,        3, "#6b7d99", "basketball"],
+    [/tennis/,            4, "#b85c48", "tennis"],
+    [/pickleball/,        5, "#4f9d8b", "pickleball"],
+    [/soccer|football/,   6, "#5c9e57", "soccer"],
+    [/volleyball/,        7, "#c9a86b", "volleyball"],
+    [/./,                 8, "#7fa06f", "pitch"]
   ];
-  const KIND = { playground: [9, "#d99a4e", "🛝"],
-                 swimming_pool: [10, "#4fa3c9", "🏊"],
-                 dog_park: [11, "#a08a6b", "🐕"],
-                 track: [12, "#b0876b", "🏃"] };
+  const KIND = { playground: [9, "#d99a4e", "playground"],
+                 swimming_pool: [10, "#4fa3c9", "pool"],
+                 dog_park: [11, "#a08a6b", "dogpark"],
+                 track: [12, "#b0876b", "track"] };
   const COURT_COLOR = {};
   for (const [, code, col] of SPORT) COURT_COLOR[code] = col;
   for (const k in KIND) COURT_COLOR[KIND[k][0]] = KIND[k][1];
@@ -486,7 +486,7 @@ const EveryParkIso = (() => {
       let sx = 0, sy = 0, np = 0;
       for (const [x, y] of rings[0]) { sx += x; sy += y; np++; }
       const cc = snapInside(inside, ...cellOf(bbox, sx / np, sy / np));
-      if (cc) sprites.push({ gx: cc[0], gy: cc[1], emoji: "🅿️" });
+      if (cc) sprites.push({ gx: cc[0], gy: cc[1], kind: "parking" });
     }
     const waterM = new Uint8Array(GRID * GRID);
     for (const rings of raw.waterRings) {
@@ -500,7 +500,7 @@ const EveryParkIso = (() => {
       let sx = 0, sy = 0, np = 0;
       for (const [x, y] of c.rings[0]) { sx += x; sy += y; np++; }
       const cc = snapInside(inside, ...cellOf(bbox, sx / np, sy / np));
-      if (cc) sprites.push({ gx: cc[0], gy: cc[1], emoji: c.emoji });
+      if (cc) sprites.push({ gx: cc[0], gy: cc[1], kind: c.emoji });
     }
 
     // The hiker's route: from every trail polyline, take the longest
@@ -553,11 +553,10 @@ const EveryParkIso = (() => {
       }
       if (hikePath.length < 6) hikePath = null;
     }
-    const trailLines = linesFrom(raw.trailFeats, bbox, inside, 1);
-    // Roads usually run along a park's edge rather than through it —
-    // clipping them strictly inside deleted exactly the road you want to
-    // see. A few blocks of margin keeps the access road visible.
-    const roadLines = linesFrom(raw.roads, bbox, inside, 4);
+    // Both clipped to the island itself: a way hanging off the edge into
+    // empty sky reads as a bug, whatever it says about the neighbourhood.
+    const trailLines = linesFrom(raw.trailFeats, bbox, inside, 0);
+    const roadLines = linesFrom(raw.roads, bbox, inside, 0);
     return { trailM, waterM, roadM, buildM, parkM, courtM, sprites, hikePath,
              trailLines, roadLines,
              trailPieces: pathPieces(trailLines, [1.5, 1.1]),
@@ -596,7 +595,138 @@ const EveryParkIso = (() => {
     { icon: "🌙", label: "Night",  fn: (r, g, b) => [r * .30 + 8, g * .34 + 10, b * .52 + 34] }
   ];
 
-  // ---- Sky: gradient + sun / low sun / moon & stars per mode ------
+  // ---- Drawn sprites (no emoji font anywhere in the scene) --------
+  function facilitySprite(ctx, kind, X, Y, r, tod) {
+    const ink = (c) => { const t = tod(c[0], c[1], c[2]);
+                         return `rgb(${t[0]|0},${t[1]|0},${t[2]|0})`; };
+    const disc = (fill, stroke) => {
+      ctx.fillStyle = ink(fill);
+      ctx.beginPath(); ctx.arc(X, Y, r, 0, 7); ctx.fill();
+      if (stroke) { ctx.strokeStyle = ink(stroke); ctx.lineWidth = Math.max(1, r * .16); ctx.stroke(); }
+    };
+    ctx.save();
+    ctx.lineCap = "round";
+    switch (kind) {
+      case "baseball":
+        disc([248, 246, 238], [176, 62, 48]);
+        ctx.strokeStyle = ink([176, 62, 48]); ctx.lineWidth = Math.max(1, r * .2);
+        ctx.beginPath(); ctx.arc(X - r * .9, Y, r * .95, -.7, .7); ctx.stroke();
+        ctx.beginPath(); ctx.arc(X + r * .9, Y, r * .95, Math.PI - .7, Math.PI + .7); ctx.stroke();
+        break;
+      case "basketball":
+        disc([214, 122, 54]);
+        ctx.strokeStyle = ink([56, 38, 26]); ctx.lineWidth = Math.max(1, r * .16);
+        ctx.beginPath(); ctx.moveTo(X - r, Y); ctx.lineTo(X + r, Y);
+        ctx.moveTo(X, Y - r); ctx.lineTo(X, Y + r); ctx.stroke();
+        break;
+      case "tennis":
+        disc([206, 226, 92]);
+        ctx.strokeStyle = ink([250, 250, 244]); ctx.lineWidth = Math.max(1, r * .18);
+        ctx.beginPath(); ctx.arc(X - r * .95, Y, r, -.75, .75); ctx.stroke();
+        break;
+      case "pickleball":
+        disc([238, 226, 120], [90, 84, 46]);
+        ctx.fillStyle = ink([90, 84, 46]);
+        for (const [dx, dy] of [[-.4, -.35], [.4, -.35], [0, .1], [-.4, .5], [.4, .5]]) {
+          ctx.beginPath(); ctx.arc(X + dx * r, Y + dy * r, r * .15, 0, 7); ctx.fill();
+        }
+        break;
+      case "soccer":
+        disc([250, 250, 246], [40, 40, 40]);
+        ctx.fillStyle = ink([40, 40, 40]);
+        ctx.beginPath();
+        for (let k = 0; k < 5; k++) {
+          const a = -Math.PI / 2 + k * Math.PI * 2 / 5;
+          const px = X + Math.cos(a) * r * .42, py = Y + Math.sin(a) * r * .42;
+          k ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+        }
+        ctx.closePath(); ctx.fill();
+        break;
+      case "volleyball":
+        disc([250, 248, 240], [70, 110, 170]);
+        ctx.strokeStyle = ink([70, 110, 170]); ctx.lineWidth = Math.max(1, r * .15);
+        ctx.beginPath(); ctx.arc(X, Y - r * 1.1, r * 1.2, .5, 2.6); ctx.stroke();
+        ctx.beginPath(); ctx.arc(X + r * 1.1, Y + r * .4, r * 1.2, 2.6, 4.4); ctx.stroke();
+        break;
+      case "playground": {                       // a slide
+        ctx.strokeStyle = ink([232, 168, 72]); ctx.lineWidth = Math.max(1.4, r * .3);
+        ctx.beginPath();
+        ctx.moveTo(X - r, Y + r * .7); ctx.quadraticCurveTo(X, Y - r * .2, X + r * .7, Y - r);
+        ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(X + r * .7, Y - r); ctx.lineTo(X + r * .7, Y + r * .7); ctx.stroke();
+        break;
+      }
+      case "pool":
+        ctx.fillStyle = ink([80, 168, 210]);
+        ctx.fillRect(X - r, Y - r * .8, r * 2, r * 1.6);
+        ctx.strokeStyle = ink([246, 250, 252]); ctx.lineWidth = Math.max(1, r * .18);
+        ctx.beginPath();
+        for (let k = -1; k <= 1; k++) {
+          ctx.moveTo(X - r * .8, Y + k * r * .5);
+          ctx.quadraticCurveTo(X, Y + k * r * .5 - r * .35, X + r * .8, Y + k * r * .5);
+        }
+        ctx.stroke();
+        break;
+      case "dogpark": {                          // paw
+        ctx.fillStyle = ink([196, 168, 122]);
+        ctx.beginPath(); ctx.ellipse(X, Y + r * .35, r * .6, r * .5, 0, 0, 7); ctx.fill();
+        for (const dx of [-.62, -.2, .2, .62]) {
+          ctx.beginPath();
+          ctx.ellipse(X + dx * r, Y - r * .5, r * .22, r * .3, dx * .5, 0, 7);
+          ctx.fill();
+        }
+        break;
+      }
+      case "track":
+        ctx.strokeStyle = ink([196, 122, 92]); ctx.lineWidth = Math.max(1.4, r * .34);
+        ctx.beginPath(); ctx.ellipse(X, Y, r, r * .62, 0, 0, 7); ctx.stroke();
+        break;
+      case "parking":
+        ctx.fillStyle = ink([54, 84, 150]);
+        ctx.fillRect(X - r * .95, Y - r * .95, r * 1.9, r * 1.9);
+        ctx.strokeStyle = ink([248, 248, 248]);
+        ctx.lineWidth = Math.max(1.2, r * .28); ctx.lineJoin = "miter";
+        ctx.beginPath();
+        ctx.moveTo(X - r * .3, Y + r * .6); ctx.lineTo(X - r * .3, Y - r * .6);
+        ctx.lineTo(X + r * .18, Y - r * .6);
+        ctx.arc(X + r * .18, Y - r * .18, r * .42, -Math.PI / 2, Math.PI / 2);
+        ctx.lineTo(X - r * .3, Y + r * .24);
+        ctx.stroke();
+        break;
+      default:                                    // generic pitch
+        ctx.strokeStyle = ink([244, 246, 240]); ctx.lineWidth = Math.max(1, r * .2);
+        ctx.strokeRect(X - r * .95, Y - r * .6, r * 1.9, r * 1.2);
+        ctx.beginPath(); ctx.moveTo(X, Y - r * .6); ctx.lineTo(X, Y + r * .6); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // A walker: head, body, two legs mid-stride.
+  function hikerSprite(ctx, X, Y, r, tod, phase) {
+    const t = tod(250, 248, 240);
+    const light = `rgb(${t[0]|0},${t[1]|0},${t[2]|0})`;
+    const t2 = tod(38, 62, 48);
+    const dark = `rgb(${t2[0]|0},${t2[1]|0},${t2[2]|0})`;
+    const sw = Math.max(1.4, r * .34);
+    ctx.save();
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.strokeStyle = dark; ctx.lineWidth = sw * 1.9;
+    ctx.beginPath(); ctx.moveTo(X, Y - r * 1.5); ctx.lineTo(X, Y - r * .1);
+    const sp = Math.sin(phase * 9) * r * .55;
+    ctx.moveTo(X, Y - r * .1); ctx.lineTo(X - sp, Y + r * .9);
+    ctx.moveTo(X, Y - r * .1); ctx.lineTo(X + sp, Y + r * .9);
+    ctx.stroke();
+    ctx.strokeStyle = light; ctx.lineWidth = sw;
+    ctx.beginPath(); ctx.moveTo(X, Y - r * 1.5); ctx.lineTo(X, Y - r * .1);
+    ctx.moveTo(X, Y - r * .1); ctx.lineTo(X - sp, Y + r * .9);
+    ctx.moveTo(X, Y - r * .1); ctx.lineTo(X + sp, Y + r * .9);
+    ctx.stroke();
+    ctx.fillStyle = light;
+    ctx.beginPath(); ctx.arc(X, Y - r * 1.95, r * .48, 0, 7); ctx.fill();
+    ctx.restore();
+  }
+
+  // ---- Sky: gradient only -----------------------------------------
   function drawSky(ctx, W, Hh, mode) {
     // Just the gradient — the sun, moon and stars were more distraction
     // than atmosphere once the terrain got detailed.
@@ -742,8 +872,8 @@ const EveryParkIso = (() => {
     // read as strings of cylinders.
     const deferred = [];        // facility marks, painted above the ways
     const trailCol = (() => { const c = tod(232, 196, 74); return `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`; })();
-    const roadCol  = (() => { const c = tod(158, 162, 168); return `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`; })();
-    const roadEdge = (() => { const c = tod(96, 100, 106); return `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`; })();
+    const roadCol  = (() => { const c = tod(146, 148, 150); return `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`; })();
+    const roadEdge = (() => { const c = tod(104, 104, 104); return `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`; })();
     const pxPerGrid = s * 1.55;
 
     // A ribbon DRAPED on the ground: widened perpendicular in grid space,
@@ -769,8 +899,8 @@ const EveryParkIso = (() => {
           ctx.closePath(); ctx.fill();
           ctx.strokeStyle = fill; ctx.lineWidth = 1; ctx.stroke();
         };
-        if (kind === "road") { band(0.62, roadEdge); band(0.42, roadCol); }
-        else band(0.26, trailCol);
+        if (kind === "road") { band(0.34, roadEdge); band(0.22, roadCol); }
+        else band(0.24, trailCol);
       }
     };
 
@@ -992,11 +1122,8 @@ const EveryParkIso = (() => {
       - (depth(b[0][0], b[0][1]) + depth(b[0][2], b[0][3])));
     for (const [pc, kind] of ways) drawRibbon(pc, kind);
 
-    ctx.textAlign = "center";
-    for (const [X, Y, sp] of deferred) {
-      ctx.font = `${Math.min(30, Math.max(10, s * 3.6)) | 0}px system-ui`;
-      ctx.fillText(sp, X, Y - s * .9);
-    }
+    for (const [X, Y, sp] of deferred)
+      facilitySprite(ctx, sp, X, Y - s * 1.5, Math.min(11, Math.max(4.5, s * 1.5)), tod);
 
     if (S.hikePath && S.hikePath.length > 3) {
       const path = S.hikePath;
@@ -1008,9 +1135,8 @@ const EveryParkIso = (() => {
       const fgy = path[i0][1] + (path[i0 + 1][1] - path[i0][1]) * fr;
       const [hx, hy] = project(fgx, fgy, heightAtCell(fgx, fgy));
       const bob = Math.sin(S.hikeT * 240) * 1.5;
-      ctx.font = `${Math.min(32, Math.max(11, s * 4)) | 0}px system-ui`;
-      ctx.textAlign = "center";
-      ctx.fillText("\u{1F6B6}", hx, hy - s * 1.1 + bob);
+      hikerSprite(ctx, hx, hy - s * 1.1 + bob,
+                  Math.min(9, Math.max(3.6, s * 1.2)), tod, S.hikeT * 100);
     }
 
     ctx.fillStyle = "rgba(255,255,255,.75)";
@@ -1036,6 +1162,19 @@ const EveryParkIso = (() => {
       </div>`;
     document.body.appendChild(ov);
     const canvas = ov.querySelector("canvas");
+    // Full-bleed on phones: the panel is the screen, the canvas fills it.
+    if (window.innerWidth <= 760) {
+      ov.classList.add("iso-full");
+      const fit = () => {
+        const box = canvas.getBoundingClientRect();
+        if (box.width > 40) {
+          canvas.width = Math.round(box.width * Math.min(2, window.devicePixelRatio || 1));
+          canvas.height = Math.round(box.height * Math.min(2, window.devicePixelRatio || 1));
+        }
+      };
+      requestAnimationFrame(fit);
+      window.addEventListener("resize", fit);
+    }
     const sub = ov.querySelector(".iso-sub");
     const tools = ov.querySelector(".iso-tools");
     const spin = document.createElement("div");
@@ -1132,7 +1271,7 @@ const EveryParkIso = (() => {
       const d = buildDressing(raw, bbox, S.inside);
       Object.assign(S, d);
       S.spriteAt = new Map();
-      for (const sp of d.sprites) S.spriteAt.set(sp.gy * GRID + sp.gx, sp.emoji);
+      for (const sp of d.sprites) S.spriteAt.set(sp.gy * GRID + sp.gx, sp.kind);
       const bits = [baseSub];
       if (d.trailM.some(v => v)) bits.push("trails");
       bits.push((d.roadPieces && d.roadPieces.length) ? "roads"
@@ -1224,7 +1363,7 @@ const EveryParkIso = (() => {
         const d2 = buildDressing(rawDressing, bbox, S.inside);
         Object.assign(S, d2);
         S.spriteAt = new Map();
-        for (const sp of d2.sprites) S.spriteAt.set(sp.gy * GRID + sp.gx, sp.emoji);
+        for (const sp of d2.sprites) S.spriteAt.set(sp.gy * GRID + sp.gx, sp.kind);
       }
       S.tex = satSample ? satTexFrom(satSample, bbox) : null;
       S.treeMask = S.tex ? treeMaskFrom(S.tex, S.inside) : null;
@@ -1285,9 +1424,41 @@ const EveryParkIso = (() => {
     S.spin = true;
 
     let yaw = 0, target = 0, dragging = false, lastX = 0;
-    canvas.addEventListener("pointerdown", e => { dragging = true; lastX = e.clientX; canvas.setPointerCapture(e.pointerId); });
-    canvas.addEventListener("pointermove", e => { if (dragging) { target += (e.clientX - lastX) * .008; lastX = e.clientX; } });
-    canvas.addEventListener("pointerup", () => dragging = false);
+    // One finger rotates, two fingers pinch to zoom.
+    const pointers = new Map();
+    let pinchDist = 0;
+    const spread = () => {
+      const [a, b2] = [...pointers.values()];
+      return Math.hypot(a.x - b2.x, a.y - b2.y);
+    };
+    canvas.addEventListener("pointerdown", e => {
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      canvas.setPointerCapture(e.pointerId);
+      if (pointers.size === 1) { dragging = true; lastX = e.clientX; }
+      else if (pointers.size === 2) { dragging = false; pinchDist = spread(); }
+    });
+    canvas.addEventListener("pointermove", e => {
+      if (!pointers.has(e.pointerId)) return;
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pointers.size >= 2) {
+        const d = spread();
+        if (pinchDist > 0 && d > 0)
+          S.zoom = Math.min(3, Math.max(.5, S.zoom * (d / pinchDist)));
+        pinchDist = d;
+      } else if (dragging) {
+        target += (e.clientX - lastX) * .008; lastX = e.clientX;
+      }
+    });
+    const release = e => {
+      pointers.delete(e.pointerId);
+      if (pointers.size < 2) pinchDist = 0;
+      if (pointers.size === 1) {
+        dragging = true; lastX = [...pointers.values()][0].x;
+      } else if (pointers.size === 0) dragging = false;
+    };
+    canvas.addEventListener("pointerup", release);
+    canvas.addEventListener("pointercancel", release);
+    canvas.style.touchAction = "none";
     const loop = () => {
       if (!document.getElementById("isoOverlay")) return;
       if (!dragging && S.spin) target += 0.0012;

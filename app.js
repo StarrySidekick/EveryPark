@@ -277,6 +277,27 @@
   // way: can I go, who runs it, does it cost, then what's actually there.
   // Deliberately terse — the map is for deciding where to go, not for
   // reading paragraphs.
+  // Drawn marks for the card's feature chips — one flat stroke style,
+  // no emoji, so the card reads as one designed object.
+  const svg1 = d => `<svg viewBox="0 0 24 24" width="13" height="13" fill="none"
+      stroke="currentColor" stroke-width="2" stroke-linecap="round"
+      stroke-linejoin="round">${d}</svg>`;
+  const FEAT_SVG = {
+    trail:      svg1('<path d="M4 20c5-3 3-8 6-11s7-2 8-6"/><circle cx="18" cy="3.5" r="1.4" fill="currentColor" stroke="none"/>'),
+    water:      svg1('<path d="M3 8c3-2 5 2 8 0s5-2 8 0M3 13c3-2 5 2 8 0s5-2 8 0M3 18c3-2 5 2 8 0s5-2 8 0"/>'),
+    beach:      svg1('<path d="M3 19c4-3 7-3 11 0M14 19c3-2 5-2 7 0M16 4a8 8 0 0 0-9 8l9-8zM16 4v11"/>'),
+    pool:       svg1('<path d="M3 16c3-2 5 2 8 0s5-2 8 0M3 20c3-2 5 2 8 0s5-2 8 0M8 13V5a2 2 0 0 1 4 0M16 13V5a2 2 0 0 1 4 0"/>'),
+    sports:     svg1('<circle cx="12" cy="12" r="8"/><path d="M4 12h16M12 4v16"/>'),
+    playground: svg1('<path d="M4 19l8-13 6 13M9 12h7"/>'),
+    dog:        svg1('<ellipse cx="12" cy="16" rx="4" ry="3.2"/><ellipse cx="6.5" cy="10" rx="1.8" ry="2.4"/><ellipse cx="17.5" cy="10" rx="1.8" ry="2.4"/><ellipse cx="10" cy="7" rx="1.7" ry="2.3"/><ellipse cx="14" cy="7" rx="1.7" ry="2.3"/>'),
+    historic:   svg1('<path d="M3 9l9-5 9 5M5 9v10M10 9v10M14 9v10M19 9v10M3 20h18"/>'),
+    parking:    svg1('<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M10 17V8h3a3 3 0 0 1 0 6h-3"/>'),
+    relief:     svg1('<path d="M2 19l7-12 4.5 7.5L16 11l6 8z"/>'),
+    wooded:     svg1('<path d="M12 3l5 8h-3l4 6H6l4-6H7z M12 17v4"/>'),
+    field:      svg1('<path d="M3 17c4-3 6 1 9-2s6 1 9-2M3 21h18"/>'),
+    mixed:      svg1('<path d="M9 3l4 7h-2.5l3 5H4.5l3-5H5z M9 15v6M17 9l3 5h-6z M17 14v7"/>')
+  };
+
   function popupHtml(p) {
     if (!p.access) classify(p);
     const A = p.attrs || {};
@@ -305,28 +326,28 @@
     // 4. What's there — feature chips, staggered in with CSS animation.
     // Each chip is one thing a visitor cares about; the icon carries it.
     const feats = [];
-    if (A.trails) feats.push(["🥾", "Trails"]);
+    if (A.trails) feats.push(["trail", "Trails"]);
     if (A.water) {
       const wt = { lake: "Lake", reservoir: "Reservoir", river: "River",
                    pond: "Pond", waterfall: "Waterfall" }[A.waterType];
-      feats.push(["🌊", A.waterName || wt || "Water"]);
+      feats.push(["water", A.waterName || wt || "Water"]);
     }
-    if (A.beach) feats.push(["🏖️", "Beach"]);
-    if (A.pool) feats.push(["🏊", "Pool"]);
-    if (A.sports) feats.push(["🏀", (A.sportList && A.sportList.length)
+    if (A.beach) feats.push(["beach", "Beach"]);
+    if (A.pool) feats.push(["pool", "Pool"]);
+    if (A.sports) feats.push(["sports", (A.sportList && A.sportList.length)
                                     ? A.sportList.slice(0, 2).join(", ") : "Sports"]);
-    if (A.playground) feats.push(["🛝", "Playground"]);
-    if (A.dogpark) feats.push(["🐕", "Dog park"]);
-    if (A.historic) feats.push(["🏛️", "Historic"]);
-    if (A.parking) feats.push(["🅿️", "Parking"]);
-    if (A.relief != null) feats.push(["⛰️", `${terrainLabel(A.relief)} · ${A.relief} m`]);
+    if (A.playground) feats.push(["playground", "Playground"]);
+    if (A.dogpark) feats.push(["dog", "Dog park"]);
+    if (A.historic) feats.push(["historic", "Historic"]);
+    if (A.parking) feats.push(["parking", "Parking"]);
+    if (A.relief != null) feats.push(["relief", `${terrainLabel(A.relief)} · ${A.relief} m`]);
     if (A.cover) {
       const c = A.cover.toLowerCase();
-      feats.push([c.includes("wood") ? "🌲" : c.includes("open") ? "🌾" : "🌳", A.cover]);
+      feats.push([c.includes("wood") ? "wooded" : c.includes("open") ? "field" : "mixed", A.cover]);
     }
     const chips = feats.map(([ic, label], i) =>
       `<span class="fchip" style="animation-delay:${45 * i}ms">
-         <span class="fchip-ic">${ic}</span>${label}</span>`).join("");
+         <span class="fchip-ic">${FEAT_SVG[ic] || ""}</span>${label}</span>`).join("");
 
     const acres = p.acres ? ` &middot; ${Number(p.acres).toLocaleString()} acres` : "";
     const dir = `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}`;
@@ -2364,7 +2385,11 @@
   (document.getElementById("randomBtn") || {addEventListener(){}}).addEventListener("click", () => {
     // Only somewhere with terrain to look at — the whole point of the
     // dice is landing somewhere you can immediately fly around in 3D.
-    const pool = allParks.filter(p => visible(p) && (p.attrs || {}).relief != null);
+    // Somewhere you can definitely go, run by a public body, with terrain
+    // worth flying around — the dice should never land on a maybe.
+    const pool = allParks.filter(p =>
+      visible(p) && p.status === "park" && (p.attrs || {}).relief != null
+      && ["town", "state", "national"].includes(p.type));
     const use = pool.length ? pool : allParks.filter(visible);
     if (!use.length) return;
     const p = use[Math.floor(Math.random() * use.length)];
