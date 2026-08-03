@@ -568,7 +568,7 @@ const EveryParkIso = (() => {
     day:    '<circle cx="12" cy="12" r="5"/><g stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 1v3M12 20v3M1 12h3M20 12h3M4.2 4.2l2 2M17.8 17.8l2 2M19.8 4.2l-2 2M6.2 17.8l-2 2"/></g>',
     sunset: '<path d="M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><path d="M6.5 18a5.5 5.5 0 0 1 11 0z"/><g stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v3M4 9l2 1.6M20 9l-2 1.6"/></g>',
     night:  '<path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/>',
-    summer: '<circle cx="12" cy="12" r="4.5"/><g stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></g>',
+    summer: '<circle cx="12" cy="9" r="6.5"/><circle cx="7" cy="12" r="4"/><circle cx="17" cy="12" r="4"/><path d="M10.8 14h2.4v7h-2.4z"/>',
     fall:   '<path d="M12 21c0-5 1-8 5-11 1.6-1.2 2.4-3.4 2.4-6-3.6 0-6.4.9-8.4 2.6C8.4 8.6 7.4 11.6 7.4 15c0 .5 0 1 .1 1.5"/><path d="M12 21c-1.5-2.5-3-4-5.5-5" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/>',
     winter: '<g stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"><path d="M12 2v20M3.3 7l17.4 10M20.7 7L3.3 17"/><path d="M9 4.4L12 6l3-1.6M9 19.6L12 18l3 1.6M4.6 9.8l.6 3.3-2.4 2.3M19.4 14.2l-.6-3.3 2.4-2.3M4.6 14.2l.6-3.3-2.4-2.3M19.4 9.8l-.6 3.3 2.4 2.3"/></g>',
     spring: '<circle cx="12" cy="12" r="2.6"/><ellipse cx="12" cy="6.4" rx="2.6" ry="3.6"/><ellipse cx="12" cy="17.6" rx="2.6" ry="3.6"/><ellipse cx="6.4" cy="12" rx="3.6" ry="2.6"/><ellipse cx="17.6" cy="12" rx="3.6" ry="2.6"/>'
@@ -1014,7 +1014,11 @@ const EveryParkIso = (() => {
           : sides === 1 ? (edge[i] ? Math.max(0, slabY - Y)
                                    : (dropM[i] / span) * zScale + 1.6)
                         : (dropM[i] / span) * zScale + (edge[i] ? ribbon : 1.6);
-          ctx.fillStyle = wallFill;
+          // The island's OUTER walls stay the one uniform earth colour;
+          // interior micro-sides keep each block's own darkened face —
+          // that per-block shading is what makes blocks read as blocks.
+          ctx.fillStyle = edge[i] ? wallFill
+            : `rgb(${r * .55 | 0},${g * .55 | 0},${b * .55 | 0})`;
           ctx.fillRect(X - wallW / 2, Y, wallW,
                        drop + hgt + (isBuild ? 7 / span * zScale : 0));
         }
@@ -1168,9 +1172,11 @@ const EveryParkIso = (() => {
       <div id="isoPanel">
         <h3>${p.name}</h3>
         <div class="iso-sub">Loading boundary and terrain…</div>
-        <canvas width="840" height="540"></canvas>
-        <div class="iso-corner iso-corner-tl"><button id="isoTod" title="Time of day"></button></div>
-        <div class="iso-corner iso-corner-tr"><button id="isoSeason" title="Season"></button></div>
+        <div class="iso-stage">
+          <canvas width="840" height="540"></canvas>
+          <div class="iso-corner iso-corner-tl"><button id="isoTod" title="Time of day"></button></div>
+          <div class="iso-corner iso-corner-tr"><button id="isoSeason" title="Season"></button></div>
+        </div>
         <div class="iso-foot">
           <span class="iso-tools"></span>
           <button id="isoClose">Close</button>
@@ -1198,7 +1204,7 @@ const EveryParkIso = (() => {
     const tools = ov.querySelector(".iso-tools");
     const spin = document.createElement("div");
     spin.className = "iso-spin";
-    ov.querySelector("#isoPanel").insertBefore(spin, canvas);
+    canvas.parentElement.insertBefore(spin, canvas);
     canvas.style.display = "none";
     const close = () => { cancelAnimationFrame(raf); ov.remove(); };
     ov.querySelector("#isoClose").addEventListener("click", close);
@@ -1431,7 +1437,7 @@ const EveryParkIso = (() => {
     // Scroll to zoom, centred on the island.
     canvas.addEventListener("wheel", e => {
       e.preventDefault();
-      S.zoom = Math.min(3, Math.max(.5, S.zoom * (e.deltaY < 0 ? 1.1 : 0.9)));
+      S.zoom = Math.min(5, Math.max(.5, S.zoom * (e.deltaY < 0 ? 1.1 : 0.9)));
     }, { passive: false });
 
     const spinBtn = document.createElement("button");
@@ -1466,7 +1472,7 @@ const EveryParkIso = (() => {
       if (pointers.size >= 2) {
         const d = spread();
         if (pinchDist > 0 && d > 0)
-          S.zoom = Math.min(3, Math.max(.5, S.zoom * (d / pinchDist)));
+          S.zoom = Math.min(5, Math.max(.5, S.zoom * (d / pinchDist)));
         pinchDist = d;
       } else if (dragging) {
         target += (e.clientX - lastX) * .008; lastX = e.clientX;

@@ -2394,7 +2394,11 @@
     if (!use.length) return;
     const p = use[Math.floor(Math.random() * use.length)];
     map.flyTo([p.lat, p.lng], Math.max(map.getZoom(), 14), { duration: 0.9 });
-    setTimeout(() => openPlace(p), 1000);
+    setTimeout(() => {
+      openPlace(p);
+      // Straight into the terrain — the dice IS the 3D tour button.
+      if (window.EveryParkIso) EveryParkIso.open(p);
+    }, 1000);
   });
 
   // Filters dropdown: the access + owner chip groups live in one panel.

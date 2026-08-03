@@ -724,9 +724,10 @@ header { border-bottom: 2px solid var(--ep-brass); }
    ============================================================ */
 
 /* Corner controls inside the 3D viewer */
+.iso-stage { position: relative; width: fit-content; margin: 0 auto; }
 .iso-corner { position: absolute; z-index: 5; }
-.iso-corner-tl { top: 52px; left: 22px; }
-.iso-corner-tr { top: 52px; right: 22px; }
+.iso-corner-tl { top: 10px; left: 10px; }
+.iso-corner-tr { top: 10px; right: 10px; }
 .iso-corner button {
   width: 38px; height: 38px; display: grid; place-items: center;
   background: rgba(13,42,30,.72); color: var(--ep-paper);
@@ -768,8 +769,8 @@ header { border-bottom: 2px solid var(--ep-brass); }
   }
   #isoOverlay.iso-full .iso-tools { justify-content: center; }
   #isoOverlay.iso-full #isoClose { width: 100%; padding: 10px; }
-  .iso-corner-tl { top: 44px; left: 14px; }
-  .iso-corner-tr { top: 44px; right: 14px; }
+  #isoOverlay.iso-full .iso-stage { width: 100%; flex: 1 1 auto; min-height: 0; }
+  #isoOverlay.iso-full #isoPanel .iso-stage canvas { height: 100%; }
   .iso-slider input { width: 90px; }
 }
 
