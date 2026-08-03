@@ -1,72 +1,109 @@
 /* ============================================================
-   EVERYPARK — ISOMETRIC TERRAIN PROTOTYPE ("like a video game")
+   EVERYPARK — ISOMETRIC TERRAIN VIEW, v2
 
-   Opens from the ⛰ button on a place card. Fetches real elevation
-   for the place's surroundings from the public AWS Terrain Tiles
-   dataset (Mapzen terrarium encoding, no key needed), then draws a
-   rotatable isometric heightmap column-by-column on a canvas.
+   Opens from the ⛰ button on a place card. Now renders the park's
+   REAL boundary as a floating island — not a square sample:
 
-   Deliberately a PROTOTYPE:
-   - square area around the pin, sized from acreage (no boundary
-     clipping yet — that needs the polygon handed over from the
-     vector tiles, which is the obvious next step)
-   - colours are derived from elevation + the place's stored NLCD
-     cover ("mostly wooded" → greens), water level tinted blue
-   - if the elevation tiles can't load (offline, CORS), it degrades
-     to a procedural hill built from the place's stored elev/relief,
-     so the button never opens a broken panel
+   1. Boundary: fetched on demand by point-in-polygon query against
+      the same public services the pipeline uses (CT DEEP, the OSM
+      mirrors, PAD-US). Best candidate wins: name match first, then
+      the smallest polygon containing the pin. No boundary found →
+      falls back to an acreage-sized square, labelled as such.
+   2. Elevation: AWS Terrain Tiles (Mapzen terrarium), fetched for
+      the polygon's bbox; procedural fallback offline.
+   3. Dressing: trails (OSM + Blue-Blazed) rasterised onto the
+      terrain as tan paths, water polygons flattened and tinted,
+      and little sprite trees scattered to match the place's NLCD
+      cover ("mostly wooded" → dense pines).
 
-   This is the only part of the site that fetches from a live
-   service, and only when the button is pressed — the map itself
-   still loads nothing at runtime.
+   Everything is fetched only when the button is pressed; the map
+   itself still loads nothing at runtime.
    ============================================================ */
 
 const EveryParkIso = (() => {
   const TILE = z => `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${z}/`;
-  const GRID = 96;                    // heightmap resolution (cells per side)
+  const OSM6 = "https://services6.arcgis.com/Do88DoK2xjTUCXd1/ArcGIS/rest/services/";
+  const DEEP = "https://services1.arcgis.com/FjPcSmEFuDYlIdKC/arcgis/rest/services/";
+  const PADUS = "https://services.arcgis.com/v01gqwM5QqNysAAi/arcgis/rest/services/" +
+                "Manager_Name_PADUS/FeatureServer/0/query";
+  const GRID = 104;
 
   let raf = null;
 
-  function metersPerSide(p) {
-    // Square that comfortably contains the place: from acreage if we
-    // have it (side of the equivalent square, padded), else 900 m.
-    const acres = Number(p.acres) || 0;
-    const side = acres > 0 ? Math.sqrt(acres * 4046.86) * 1.7 : 900;
-    return Math.min(Math.max(side, 500), 6000);
+  const norm = s => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+  async function arc(url, params) {
+    const body = new URLSearchParams({ f: "json", ...params });
+    const r = await fetch(url, { method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" }, body });
+    const j = await r.json();
+    if (j.error) throw new Error(j.error.message || "service error");
+    return j.features || [];
   }
 
+  // ---- 1. The real boundary --------------------------------------
+  async function fetchBoundary(p) {
+    const pt = JSON.stringify({ x: p.lng, y: p.lat,
+                                spatialReference: { wkid: 4326 } });
+    const common = { geometry: pt, geometryType: "esriGeometryPoint",
+                     inSR: "4326", outSR: "4326",
+                     spatialRel: "esriSpatialRelIntersects",
+                     returnGeometry: "true", maxAllowableOffset: "0.00005" };
+    const sources = [
+      { url: DEEP + "Connecticut_DEEP_Property/FeatureServer/0/query",
+        field: "PROPERTY", label: "CT DEEP" },
+      { url: OSM6 + "OSM_NA_Leisure/FeatureServer/0/query",
+        field: "name", label: "OpenStreetMap" },
+      { url: OSM6 + "OSM_NA_Landuse/FeatureServer/0/query",
+        field: "name", label: "OpenStreetMap" },
+      { url: PADUS, field: "Unit_Nm", label: "USGS PAD-US" }
+    ];
+    const results = await Promise.allSettled(sources.map(s =>
+      arc(s.url, { ...common, outFields: s.field }).then(feats =>
+        feats.filter(f => f.geometry && f.geometry.rings)
+             .map(f => ({ rings: f.geometry.rings,
+                          name: f.attributes && f.attributes[s.field],
+                          label: s.label })))));
+    const cands = results.flatMap(r => r.status === "fulfilled" ? r.value : []);
+    if (!cands.length) return null;
+
+    const area = c => Math.abs(c.rings.reduce((s2, ring) => {
+      let a = 0;
+      for (let i = 0; i < ring.length - 1; i++)
+        a += ring[i][0] * ring[i + 1][1] - ring[i + 1][0] * ring[i][1];
+      return s2 + a / 2;
+    }, 0));
+    const wanted = new Set([norm(p.name), ...(p.aka || []).map(norm)]);
+    const named = cands.filter(c => wanted.has(norm(c.name)));
+    const pool = named.length ? named : cands;
+    // Named: biggest wins (a preserve is many parcels; show the property).
+    // Unnamed fallback: smallest containing polygon is the most specific.
+    pool.sort((a, b) => named.length ? area(b) - area(a) : area(a) - area(b));
+    return pool[0];
+  }
+
+  // ---- 2. Elevation ----------------------------------------------
   function tileXY(lat, lng, z) {
     const n = 2 ** z;
-    const x = (lng + 180) / 360 * n;
     const latR = lat * Math.PI / 180;
-    const y = (1 - Math.log(Math.tan(latR) + 1 / Math.cos(latR)) / Math.PI) / 2 * n;
-    return { x, y };
+    return { x: (lng + 180) / 360 * n,
+             y: (1 - Math.log(Math.tan(latR) + 1 / Math.cos(latR)) / Math.PI) / 2 * n };
   }
+  const loadImage = url => new Promise((res, rej) => {
+    const im = new Image();
+    im.crossOrigin = "anonymous";
+    im.onload = () => res(im); im.onerror = rej; im.src = url;
+  });
 
-  function loadImage(url) {
-    return new Promise((res, rej) => {
-      const im = new Image();
-      im.crossOrigin = "anonymous";
-      im.onload = () => res(im);
-      im.onerror = rej;
-      im.src = url;
-    });
-  }
-
-  // Sample a GRID×GRID heightmap around the pin from terrarium tiles.
-  async function fetchHeights(p, sideM) {
-    // Pick a zoom where the area spans a sensible number of pixels.
-    const z = sideM > 3000 ? 12 : sideM > 1200 ? 13 : 14;
-    const mPerDeg = 111320 * Math.cos(p.lat * Math.PI / 180);
-    const dLng = sideM / mPerDeg / 2, dLat = sideM / 111320 / 2;
-    const tl = tileXY(p.lat + dLat, p.lng - dLng, z);
-    const br = tileXY(p.lat - dLat, p.lng + dLng, z);
-
+  async function fetchHeights(bbox) {
+    const [w, s, e, n] = bbox;
+    const spanM = Math.max((e - w) * 111320 * Math.cos(s * Math.PI / 180),
+                           (n - s) * 111320);
+    const z = spanM > 3000 ? 12 : spanM > 1200 ? 13 : 14;
+    const tl = tileXY(n, w, z), br = tileXY(s, e, z);
     const x0 = Math.floor(tl.x), y0 = Math.floor(tl.y);
-    const x1 = Math.floor(br.x), y1 = Math.floor(br.y);
-    const cols = x1 - x0 + 1, rows = y1 - y0 + 1;
-    if (cols * rows > 9) throw new Error("area spans too many tiles");
-
+    const cols = Math.floor(br.x) - x0 + 1, rows = Math.floor(br.y) - y0 + 1;
+    if (cols * rows > 12) throw new Error("area too large");
     const cv = document.createElement("canvas");
     cv.width = cols * 256; cv.height = rows * 256;
     const cx = cv.getContext("2d", { willReadFrequently: true });
@@ -75,25 +112,21 @@ const EveryParkIso = (() => {
       return loadImage(`${TILE(z)}${tx}/${ty}.png`)
         .then(im => cx.drawImage(im, (tx - x0) * 256, (ty - y0) * 256));
     }));
-
     const px = cx.getImageData(0, 0, cv.width, cv.height).data;
     const H = new Float32Array(GRID * GRID);
-    for (let gy = 0; gy < GRID; gy++) {
+    for (let gy = 0; gy < GRID; gy++)
       for (let gx = 0; gx < GRID; gx++) {
-        const fx = (tl.x - x0 + (br.x - tl.x) * gx / (GRID - 1)) * 256;
-        const fy = (tl.y - y0 + (br.y - tl.y) * gy / (GRID - 1)) * 256;
-        const ix = Math.min(cv.width - 1, Math.max(0, Math.round(fx)));
-        const iy = Math.min(cv.height - 1, Math.max(0, Math.round(fy)));
+        const lng = w + (e - w) * gx / (GRID - 1);
+        const lat = n - (n - s) * gy / (GRID - 1);
+        const t = tileXY(lat, lng, z);
+        const ix = Math.min(cv.width - 1, Math.max(0, Math.round((t.x - x0) * 256)));
+        const iy = Math.min(cv.height - 1, Math.max(0, Math.round((t.y - y0) * 256)));
         const k = (iy * cv.width + ix) * 4;
-        // terrarium: elevation = (R*256 + G + B/256) - 32768
         H[gy * GRID + gx] = px[k] * 256 + px[k + 1] + px[k + 2] / 256 - 32768;
       }
-    }
     return H;
   }
 
-  // Fallback: a plausible hill from the stored elev/relief, so the
-  // prototype still shows something with no network.
   function proceduralHeights(p) {
     const A = p.attrs || {};
     const base = A.elev != null ? A.elev : 120;
@@ -109,73 +142,191 @@ const EveryParkIso = (() => {
     return H;
   }
 
-  function coverPalette(p) {
-    const c = ((p.attrs || {}).cover || "").toLowerCase();
-    if (c.includes("wood")) return { lo: [46, 92, 60], hi: [140, 185, 120] };
-    if (c.includes("open")) return { lo: [126, 138, 74], hi: [214, 205, 130] };
-    if (c.includes("wet") || c.includes("water")) return { lo: [58, 96, 92], hi: [150, 190, 170] };
-    return { lo: [70, 105, 72], hi: [175, 195, 140] };
+  // ---- 3. Rasterise helpers --------------------------------------
+  // Even-odd point-in-rings test — handles holes for free.
+  function insideRings(rings, x, y) {
+    let inside = false;
+    for (const ring of rings)
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+        if ((yi > y) !== (yj > y) &&
+            x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
+      }
+    return inside;
   }
 
-  function draw(canvas, H, p, yaw) {
+  function maskFromRings(rings, bbox) {
+    const [w, s, e, n] = bbox;
+    const M = new Uint8Array(GRID * GRID);
+    for (let gy = 0; gy < GRID; gy++)
+      for (let gx = 0; gx < GRID; gx++) {
+        const lng = w + (e - w) * gx / (GRID - 1);
+        const lat = n - (n - s) * gy / (GRID - 1);
+        if (insideRings(rings, lng, lat)) M[gy * GRID + gx] = 1;
+      }
+    return M;
+  }
+
+  function cellOf(bbox, lng, lat) {
+    const [w, s, e, n] = bbox;
+    return [Math.round((lng - w) / (e - w) * (GRID - 1)),
+            Math.round((n - lat) / (n - s) * (GRID - 1))];
+  }
+
+  function rasterisePaths(features, bbox, M) {
+    for (const f of features) {
+      const paths = (f.geometry && f.geometry.paths) || [];
+      for (const path of paths)
+        for (let i = 0; i < path.length - 1; i++) {
+          const [x1, y1] = cellOf(bbox, path[i][0], path[i][1]);
+          const [x2, y2] = cellOf(bbox, path[i + 1][0], path[i + 1][1]);
+          const steps = Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1), 1);
+          for (let t = 0; t <= steps; t++) {
+            const gx = Math.round(x1 + (x2 - x1) * t / steps);
+            const gy = Math.round(y1 + (y2 - y1) * t / steps);
+            if (gx >= 0 && gx < GRID && gy >= 0 && gy < GRID)
+              M[gy * GRID + gx] = 1;
+          }
+        }
+    }
+  }
+
+  async function fetchDressing(bbox) {
+    const [w, s, e, n] = bbox;
+    const env = JSON.stringify({ xmin: w, ymin: s, xmax: e, ymax: n,
+                                 spatialReference: { wkid: 4326 } });
+    const common = { geometry: env, geometryType: "esriGeometryEnvelope",
+                     inSR: "4326", outSR: "4326", outFields: "",
+                     returnGeometry: "true", maxAllowableOffset: "0.00008",
+                     resultRecordCount: "400" };
+    const [trails, blue, water] = await Promise.allSettled([
+      arc(OSM6 + "OSM_NA_Trails/FeatureServer/0/query",
+          { ...common, where: "highway IN ('path','track','bridleway')" }),
+      arc(DEEP + "BlueBlazedHikingTrails/FeatureServer/0/query",
+          { ...common, where: "1=1" }),
+      arc(OSM6 + "OSM_NA_Water/FeatureServer/0/query", { ...common, where: "1=1" })
+    ]);
+    const trailM = new Uint8Array(GRID * GRID);
+    for (const r of [trails, blue])
+      if (r.status === "fulfilled") rasterisePaths(r.value, bbox, trailM);
+    const waterM = new Uint8Array(GRID * GRID);
+    if (water.status === "fulfilled")
+      for (const f of water.value)
+        if (f.geometry && f.geometry.rings) {
+          const m2 = maskFromRings(f.geometry.rings, bbox);
+          for (let i = 0; i < waterM.length; i++) if (m2[i]) waterM[i] = 1;
+        }
+    return { trailM, waterM };
+  }
+
+  // ---- 4. Drawing ------------------------------------------------
+  function coverPalette(p) {
+    const c = ((p.attrs || {}).cover || "").toLowerCase();
+    if (c.includes("wood")) return { lo: [52, 96, 62], hi: [140, 182, 118] };
+    if (c.includes("open")) return { lo: [128, 138, 76], hi: [212, 203, 130] };
+    return { lo: [76, 108, 74], hi: [178, 195, 140] };
+  }
+  function treeDensity(p) {
+    const c = ((p.attrs || {}).cover || "").toLowerCase();
+    if (c.includes("wood")) return 0.16;
+    if (c.includes("mixed")) return 0.09;
+    if (c.includes("open")) return 0.03;
+    return 0.07;
+  }
+  const hash = (gx, gy) => {
+    let h = (gx * 73856093) ^ (gy * 19349663);
+    h = (h ^ (h >> 13)) * 1274126177;
+    return ((h ^ (h >> 16)) >>> 0) / 4294967295;
+  };
+
+  function draw(canvas, S, yaw) {
+    const { H, inside, trailM, waterM, p } = S;
     const ctx = canvas.getContext("2d");
     const W = canvas.width, Hh = canvas.height;
     ctx.clearRect(0, 0, W, Hh);
 
     let min = Infinity, max = -Infinity;
-    for (const h of H) { if (h < min) min = h; if (h > max) max = h; }
+    for (let i = 0; i < H.length; i++)
+      if (inside[i]) { if (H[i] < min) min = H[i]; if (H[i] > max) max = H[i]; }
+    if (min === Infinity) { min = 0; max = 1; }
     const span = Math.max(max - min, 8);
     const pal = coverPalette(p);
-    const A = p.attrs || {};
-    const water = (A.water && A.waterType !== "river") ? min + span * .06 : -Infinity;
+    const density = treeDensity(p);
+    let waterLevel = Infinity;
+    for (let i = 0; i < H.length; i++)
+      if (inside[i] && waterM[i] && H[i] < waterLevel) waterLevel = H[i];
 
-    const s = W / (GRID * 1.9);               // iso cell size
+    const s = W / (GRID * 1.9);
     const zScale = Math.min(60, 9000 / span) * (span / 90);
-    const cx = W / 2, cy = Hh * 0.62;
+    const cx = W / 2, cy = Hh * 0.60;
     const cos = Math.cos(yaw), sin = Math.sin(yaw);
 
-    // Painter's algorithm: sort cells by projected depth each frame.
     const order = [];
     for (let gy = 0; gy < GRID; gy++)
       for (let gx = 0; gx < GRID; gx++) {
+        if (!inside[gy * GRID + gx]) continue;
         const rx = (gx - GRID / 2) * cos - (gy - GRID / 2) * sin;
         const ry = (gx - GRID / 2) * sin + (gy - GRID / 2) * cos;
         order.push([ry, rx, gx, gy]);
       }
     order.sort((a, b) => a[0] - b[0]);
 
+    const w = s * 1.62, hgt = s * .92;
     for (const [ry, rx, gx, gy] of order) {
-      const h = H[gy * GRID + gx];
+      const i = gy * GRID + gx;
+      let h = H[i];
+      const isWater = waterM[i] && (h <= waterLevel + 4);
+      if (isWater) h = waterLevel;
       const t = (h - min) / span;
       const X = cx + rx * s * 1.55;
-      const Y = cy + ry * s * .8 - (h - min) / span * zScale;
+      const Y = cy + ry * s * .8 - t * zScale;
 
       let r, g, b;
-      if (h <= water) { r = 62; g = 118; b = 168; }
-      else {
+      if (isWater) {
+        const rip = Math.sin(gx * 1.3 + gy * 2.1) * 6;
+        r = 56 + rip; g = 116 + rip; b = 172;
+      } else if (trailM[i]) {
+        r = 196; g = 168; b = 122;                    // worn-path tan
+      } else {
         r = pal.lo[0] + (pal.hi[0] - pal.lo[0]) * t;
         g = pal.lo[1] + (pal.hi[1] - pal.lo[1]) * t;
         b = pal.lo[2] + (pal.hi[2] - pal.lo[2]) * t;
-        // cheap hillshade: compare with the neighbour to the "light" side
-        const n = H[gy * GRID + Math.max(0, gx - 1)];
-        const sh = Math.max(-14, Math.min(18, (h - n) * 1.6));
+        const nb = H[gy * GRID + Math.max(0, gx - 1)];
+        const sh = Math.max(-14, Math.min(18, (h - nb) * 1.6));
         r += sh; g += sh; b += sh;
       }
       ctx.fillStyle = `rgb(${r | 0},${g | 0},${b | 0})`;
-      const w = s * 1.62, hgt = s * .92;
       ctx.fillRect(X - w / 2, Y - hgt / 2, w + .7, hgt + .7);
+
+      // A sprite tree, drawn straight after its own cell so nearer rows
+      // paint over it correctly. Density follows the NLCD cover.
+      if (!isWater && !trailM[i] && hash(gx, gy) < density) {
+        const jx = (hash(gx + 7, gy) - .5) * w * .6;
+        const th = s * (1.5 + hash(gx, gy + 3));      // tree height varies
+        const half = s * .55;
+        const shade = 24 * hash(gx + 1, gy + 1);
+        ctx.fillStyle = `rgb(${58 + shade | 0},${44 + shade * .6 | 0},30)`;
+        ctx.fillRect(X + jx - s * .08, Y - th * .35, s * .16, th * .4);
+        ctx.fillStyle = `rgb(${30 + shade | 0},${96 + shade | 0},${46 + shade * .8 | 0})`;
+        ctx.beginPath();
+        ctx.moveTo(X + jx, Y - th);
+        ctx.lineTo(X + jx - half, Y - th * .3);
+        ctx.lineTo(X + jx + half, Y - th * .3);
+        ctx.closePath(); ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(X + jx, Y - th * 1.35);
+        ctx.lineTo(X + jx - half * .72, Y - th * .72);
+        ctx.lineTo(X + jx + half * .72, Y - th * .72);
+        ctx.closePath(); ctx.fill();
+      }
     }
 
-    // Pin marker at centre.
-    ctx.fillStyle = "#ff5b4d";
-    ctx.beginPath();
-    ctx.arc(cx, cy - (H[(GRID / 2 | 0) * GRID + (GRID / 2 | 0)] - min) / span * zScale - 8, 4.5, 0, 7);
-    ctx.fill();
     ctx.fillStyle = "rgba(255,255,255,.75)";
     ctx.font = "11px system-ui";
     ctx.fillText(`${Math.round(min)}–${Math.round(max)} m`, 10, Hh - 10);
   }
 
+  // ---- 5. Open ----------------------------------------------------
   async function open(p) {
     if (document.getElementById("isoOverlay")) return;
     const ov = document.createElement("div");
@@ -183,35 +334,68 @@ const EveryParkIso = (() => {
     ov.innerHTML = `
       <div id="isoPanel">
         <h3>${p.name}</h3>
-        <div class="iso-sub">Isometric terrain prototype · drag to rotate ·
-          real USGS/AWS elevation${p.acres ? ` · ~${Number(p.acres).toLocaleString()} acres` : ""}</div>
-        <canvas width="820" height="520"></canvas>
+        <div class="iso-sub">Loading boundary and terrain…</div>
+        <canvas width="840" height="540"></canvas>
         <div class="iso-foot">
-          <span>Elevation: AWS Terrain Tiles (Mapzen terrarium) · fetched on demand</span>
+          <span>Elevation: AWS Terrain Tiles · boundary &amp; features fetched on demand</span>
           <button id="isoClose">Close</button>
         </div>
       </div>`;
     document.body.appendChild(ov);
     const canvas = ov.querySelector("canvas");
+    const sub = ov.querySelector(".iso-sub");
     const close = () => { cancelAnimationFrame(raf); ov.remove(); };
     ov.querySelector("#isoClose").addEventListener("click", close);
     ov.addEventListener("click", e => { if (e.target === ov) close(); });
 
-    const side = metersPerSide(p);
-    let H;
-    try { H = await fetchHeights(p, side); }
-    catch (e) { console.warn("terrain tiles unavailable, procedural fallback:", e); H = proceduralHeights(p); }
+    // Boundary → bbox → heights + dressing, all best-effort.
+    let boundary = null;
+    try { boundary = await fetchBoundary(p); } catch (e) { /* fall through */ }
+    let bbox, inside;
+    if (boundary) {
+      let w = 180, s2 = 90, e2 = -180, n2 = -90;
+      for (const ring of boundary.rings)
+        for (const [x, y] of ring) {
+          if (x < w) w = x; if (x > e2) e2 = x;
+          if (y < s2) s2 = y; if (y > n2) n2 = y;
+        }
+      const padX = (e2 - w) * .08 + 1e-4, padY = (n2 - s2) * .08 + 1e-4;
+      bbox = [w - padX, s2 - padY, e2 + padX, n2 + padY];
+      inside = maskFromRings(boundary.rings, bbox);
+    } else {
+      const acres = Number(p.acres) || 60;
+      const sideM = Math.min(Math.max(Math.sqrt(acres * 4046.86) * 1.6, 500), 6000);
+      const mPerDeg = 111320 * Math.cos(p.lat * Math.PI / 180);
+      const dLng = sideM / mPerDeg / 2, dLat = sideM / 111320 / 2;
+      bbox = [p.lng - dLng, p.lat - dLat, p.lng + dLng, p.lat + dLat];
+      inside = new Uint8Array(GRID * GRID).fill(1);
+    }
 
-    let yaw = 0.0, target = 0.0, dragging = false, lastX = 0;
+    let H;
+    try { H = await fetchHeights(bbox); }
+    catch (e) { H = proceduralHeights(p); }
+    let dressing = { trailM: new Uint8Array(GRID * GRID),
+                     waterM: new Uint8Array(GRID * GRID) };
+    try { dressing = await fetchDressing(bbox); } catch (e) { /* optional */ }
+
+    const nTrail = dressing.trailM.reduce((a, b) => a + b, 0);
+    const nWater = dressing.waterM.reduce((a, b) => a + b, 0);
+    sub.textContent = [
+      boundary ? `boundary: ${boundary.label}` : "no boundary found — square sample",
+      nTrail ? "trails" : null, nWater ? "water" : null,
+      ((p.attrs || {}).cover || null), "drag to rotate"
+    ].filter(Boolean).join(" · ");
+
+    const S = { H, inside, ...dressing, p };
+    let yaw = 0, target = 0, dragging = false, lastX = 0;
     canvas.addEventListener("pointerdown", e => { dragging = true; lastX = e.clientX; canvas.setPointerCapture(e.pointerId); });
     canvas.addEventListener("pointermove", e => { if (dragging) { target += (e.clientX - lastX) * .008; lastX = e.clientX; } });
     canvas.addEventListener("pointerup", () => dragging = false);
-
     const loop = () => {
       if (!document.getElementById("isoOverlay")) return;
-      if (!dragging) target += 0.0012;         // slow idle spin
+      if (!dragging) target += 0.0012;
       yaw += (target - yaw) * .15;
-      draw(canvas, H, p, yaw);
+      draw(canvas, S, yaw);
       raf = requestAnimationFrame(loop);
     };
     loop();

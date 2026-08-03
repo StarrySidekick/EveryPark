@@ -9,7 +9,7 @@
   --panel: #ffffff;
   --text: #1c2321;
   --muted: #66716c;
-  --radius: 12px;
+  --radius: 3px;
   --shadow: 0 2px 14px rgba(0,0,0,.12);
 }
 
@@ -52,7 +52,7 @@ header .tagline { font-size: .78rem; opacity: .85; display: block; font-weight: 
 
 #search {
   border: none;
-  border-radius: 20px;
+  border-radius: 3px;
   padding: 8px 16px;
   font-size: .9rem;
   width: 230px;
@@ -65,7 +65,7 @@ header .tagline { font-size: .78rem; opacity: .85; display: block; font-weight: 
   border: 2px solid rgba(255,255,255,.55);
   background: transparent;
   color: #fff;
-  border-radius: 20px;
+  border-radius: 3px;
   padding: 5px 12px;
   font-size: .8rem;
   font-weight: 600;
@@ -99,7 +99,7 @@ header .tagline { font-size: .78rem; opacity: .85; display: block; font-weight: 
 
 #layersBtn {
   background: rgba(255,255,255,.15);
-  border: none; color: #fff; border-radius: 20px;
+  border: none; color: #fff; border-radius: 3px;
   padding: 6px 14px; font-size: .8rem; font-weight: 600; cursor: pointer;
   align-self: flex-end;
 }
@@ -109,7 +109,7 @@ header .tagline { font-size: .78rem; opacity: .85; display: block; font-weight: 
   position: absolute;
   top: 100%; right: 14px;
   background: #fff;
-  border-radius: 12px;
+  border-radius: 3px;
   box-shadow: 0 6px 22px rgba(0,0,0,.28);
   padding: 12px;
   z-index: 1400;
@@ -123,7 +123,7 @@ header .tagline { font-size: .78rem; opacity: .85; display: block; font-weight: 
 #layersPanel .lp-note { font-size: .66rem; color: var(--muted); margin-top: 2px; }
 
 /* ---------- Popup blocks ---------- */
-.pblock { border-radius: 7px; padding: 6px 9px; margin-bottom: 7px; }
+.pblock { border-radius: 3px; padding: 6px 9px; margin-bottom: 7px; }
 .pblock .pb-head { font-weight: 700; font-size: .78rem; }
 .pblock .pb-body { font-size: .71rem; margin-top: 2px; line-height: 1.4; }
 .pblock.acc-open       { background: #e8f4ec; color: #1d6b3f; }
@@ -139,7 +139,7 @@ header .tagline { font-size: .78rem; opacity: .85; display: block; font-weight: 
 .popup-tags .tag {
   font-size: .72rem;
   background: #eef4ef;
-  border-radius: 10px;
+  border-radius: 3px;
   padding: 2px 8px;
   color: #33463c;
 }
@@ -148,7 +148,7 @@ header .tagline { font-size: .78rem; opacity: .85; display: block; font-weight: 
 .popup-access {
   font-size: .74rem;
   font-weight: 600;
-  border-radius: 6px;
+  border-radius: 3px;
   padding: 4px 8px;
   margin-bottom: 8px;
 }
@@ -159,7 +159,7 @@ header .tagline { font-size: .78rem; opacity: .85; display: block; font-weight: 
   background: rgba(255,255,255,.15);
   border: none;
   color: #fff;
-  border-radius: 20px;
+  border-radius: 3px;
   padding: 6px 14px;
   font-size: .8rem;
   font-weight: 600;
@@ -213,7 +213,7 @@ main { flex: 1; display: flex; position: relative; min-height: 0; }
   font-size: .68rem;
   font-weight: 700;
   padding: 2px 8px;
-  border-radius: 10px;
+  border-radius: 3px;
   color: #fff;
   text-transform: uppercase;
   letter-spacing: .4px;
@@ -234,7 +234,7 @@ main { flex: 1; display: flex; position: relative; min-height: 0; }
   text-decoration: none;
   color: var(--accent);
   border: 1px solid var(--accent);
-  border-radius: 14px;
+  border-radius: 3px;
   padding: 3px 10px;
 }
 .popup-links a:hover { background: var(--accent); color: #fff; }
@@ -262,7 +262,7 @@ main { flex: 1; display: flex; position: relative; min-height: 0; }
   background: rgba(20,30,26,.88);
   color: #fff;
   padding: 8px 18px;
-  border-radius: 20px;
+  border-radius: 3px;
   font-size: .8rem;
   z-index: 1300;
   display: none;
@@ -279,7 +279,7 @@ main { flex: 1; display: flex; position: relative; min-height: 0; }
   background: rgba(20,30,26,.9);
   color: #fff;
   padding: 6px 15px;
-  border-radius: 18px;
+  border-radius: 3px;
   font-size: .82rem;
   font-weight: 600;
   pointer-events: none;
@@ -299,7 +299,7 @@ main { flex: 1; display: flex; position: relative; min-height: 0; }
   left: 12px;
   z-index: 1000;
   background: rgba(255,255,255,.94);
-  border-radius: 10px;
+  border-radius: 3px;
   padding: 10px 12px;
   box-shadow: 0 2px 10px rgba(0,0,0,.25);
   font-size: .72rem;
@@ -314,7 +314,7 @@ main { flex: 1; display: flex; position: relative; min-height: 0; }
 }
 .legend-row .sw.fill-open { background: rgba(67,160,71,.55); border: 1.5px solid #43a047; }
 .legend-row .sw.fill-perm { background: rgba(67,160,71,.22); border: 1.5px dashed #43a047; }
-.legend-row .sw.ring { background: rgba(67,160,71,.28); border: 2.5px solid; border-radius: 4px; }
+.legend-row .sw.ring { background: rgba(67,160,71,.28); border: 2.5px solid; border-radius: 2px; }
 .legend-note { margin-top: 6px; color: var(--muted); font-size: .66rem; }
 #legend.collapsed .legend-row, #legend.collapsed .legend-note,
 #legend.collapsed .legend-padus { display: none; }
@@ -357,7 +357,7 @@ main { flex: 1; display: flex; position: relative; min-height: 0; }
 /* ---------- Guide panel ---------- */
 #guideBtn {
   background: rgba(255,255,255,.15);
-  border: none; color: #fff; border-radius: 20px;
+  border: none; color: #fff; border-radius: 3px;
   padding: 6px 14px; font-size: .8rem; font-weight: 600; cursor: pointer;
   align-self: flex-end;
 }
@@ -372,7 +372,7 @@ main { flex: 1; display: flex; position: relative; min-height: 0; }
 #guideOverlay[hidden] { display: none; }
 
 #guide {
-  background: #fff; border-radius: 16px;
+  background: #fff; border-radius: 3px;
   max-width: 720px; width: 100%; max-height: 86vh;
   overflow-y: auto; padding: 30px 34px 34px;
   box-shadow: 0 18px 60px rgba(0,0,0,.4);
@@ -386,7 +386,7 @@ main { flex: 1; display: flex; position: relative; min-height: 0; }
 #guideClose {
   position: absolute; top: 14px; right: 16px;
   background: none; border: none; font-size: 1.7rem; line-height: 1;
-  color: var(--muted); cursor: pointer; padding: 2px 8px; border-radius: 8px;
+  color: var(--muted); cursor: pointer; padding: 2px 8px; border-radius: 3px;
 }
 #guideClose:hover { background: #eef1ef; color: var(--text); }
 
@@ -394,13 +394,13 @@ main { flex: 1; display: flex; position: relative; min-height: 0; }
   border-top: 1px solid #eceeed;
   padding: 16px 0 4px;
   transition: background .3s;
-  border-radius: 8px;
+  border-radius: 3px;
 }
 .g-cat h3 { font-size: 1rem; display: flex; align-items: center; gap: 9px; margin-bottom: 6px; }
 .g-cat p { font-size: .88rem; margin-bottom: 7px; }
 .g-cat .g-why, .g-cat .g-acc { font-size: .84rem; color: #4b5651; }
 .g-sw {
-  width: 15px; height: 15px; border-radius: 4px;
+  width: 15px; height: 15px; border-radius: 2px;
   border: 3px solid; background: rgba(67,160,71,.28);
   flex-shrink: 0; display: inline-block;
 }
@@ -443,7 +443,7 @@ a.badge:hover { filter: brightness(1.15); text-decoration: underline; }
 .pfacts tr + tr th, .pfacts tr + tr td { border-top: 1px solid #f0f2f0; }
 
 .pnote { font-size: .74rem; color: #8a5a1b; background: #fdf1e3;
-         border-radius: 6px; padding: 6px 9px; margin: 6px 0 2px; }
+         border-radius: 3px; padding: 6px 9px; margin: 6px 0 2px; }
 
 /* Status block is now a single line, so tighten it */
 .pblock .pb-head { font-size: .82rem; }
@@ -453,22 +453,20 @@ a.badge:hover { filter: brightness(1.15); text-decoration: underline; }
 
 /* Research provenance — this fact was confirmed by a person, not inferred */
 .pchecked { font-size: .7rem; color: #1d6b3f; background: #e8f4ec;
-            border-radius: 6px; padding: 4px 8px; margin-top: 6px; }
+            border-radius: 3px; padding: 4px 8px; margin-top: 6px; }
 
 /* Build badge — visible proof of which code and data are loaded. */
 /* Pinned to the actual top-right corner of the header. Sitting inline
    with the filter chips, it read as one more control and was invisible
    as a status indicator — which defeated the point of having it. */
 #buildBadge {
-  position: absolute;
-  top: 8px;
-  right: 12px;
-  z-index: 30;
+  /* In flow with the header controls since the 2026-08-03 rework —
+     absolutely pinning it overlapped the Filters button. */
   font: 600 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
   color: rgba(255,255,255,.82);
   background: rgba(0,0,0,.22);
   border: 1px solid rgba(255,255,255,.22);
-  border-radius: 999px;
+  border-radius: 3px;
   padding: 4px 9px;
   white-space: nowrap;
 }
@@ -492,7 +490,7 @@ header { position: relative; }
 .fchips { display: flex; flex-wrap: wrap; gap: 5px; margin: 8px 0 4px; }
 .fchip {
   display: inline-flex; align-items: center; gap: 5px;
-  background: #f2f6f3; border: 1px solid #dfe7e1; border-radius: 999px;
+  background: #f2f6f3; border: 1px solid #dfe7e1; border-radius: 3px;
   padding: 3px 10px 3px 6px; font-size: .74rem; font-weight: 600;
   color: #2c3a32; line-height: 1.3; white-space: nowrap;
   animation: ep-chip .3s ease-out both;
@@ -514,7 +512,7 @@ header { position: relative; }
 /* 3D terrain button — sits beside Directions. */
 .popup-links { display: flex; gap: 7px; align-items: center; }
 .iso-btn {
-  display: inline-block; padding: 5px 10px; border-radius: 7px;
+  display: inline-block; padding: 5px 10px; border-radius: 3px;
   background: #2c3e50; color: #fff !important; font-size: .76rem;
   font-weight: 700; text-decoration: none;
 }
@@ -528,17 +526,37 @@ header { position: relative; }
   animation: ep-pop .2s ease-out both;
 }
 #isoPanel {
-  background: #101815; border-radius: 14px; padding: 14px 16px 12px;
+  background: #101815; border-radius: 3px; padding: 14px 16px 12px;
   box-shadow: 0 18px 60px rgba(0,0,0,.5); color: #dfe9e2;
   max-width: min(94vw, 860px);
 }
 #isoPanel h3 { margin: 0 0 2px; font-size: 1rem; color: #fff; }
 #isoPanel .iso-sub { font-size: .74rem; color: #93a89b; margin-bottom: 8px; }
-#isoPanel canvas { display: block; border-radius: 9px; background: #0b0f0d;
+#isoPanel canvas { display: block; border-radius: 3px; background: #0b0f0d;
                    cursor: grab; max-width: 100%; }
 #isoPanel canvas:active { cursor: grabbing; }
 #isoPanel .iso-foot { display: flex; justify-content: space-between;
   align-items: center; margin-top: 8px; font-size: .72rem; color: #7d9186; }
-#isoClose { background: #26332c; border: 0; color: #fff; border-radius: 7px;
+#isoClose { background: #26332c; border: 0; color: #fff; border-radius: 3px;
             padding: 6px 12px; font-weight: 700; cursor: pointer; }
 #isoClose:hover { background: #33443b; }
+
+
+/* ---------- Filters dropdown (2026-08-03 header rework) ---------- */
+header > #search { width: 250px; }
+header h1 { margin-right: 4px; }
+.filters-wrap { position: relative; }
+#filtersBtn {
+  background: rgba(255,255,255,.15);
+  border: none; color: #fff; border-radius: 3px;
+  padding: 7px 14px; font-size: .82rem; font-weight: 600; cursor: pointer;
+}
+#filtersBtn:hover, #filtersBtn.active { background: rgba(255,255,255,.3); }
+#filtersPanel {
+  position: absolute; top: calc(100% + 8px); left: 0;
+  background: var(--accent); border: 1px solid rgba(255,255,255,.25);
+  border-radius: 3px; box-shadow: var(--shadow);
+  padding: 12px 14px; display: flex; flex-direction: column; gap: 12px;
+  z-index: 1300; min-width: 320px;
+}
+#filtersPanel .chips { flex-wrap: wrap; }

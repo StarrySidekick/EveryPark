@@ -7,8 +7,8 @@
 const CONFIG = {
 
   // Site title shown in the header and browser tab
-  siteTitle: "Connecticut Parks Explorer",
-  tagline: "Every state, national & town park in one map",
+  siteTitle: "Every Park",
+  tagline: "",
 
   // ---- THE VISUAL SYSTEM ---------------------------------------------
   // Three things encoded at once, so the map answers all three questions
@@ -90,6 +90,7 @@ const CONFIG = {
       label: "Satellite",
       url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
       attribution: "Imagery &copy; Esri, Maxar, Earthstar Geographics",
+      roadsUrl: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}",
       labelsUrl: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
     },
     {
@@ -170,7 +171,7 @@ const CONFIG = {
   // Shown in the top-right corner. Bumped by hand on every code change,
   // so there's visible proof of which build is actually loaded rather
   // than guessing whether a cached copy is being served.
-  siteVersion: "v0.12.0",
+  siteVersion: "v0.13.0",
 
   // ---- VECTOR TILES --------------------------------------------------
   // Every boundary and trail, pre-cut into map tiles and packed into one

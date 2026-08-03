@@ -9,7 +9,8 @@
   // ------------------------------------------------------------------
   document.title = CONFIG.siteTitle;
   document.getElementById("siteTitle").textContent = CONFIG.siteTitle;
-  document.getElementById("tagline").textContent = CONFIG.tagline;
+  const tagEl = document.getElementById("tagline");
+  if (tagEl) tagEl.textContent = CONFIG.tagline || "";
 
   // Build badge. Shows the code version and the dataset date together,
   // because "did my change actually ship?" and "is this a cached copy?"
@@ -34,6 +35,8 @@
   const baseLayers = {};
   CONFIG.basemaps.forEach((b, i) => {
     const parts = [L.tileLayer(b.url, { attribution: b.attribution, maxZoom: 19 })];
+    // Roads drawn over imagery: how you'd actually get there, at a glance.
+    if (b.roadsUrl) parts.push(L.tileLayer(b.roadsUrl, { maxZoom: 19 }));
     if (b.labelsUrl) parts.push(L.tileLayer(b.labelsUrl, { maxZoom: 19 }));
     baseLayers[b.label] = L.layerGroup(parts);
     if (i === 0) baseLayers[b.label].addTo(map);
@@ -1467,7 +1470,7 @@
       padusProbe = probePadus().then(b => {
         if (b) {
           padusBase = b;
-          document.getElementById("padusToggle").removeAttribute("disabled");
+          { const pt = document.getElementById("padusToggle"); if (pt) pt.removeAttribute("disabled"); }
         } else {
           console.info("PAD-US unavailable — boundaries will be skipped.");
         }
@@ -1506,7 +1509,7 @@
       if (!areas.length) { hideStatus(); return; }
       // Ratings came from somewhere, so the layer toggle is worth
       // offering; turning it on is what triggers the endpoint probe.
-      document.getElementById("padusToggle").removeAttribute("disabled");
+      { const pt = document.getElementById("padusToggle"); if (pt) pt.removeAttribute("disabled"); }
 
       const grid = makeGrid(0.01);
       for (const a of areas) grid.add(a.lat, a.lng, a);
@@ -2300,11 +2303,28 @@
     layersPanel.hidden = !layersPanel.hidden;
     e.currentTarget.classList.toggle("active", !layersPanel.hidden);
   });
+
+  // Filters dropdown: the access + owner chip groups live in one panel.
+  const filtersPanel = document.getElementById("filtersPanel");
+  const filtersBtn = document.getElementById("filtersBtn");
+  if (filtersBtn && filtersPanel) {
+    filtersBtn.addEventListener("click", () => {
+      filtersPanel.hidden = !filtersPanel.hidden;
+      filtersBtn.classList.toggle("active", !filtersPanel.hidden);
+    });
+    document.addEventListener("click", e => {
+      if (!filtersPanel.hidden && !filtersPanel.contains(e.target) && e.target !== filtersBtn) {
+        filtersPanel.hidden = true;
+        filtersBtn.classList.remove("active");
+      }
+    });
+  }
   document.addEventListener("click", (e) => {
-    if (!layersPanel.hidden && !layersPanel.contains(e.target) &&
+    if (layersPanel && !layersPanel.hidden && !layersPanel.contains(e.target) &&
         e.target.id !== "layersBtn") {
       layersPanel.hidden = true;
-      document.getElementById("layersBtn").classList.remove("active");
+      const lb = document.getElementById("layersBtn");
+      if (lb) lb.classList.remove("active");
     }
   });
 
