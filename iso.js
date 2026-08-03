@@ -705,7 +705,9 @@ const EveryParkIso = (() => {
         [r, g, b] = SEASONS[S.season || 0].ground(r, g, b);
       [r, g, b] = tod(r, g, b);
 
-      const sides = S.sides == null ? 0 : S.sides;   // 0 solid, 1 skirt, 2 none
+      // 0 solid (down to the terrain's lowest point), 1 infinite (level
+      // slab line), 2 skirt (ribbon), 3 tops (no fill)
+      const sides = S.sides == null ? 0 : S.sides;
       if (smooth && gx + 1 < GRID && gy + 1 < GRID
           && inside[i + 1] && inside[i + GRID] && inside[i + GRID + 1]) {
         // "Blockiness → infinity": fill the quad between this vertex and
@@ -722,19 +724,27 @@ const EveryParkIso = (() => {
         ctx.closePath(); ctx.fill();
         // hairline stroke of the same colour hides seam cracks
         ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = 1; ctx.stroke();
-        if (edge[i] && sides !== 2) {
-          // Wall to the level slab line (solid) or a fixed ribbon
-          // (skirt). Drawn as a rect over the quad's full x-span so it
-          // works whichever direction the edge faces after rotation.
-          const xs = [p00[0], p10[0], p11[0], p01[0]];
-          const ys = [p00[1], p10[1], p11[1], p01[1]];
-          const x0 = Math.min(...xs), x1 = Math.max(...xs);
-          const yTop = Math.min(...ys);
-          const yBot = sides === 0 ? slabY
-                     : Math.max(...ys) + zScale * .12 + s * 2.4;
-          ctx.fillStyle = `rgb(${r * .5 | 0},${g * .5 | 0},${b * .5 | 0})`;
-          ctx.fillRect(x0 - .5, yTop, x1 - x0 + 1, Math.max(0, yBot - yTop));
-          // then repaint the top so the wall sits behind it
+        if (edge[i] && sides !== 3) {
+          // True wall polygons hung from each OUTWARD mesh edge, so the
+          // wall follows the surface instead of a jagged screen rect.
+          // Bottom: min-elevation plane (solid, sloped correctly per
+          // corner), the level slab line (infinite), or a ribbon (skirt).
+          const bot = (pt, fgx, fgy) =>
+            sides === 0 ? project(fgx, fgy, min)[1] + s * .9
+          : sides === 1 ? slabY
+          : Math.max(p00[1], p10[1], p11[1], p01[1]) + zScale * .12 + s * 2.4;
+          const wall = (pa, pb, ga, gaY, gb, gbY) => {
+            ctx.fillStyle = `rgb(${r * .5 | 0},${g * .5 | 0},${b * .5 | 0})`;
+            ctx.beginPath();
+            ctx.moveTo(pa[0], pa[1]); ctx.lineTo(pb[0], pb[1]);
+            ctx.lineTo(pb[0], bot(pb, gb, gbY)); ctx.lineTo(pa[0], bot(pa, ga, gaY));
+            ctx.closePath(); ctx.fill();
+          };
+          if (gy === 0 || !inside[i - GRID])          wall(p00, p10, gx, gy, gx + 1, gy);
+          if (gx === 0 || !inside[i - 1])             wall(p00, p01, gx, gy, gx, gy + 1);
+          if (gx + 2 >= GRID || !inside[i + 2])       wall(p10, p11, gx + 1, gy, gx + 1, gy + 1);
+          if (gy + 2 >= GRID || !inside[i + 2 * GRID]) wall(p01, p11, gx, gy + 1, gx + 1, gy + 1);
+          // repaint the top so walls sit behind it
           ctx.fillStyle = `rgb(${r | 0},${g | 0},${b | 0})`;
           ctx.beginPath();
           ctx.moveTo(p00[0], p00[1]); ctx.lineTo(p10[0], p10[1]);
@@ -742,14 +752,16 @@ const EveryParkIso = (() => {
           ctx.closePath(); ctx.fill();
         }
       } else {
-        // Sides: 0 = solid wall down to one level slab line, 1 =
-        // neighbour-drop skirt (old look), 2 = top faces only.
-        if (sides !== 2) {
-          const skirt = sides === 0
-            ? (edge[i] ? Math.max(0, slabY - Y)
-                       : (dropM[i] / span) * zScale + 1.6)
-            : (dropM[i] / span) * zScale
-              + (edge[i] ? zScale * .12 + s * 2.4 : 1.6);
+        if (sides !== 3) {
+          const skirt =
+            sides === 0
+              ? (edge[i] ? t * zScale + s * .9              // to min-elevation plane
+                         : (dropM[i] / span) * zScale + 1.6)
+            : sides === 1
+              ? (edge[i] ? Math.max(0, slabY - Y)           // level slab line
+                         : (dropM[i] / span) * zScale + 1.6)
+              : (dropM[i] / span) * zScale
+                + (edge[i] ? zScale * .12 + s * 2.4 : 1.6); // ribbon skirt
           ctx.fillStyle = `rgb(${r * .55 | 0},${g * .55 | 0},${b * .55 | 0})`;
           ctx.fillRect(X - w / 2, Y, w + .7,
                        skirt + hgt + (isBuild ? 7 / span * zScale : 0));
@@ -1041,12 +1053,12 @@ const EveryParkIso = (() => {
       seasonBtn.textContent = `${SEASONS[S.season].icon} ${SEASONS[S.season].label}`;
     });
 
-    const SIDES_LABELS = ["🧱 Solid", "🪜 Skirt", "▭ Tops"];
+    const SIDES_LABELS = ["🧱 Solid", "⬇️ Infinite", "🪜 Skirt", "▭ Tops"];
     const sidesBtn = document.createElement("button");
     sidesBtn.className = "iso-tool";
     sidesBtn.textContent = SIDES_LABELS[0];
     sidesBtn.addEventListener("click", () => {
-      S.sides = (S.sides + 1) % 3;
+      S.sides = (S.sides + 1) % 4;
       sidesBtn.textContent = SIDES_LABELS[S.sides];
     });
 

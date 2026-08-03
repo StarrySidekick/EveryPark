@@ -87,7 +87,19 @@ const CONFIG = {
   // labelsUrl (optional) draws place names on top of imagery.
   basemaps: [
     {
-      label: "Satellite",
+      // USGS's national imagery basemap is built on NAIP: one leaf-on
+      // survey, consistent across all of Connecticut at every zoom —
+      // no mixed-season patchwork. Native tiles stop at z16; Leaflet
+      // upsamples beyond that (maxNativeZoom).
+      label: "Satellite (NAIP)",
+      url: "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}",
+      attribution: "Imagery &copy; USGS The National Map (NAIP)",
+      maxNativeZoom: 16,
+      roadsUrl: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}",
+      labelsUrl: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
+    },
+    {
+      label: "Satellite (Esri, sharper)",
       url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
       attribution: "Imagery &copy; Esri, Maxar, Earthstar Geographics",
       roadsUrl: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}",
@@ -171,7 +183,7 @@ const CONFIG = {
   // Shown in the top-right corner. Bumped by hand on every code change,
   // so there's visible proof of which build is actually loaded rather
   // than guessing whether a cached copy is being served.
-  siteVersion: "v0.18.0",
+  siteVersion: "v0.19.0",
 
   // ---- VECTOR TILES --------------------------------------------------
   // Every boundary and trail, pre-cut into map tiles and packed into one

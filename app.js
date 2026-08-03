@@ -34,7 +34,8 @@
   const map = L.map("map", { zoomControl: true }).setView(CONFIG.mapCenter, CONFIG.mapZoom);
   const baseLayers = {};
   CONFIG.basemaps.forEach((b, i) => {
-    const parts = [L.tileLayer(b.url, { attribution: b.attribution, maxZoom: 19 })];
+    const parts = [L.tileLayer(b.url, { attribution: b.attribution, maxZoom: 19,
+                                        maxNativeZoom: b.maxNativeZoom || 19 })];
     // Roads drawn over imagery: how you'd actually get there, at a glance.
     if (b.roadsUrl) parts.push(L.tileLayer(b.roadsUrl, { maxZoom: 19 }));
     if (b.labelsUrl) parts.push(L.tileLayer(b.labelsUrl, { maxZoom: 19 }));
