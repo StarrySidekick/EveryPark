@@ -513,12 +513,29 @@ const EveryParkIso = (() => {
     if (c.includes("open")) return { lo: [128, 138, 76], hi: [212, 203, 130] };
     return { lo: [76, 108, 74], hi: [178, 195, 140] };
   }
-  function treeDensity(p) {
+  // Tree probability per CELL derives from trees per GROUND AREA, so
+  // the forest doesn't thicken or thin when the block slider moves.
+  // With a canopy mask (from satellite imagery) trees stand only where
+  // imagery shows canopy; without one, the place's cover label sets an
+  // average spacing.
+  function treeProb(p, mPerBlock, masked) {
+    if (masked) return Math.min(1, (mPerBlock / 18) ** 2);
     const c = ((p.attrs || {}).cover || "").toLowerCase();
-    if (c.includes("wood")) return 0.16;
-    if (c.includes("mixed")) return 0.09;
-    if (c.includes("open")) return 0.03;
-    return 0.07;
+    const spacing = c.includes("wood") ? 22
+                  : c.includes("mixed") ? 34
+                  : c.includes("open") ? 70 : 40;
+    return Math.min(1, (mPerBlock / spacing) ** 2);
+  }
+
+  // Canopy from imagery: dark vegetated pixels read as tree cover.
+  function treeMaskFrom(tex) {
+    const M = new Uint8Array(GRID * GRID);
+    for (let i = 0; i < GRID * GRID; i++) {
+      const r = tex[i * 3], g = tex[i * 3 + 1], b = tex[i * 3 + 2];
+      const bright = (r + g + b) / 3;
+      if (g > 56 && g >= r * 1.02 && g > b * 1.05 && bright < 138) M[i] = 1;
+    }
+    return M;
   }
 
   function draw(canvas, S, yaw) {
@@ -536,7 +553,7 @@ const EveryParkIso = (() => {
     if (min === Infinity) { min = 0; max = 1; }
     const span = Math.max(max - min, 8);
     const pal = coverPalette(p);
-    const density = treeDensity(p);
+    const density = treeProb(p, S.mPerBlock || 10, !!S.treeMask);
     let waterLevel = Infinity;
     for (let i = 0; i < H.length; i++)
       if (inside[i] && waterM[i] && H[i] < waterLevel) waterLevel = H[i];
@@ -611,6 +628,7 @@ const EveryParkIso = (() => {
       }
       [r, g, b] = tod(r, g, b);
 
+      const sides = S.sides == null ? 0 : S.sides;   // 0 solid, 1 skirt, 2 none
       if (smooth && gx + 1 < GRID && gy + 1 < GRID
           && inside[i + 1] && inside[i + GRID] && inside[i + GRID + 1]) {
         // "Blockiness → infinity": fill the quad between this vertex and
@@ -627,17 +645,30 @@ const EveryParkIso = (() => {
         ctx.closePath(); ctx.fill();
         // hairline stroke of the same colour hides seam cracks
         ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = 1; ctx.stroke();
-        if (edge[i]) {
+        if (edge[i] && sides !== 2) {
+          // Side wall down to the island's base plane: a clean straight
+          // hem instead of the ragged terrain-following fringe.
+          const baseY = t * zScale + s * 1.6;          // distance to min-elevation plane
           ctx.fillStyle = `rgb(${r * .5 | 0},${g * .5 | 0},${b * .5 | 0})`;
-          ctx.fillRect(Math.min(p00[0], p01[0]), Math.max(p00[1], p01[1], p10[1], p11[1]) - 1,
-                       Math.abs(p10[0] - p01[0]) + 2, zScale * .12 + s * 2.4);
+          ctx.beginPath();
+          ctx.moveTo(p01[0], p01[1]); ctx.lineTo(p11[0], p11[1]);
+          ctx.lineTo(p11[0], p11[1] + (sides === 0 ? baseY : zScale * .12 + s * 2.4));
+          ctx.lineTo(p01[0], p01[1] + (sides === 0 ? baseY : zScale * .12 + s * 2.4));
+          ctx.closePath(); ctx.fill();
         }
       } else {
-        const skirt = (dropM[i] / span) * zScale
-                    + (edge[i] ? zScale * .12 + s * 2.4 : 1.6)
-                    + (isBuild ? 7 / span * zScale : 0);
-        ctx.fillStyle = `rgb(${r * .55 | 0},${g * .55 | 0},${b * .55 | 0})`;
-        ctx.fillRect(X - w / 2, Y, w + .7, skirt + hgt);
+        // Sides: 0 = solid wall to the base elevation plane (clean flat
+        // hem), 1 = neighbour-drop skirt (old look), 2 = top faces only.
+        if (sides !== 2) {
+          const toBase = t * zScale + s * 1.6;
+          const skirt = sides === 0
+            ? (edge[i] ? toBase : (dropM[i] / span) * zScale + 1.6)
+            : (dropM[i] / span) * zScale
+              + (edge[i] ? zScale * .12 + s * 2.4 : 1.6);
+          ctx.fillStyle = `rgb(${r * .55 | 0},${g * .55 | 0},${b * .55 | 0})`;
+          ctx.fillRect(X - w / 2, Y, w + .7,
+                       skirt + hgt + (isBuild ? 7 / span * zScale : 0));
+        }
         ctx.fillStyle = `rgb(${r | 0},${g | 0},${b | 0})`;
         ctx.fillRect(X - w / 2, Y - hgt / 2, w + .7, hgt + .7);
       }
@@ -649,7 +680,8 @@ const EveryParkIso = (() => {
         ctx.fillText(sp, X, Y - s * .9);
       }
       if (!useSat && !sp && !isWater && !isBuild && !trailM[i] && !roadM[i]
-          && !courtM[i] && !parkM[i] && hash(gx, gy) < density) {
+          && !courtM[i] && !parkM[i] && hash(gx, gy) < density
+          && (!S.treeMask || S.treeMask[i])) {
         const jx = (hash(gx + 7, gy) - .5) * w * .6;
         const th = s * (1.5 + hash(gx, gy + 3));
         const half = s * .55;
@@ -784,7 +816,7 @@ const EveryParkIso = (() => {
       return { inside, H, dropM, edge };
     };
 
-    GRID = gridFor(10);                      // default: 1 block ≈ 10 m
+    GRID = gridFor(Math.max(10, Math.ceil(spanM / 240 / 2) * 2));  // default ≈ 10 m
     const { inside, H, dropM, edge } = buildTerrain();
 
     // TERRAIN FIRST. Trails/roads/buildings/courts stream in after —
@@ -797,7 +829,7 @@ const EveryParkIso = (() => {
                 buildM: empty(), parkM: empty(), courtM: empty(),
                 spriteAt: new Map(), hikePath: null, hikeT: 0,
                 useSat: false, tex: null, tod: 0, zoom: 1, cellM: 10,
-                smooth: false, mPerBlock: 10 };
+                smooth: false, mPerBlock: 10, sides: 0, treeMask: null };
     const baseSub = boundary ? `boundary: ${boundary.label}`
                              : "no boundary found — square sample";
     sub.textContent = baseSub + " · fetching trails, roads, buildings…";
@@ -822,6 +854,15 @@ const EveryParkIso = (() => {
       sub.textContent = baseSub + " · extras unavailable · drag to rotate";
     });
 
+    // Canopy: fetch the imagery sample in the background so trees can
+    // stand where the imagery actually shows trees. Doesn't turn the
+    // satellite drape on — just informs the forest.
+    fetchSatSample(bbox).then(t => {
+      satSample = t;
+      S.tex = satTexFrom(t, bbox);
+      S.treeMask = treeMaskFrom(S.tex);
+    }).catch(() => { /* uniform cover fallback */ });
+
     // Toolbar: time of day, satellite drape, export.
     const todBtn = document.createElement("button");
     todBtn.className = "iso-tool";
@@ -840,6 +881,7 @@ const EveryParkIso = (() => {
         try {
           satSample = await fetchSatSample(bbox);
           S.tex = satTexFrom(satSample, bbox);
+          S.treeMask = treeMaskFrom(S.tex);
         }
         catch (e) { satBtn.textContent = "🛰 unavailable"; return; }
         satBtn.textContent = "🛰 Satellite";
@@ -862,10 +904,16 @@ const EveryParkIso = (() => {
       } catch (e) { shotBtn.textContent = "📸 unavailable"; }
     });
     // Block-size slider: a block is a real distance on the ground.
+    // Big parks clamp at 240 cells per side, so a fixed 4-20 m range
+    // left the slider dead there (every value clamped to the same grid).
+    // The range now starts at the smallest ACHIEVABLE block size.
+    const minCell = Math.max(4, Math.ceil(spanM / 240 / 2) * 2);
+    const defCell = Math.max(10, minCell);
     const sliderWrap = document.createElement("label");
     sliderWrap.className = "iso-slider";
     sliderWrap.innerHTML = `<span class="iso-slider-lab"></span>
-      <input type="range" min="4" max="20" step="2" value="10">`;
+      <input type="range" min="${minCell}" max="${minCell + 16}" step="2"
+             value="${defCell}">`;
     const slider = sliderWrap.querySelector("input");
     const sliderLab = sliderWrap.querySelector(".iso-slider-lab");
     const labelBlocks = () => {
@@ -886,14 +934,25 @@ const EveryParkIso = (() => {
         for (const sp of d2.sprites) S.spriteAt.set(sp.gy * GRID + sp.gx, sp.emoji);
       }
       S.tex = satSample ? satTexFrom(satSample, bbox) : null;
+      S.treeMask = S.tex ? treeMaskFrom(S.tex) : null;
       if (!S.tex) S.useSat = false;
       labelBlocks();
     };
+    S.cellM = defCell;
     let sliderTimer = null;
     slider.addEventListener("input", () => {
       S.cellM = +slider.value;
       clearTimeout(sliderTimer);
       sliderTimer = setTimeout(rebuild, 160);
+    });
+
+    const SIDES_LABELS = ["🧱 Solid", "🪜 Skirt", "▭ Tops"];
+    const sidesBtn = document.createElement("button");
+    sidesBtn.className = "iso-tool";
+    sidesBtn.textContent = SIDES_LABELS[0];
+    sidesBtn.addEventListener("click", () => {
+      S.sides = (S.sides + 1) % 3;
+      sidesBtn.textContent = SIDES_LABELS[S.sides];
     });
 
     const smoothBtn = document.createElement("button");
@@ -904,7 +963,7 @@ const EveryParkIso = (() => {
       smoothBtn.classList.toggle("active", S.smooth);
     });
 
-    tools.append(todBtn, satBtn, smoothBtn, shotBtn, sliderWrap);
+    tools.append(todBtn, satBtn, smoothBtn, sidesBtn, shotBtn, sliderWrap);
 
     // Scroll to zoom, centred on the island.
     canvas.addEventListener("wheel", e => {
