@@ -229,6 +229,15 @@ deploy actually reached the browser.
 
 ---
 
+## 3D viewer (iso.js)
+
+Its intended appearance is pinned down in `tools/isotest/VISUALS.md` —
+tree field stable across motion LOD, continuous brown rim, no wall
+strokes, gap-free smooth mesh mid-spin. **Run `tools/isotest/check.mjs`
+(offline Playwright harness, no network) before pushing any `iso.js`
+change**: every invariant in that file has been broken at least once by
+an edit that looked correct.
+
 ## Conventions
 
 - Comments explain **why**, not what — especially the non-obvious constraint

@@ -885,8 +885,7 @@ const EveryParkIso = (() => {
     if (min === Infinity) { min = 0; max = 1; }
     const span = Math.max(max - min, 8);
     const pal = coverPalette(p);
-    const density = Math.min(1, treeProb(p, S.mPerBlock || 10, !!S.treeMask)
-                                * (S.lod || 1) * (S.lod || 1));
+    const density = Math.min(1, treeProb(p, S.mPerBlock || 10, !!S.treeMask));
     let waterLevel = Infinity;
     for (let i = 0; i < H.length; i++)
       if (inside[i] && waterM[i] && H[i] < waterLevel) waterLevel = H[i];
@@ -1055,7 +1054,14 @@ const EveryParkIso = (() => {
         const p11 = project(gx + st, gy + st, hAt(gx + st, gy + st));
         const p01 = project(gx, gy + st, hAt(gx, gy + st));
 
-        if (sides !== 3 && edge[i]) {
+        if (sides !== 3) {
+          // A wall belongs wherever the NEIGHBOURING QUAD is missing —
+          // the neighbour anchored one stride away, not one cell away.
+          // Gating this on the full-res edge[] mask broke the rim while
+          // spinning: coarse anchors next to the boundary aren't edge
+          // cells themselves, so their walls silently vanished.
+          const out = (ax, ay) => ax < 0 || ay < 0 || ax >= GRID
+                               || ay >= GRID || !inside[ay * GRID + ax];
           const botOf = (pt, fgx, fgy) =>
             sides === 0 ? project(fgx, fgy, min)[1] + s * .9
           : sides === 1 ? slabY
@@ -1069,10 +1075,10 @@ const EveryParkIso = (() => {
             ctx.closePath(); ctx.fill();
             ctx.strokeStyle = wallFill; ctx.lineWidth = 1; ctx.stroke();
           };
-          if (gy === 0 || !inside[i - GRID])              wall(p00, p10, gx, gy, gx + st, gy);
-          if (gx === 0 || !inside[i - 1])                 wall(p00, p01, gx, gy, gx, gy + st);
-          if (gx + st >= GRID || !inside[i + st])         wall(p10, p11, gx + st, gy, gx + st, gy + st);
-          if (gy + st >= GRID || !inside[i + st * GRID])  wall(p01, p11, gx, gy + st, gx + st, gy + st);
+          if (out(gx, gy - st))  wall(p00, p10, gx, gy, gx + st, gy);
+          if (out(gx - st, gy))  wall(p00, p01, gx, gy, gx, gy + st);
+          if (out(gx + st, gy))  wall(p10, p11, gx + st, gy, gx + st, gy + st);
+          if (out(gx, gy + st))  wall(p01, p11, gx, gy + st, gx + st, gy + st);
         }
         ctx.fillStyle = topFill;
         ctx.beginPath();
@@ -1116,7 +1122,11 @@ const EveryParkIso = (() => {
             if (nh != null && nh >= h - 0.05) return;
             const ya = botFor(pa, ax, ay, nh), yb = botFor(pb, bx, by, nh);
             if (ya <= pa[1] + .5 && yb <= pb[1] + .5) return;
-            ctx.fillStyle = (nh == null && edge[i]) ? wallFill
+            // A missing neighbour IS the island's rim — paint it earth
+            // brown. Requiring edge[i] too lost the brown ring while
+            // spinning: at a coarse stride the anchor cell next to the
+            // boundary isn't flagged edge, so the rim went green.
+            ctx.fillStyle = nh == null ? wallFill
               : rgbStr(r * shade, g * shade, b * shade);
             ctx.beginPath();
             ctx.moveTo(pa[0], pa[1]); ctx.lineTo(pb[0], pb[1]);
@@ -1143,81 +1153,102 @@ const EveryParkIso = (() => {
         ctx.strokeStyle = topFill; ctx.lineWidth = 1; ctx.stroke();
       }
 
-      const sp = spriteAt && spriteAt.get(i);
-      // Facility marks are drawn after the ways, so a court's icon is
-      // never painted over by the road running past it.
-      if (sp) deferred.push([X, Y, sp]);
-      // Trees stay in satellite mode too — the drape is the ground, the
-      // sprites are the forest standing on it.
-      if (!sp && !isWater && !isBuild && !trailM[i] && !roadM[i]
-          && !courtM[i] && !parkM[i] && hash(gx, gy) < density
-          && (!S.treeMask || S.treeMask[i])) {
-        const jx = (hash(gx + 7, gy) - .5) * w * .6;
-        const th = s * st * (1.5 + hash(gx, gy + 3)) * 1.35;
-        const tw = th * (TREE_W / TREE_H);
-        const v = (hash(gx + 1, gy + 1) * TREE_N) | 0;
-        ctx.drawImage(atlas, v * TREE_W, 0, TREE_W, TREE_H,
-                      X + jx - tw / 2, Y - th, tw, th);
-      }
+      // Decorations — facility marks, trees, headstones, boulders — are
+      // seeded per FULL-RES cell whatever stride the geometry walks.
+      // When they followed the coarse lattice instead, the entire
+      // forest reshuffled, resized and flickered every time motion LOD
+      // kicked in or the walk direction flipped quadrant. Each coarse
+      // step scans its own sub-cells and projects every decoration at
+      // that cell's true spot at its true size, so the tree field is
+      // pixel-identical at any LOD.
+      for (let sy = 0; sy < st; sy++)
+      for (let sx = 0; sx < st; sx++) {
+        const dgx = gx + sx * dirX, dgy = gy + sy * dirY;
+        if (dgx < 0 || dgy < 0 || dgx >= GRID || dgy >= GRID) continue;
+        const j = dgy * GRID + dgx;
+        if (!inside[j]) continue;
+        let dh = H[j];
+        const dWater = waterM[j] && (dh <= waterLevel + 4);
+        const dBuild = buildM[j] && !dWater;
+        if (dWater) dh = waterLevel;
+        if (dBuild) dh += 7;
+        const [dX, dY] = project(dgx, dgy, dh);
 
-      // Headstones instead of pines: little pale slabs in rows, with a
-      // couple of bare crooked trees. Cemeteries should feel like
-      // cemeteries.
-      else if (p.type === "cemetery" && !sp && !isWater && !isBuild
-               && !trailM[i] && !roadM[i] && !parkM[i]
-               && hash(gx * 2, gy) < 0.20) {
-        const stoneH = s * (.7 + .35 * hash(gx, gy + 5));
-        const stoneW = s * .42;
-        let [gr2, gg2, gb2] = tod(198, 200, 196);
-        ctx.fillStyle = `rgb(${gr2 | 0},${gg2 | 0},${gb2 | 0})`;
-        ctx.beginPath();
-        ctx.moveTo(X - stoneW / 2, Y);
-        ctx.lineTo(X - stoneW / 2, Y - stoneH * .68);
-        ctx.quadraticCurveTo(X, Y - stoneH * 1.12, X + stoneW / 2, Y - stoneH * .68);
-        ctx.lineTo(X + stoneW / 2, Y);
-        ctx.closePath(); ctx.fill();
-        if (hash(gx + 9, gy + 9) < 0.14) {           // a bare crooked tree
-          let [br, bg2, bb] = tod(58, 52, 48);
-          ctx.strokeStyle = `rgb(${br | 0},${bg2 | 0},${bb | 0})`;
-          ctx.lineWidth = Math.max(1, s * .16);
-          ctx.beginPath();
-          ctx.moveTo(X, Y);
-          ctx.lineTo(X + s * .2, Y - s * 1.5);
-          ctx.moveTo(X + s * .12, Y - s * .9);
-          ctx.lineTo(X - s * .5, Y - s * 1.35);
-          ctx.moveTo(X + s * .17, Y - s * 1.15);
-          ctx.lineTo(X + s * .8, Y - s * 1.6);
-          ctx.stroke();
+        const sp = spriteAt && spriteAt.get(j);
+        // Facility marks are drawn after the ways, so a court's icon is
+        // never painted over by the road running past it.
+        if (sp) { deferred.push([dX, dY, sp]); continue; }
+        if (dWater || dBuild || trailM[j] || roadM[j] || parkM[j]) continue;
+
+        // Trees stay in satellite mode too — the drape is the ground,
+        // the sprites are the forest standing on it.
+        if (!courtM[j] && hash(dgx, dgy) < density
+            && (!S.treeMask || S.treeMask[j])) {
+          const jx = (hash(dgx + 7, dgy) - .5) * s * .97;
+          const th = s * (1.5 + hash(dgx, dgy + 3)) * 1.35;
+          const tw = th * (TREE_W / TREE_H);
+          const v = (hash(dgx + 1, dgy + 1) * TREE_N) | 0;
+          ctx.drawImage(atlas, v * TREE_W, 0, TREE_W, TREE_H,
+                        dX + jx - tw / 2, dY - th, tw, th);
         }
-      }
 
-      // Boulders: same scatter as trees, but only where the ground is
-      // genuinely steep — Connecticut's outcrops sit on the slopes, and
-      // seeding them off gradient keeps them off lawns and meadows.
-      else if (!sp && !isWater && !isBuild && !trailM[i] && !roadM[i]
-               && !courtM[i] && !parkM[i]) {
-        const grad = Math.abs(h - nb)
-                   + Math.abs(h - H[Math.max(0, i - GRID)]);
-        if (grad > (S.mPerBlock || 10) * 0.30
-            && hash(gx + 31, gy + 17) < 0.055) {
-          const rx2 = (hash(gx + 5, gy + 11) - .5) * w * .5;
-          const rs = s * (.5 + .5 * hash(gx + 3, gy + 9));
-          const v = 26 * hash(gx + 13, gy + 2);
-          let [kr, kg, kb] = tod(126 + v, 122 + v, 114 + v);
-          ctx.fillStyle = `rgb(${kr | 0},${kg | 0},${kb | 0})`;
+        // Headstones instead of pines: little pale slabs in rows, with
+        // a couple of bare crooked trees. Cemeteries should feel like
+        // cemeteries.
+        else if (p.type === "cemetery" && hash(dgx * 2, dgy) < 0.20) {
+          const stoneH = s * (.7 + .35 * hash(dgx, dgy + 5));
+          const stoneW = s * .42;
+          let [gr2, gg2, gb2] = tod(198, 200, 196);
+          ctx.fillStyle = `rgb(${gr2 | 0},${gg2 | 0},${gb2 | 0})`;
           ctx.beginPath();
-          ctx.moveTo(X + rx2 - rs, Y);
-          ctx.lineTo(X + rx2 - rs * .55, Y - rs * .95);
-          ctx.lineTo(X + rx2 + rs * .35, Y - rs * 1.05);
-          ctx.lineTo(X + rx2 + rs, Y - rs * .2);
+          ctx.moveTo(dX - stoneW / 2, dY);
+          ctx.lineTo(dX - stoneW / 2, dY - stoneH * .68);
+          ctx.quadraticCurveTo(dX, dY - stoneH * 1.12, dX + stoneW / 2, dY - stoneH * .68);
+          ctx.lineTo(dX + stoneW / 2, dY);
           ctx.closePath(); ctx.fill();
-          let [sr, sg, sb] = tod(92, 89, 84);
-          ctx.fillStyle = `rgb(${sr | 0},${sg | 0},${sb | 0})`;
-          ctx.beginPath();
-          ctx.moveTo(X + rx2 + rs * .35, Y - rs * 1.05);
-          ctx.lineTo(X + rx2 + rs, Y - rs * .2);
-          ctx.lineTo(X + rx2 + rs * .2, Y);
-          ctx.closePath(); ctx.fill();
+          if (hash(dgx + 9, dgy + 9) < 0.14) {       // a bare crooked tree
+            let [br, bg2, bb] = tod(58, 52, 48);
+            ctx.strokeStyle = `rgb(${br | 0},${bg2 | 0},${bb | 0})`;
+            ctx.lineWidth = Math.max(1, s * .16);
+            ctx.beginPath();
+            ctx.moveTo(dX, dY);
+            ctx.lineTo(dX + s * .2, dY - s * 1.5);
+            ctx.moveTo(dX + s * .12, dY - s * .9);
+            ctx.lineTo(dX - s * .5, dY - s * 1.35);
+            ctx.moveTo(dX + s * .17, dY - s * 1.15);
+            ctx.lineTo(dX + s * .8, dY - s * 1.6);
+            ctx.stroke();
+          }
+        }
+
+        // Boulders: same scatter as trees, but only where the ground is
+        // genuinely steep — Connecticut's outcrops sit on the slopes,
+        // and seeding them off gradient keeps them off lawns and
+        // meadows.
+        else if (!courtM[j]) {
+          const grad = Math.abs(H[j] - H[dgy * GRID + Math.max(0, dgx - 1)])
+                     + Math.abs(H[j] - H[Math.max(0, j - GRID)]);
+          if (grad > (S.mPerBlock || 10) * 0.30
+              && hash(dgx + 31, dgy + 17) < 0.055) {
+            const rx2 = (hash(dgx + 5, dgy + 11) - .5) * s * .81;
+            const rs = s * (.5 + .5 * hash(dgx + 3, dgy + 9));
+            const v = 26 * hash(dgx + 13, dgy + 2);
+            let [kr, kg, kb] = tod(126 + v, 122 + v, 114 + v);
+            ctx.fillStyle = `rgb(${kr | 0},${kg | 0},${kb | 0})`;
+            ctx.beginPath();
+            ctx.moveTo(dX + rx2 - rs, dY);
+            ctx.lineTo(dX + rx2 - rs * .55, dY - rs * .95);
+            ctx.lineTo(dX + rx2 + rs * .35, dY - rs * 1.05);
+            ctx.lineTo(dX + rx2 + rs, dY - rs * .2);
+            ctx.closePath(); ctx.fill();
+            let [sr, sg, sb] = tod(92, 89, 84);
+            ctx.fillStyle = `rgb(${sr | 0},${sg | 0},${sb | 0})`;
+            ctx.beginPath();
+            ctx.moveTo(dX + rx2 + rs * .35, dY - rs * 1.05);
+            ctx.lineTo(dX + rx2 + rs, dY - rs * .2);
+            ctx.lineTo(dX + rx2 + rs * .2, dY);
+            ctx.closePath(); ctx.fill();
+          }
         }
       }
     }

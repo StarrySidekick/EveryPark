@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<style>body { margin: 0; background: #223; }</style>
+</head>
+<body>
+<script>
+  // Offline determinism: every fetch fails, so the viewer falls back to
+  // procedural terrain and a full-square island. That exercises the whole
+  // renderer without any network, which is exactly what a regression
+  // check wants — the same scene every run.
+  window.fetch = () => Promise.reject(new Error("offline harness"));
+</script>
+<script src="../../iso.js"></script>
+<script>
+  window.openTest = (over) => EveryParkIso.open(Object.assign({
+    name: "Test Park", lat: 41.42, lng: -73.48, acres: 220,
+    type: "town", attrs: { relief: 130, elev: 150, cover: "open" }
+  }, over || {}));
+</script>
+</body>
+</html>
