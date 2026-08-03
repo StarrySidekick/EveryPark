@@ -772,3 +772,15 @@ header { border-bottom: 2px solid var(--ep-brass); }
   .iso-corner-tr { top: 44px; right: 14px; }
   .iso-slider input { width: 90px; }
 }
+
+
+/* The viewer owns its gestures: without touch-action the browser eats
+   the pinch as page zoom and the canvas never sees it. */
+#isoOverlay, #isoPanel, #isoPanel canvas { touch-action: none; }
+/* Desktop: keep the canvas at a sane size and its true aspect. */
+#isoPanel canvas { width: min(84vw, 840px); height: auto; aspect-ratio: 840 / 540; }
+@media (max-width: 760px) {
+  #isoOverlay.iso-full #isoPanel canvas {
+    width: 100%; height: auto; aspect-ratio: auto; flex: 1 1 auto; min-height: 0;
+  }
+}

@@ -14,7 +14,7 @@
      emoji sprite each (⚾🏀🎾🏓⚽…).
    - A little hiker 🚶 walking the longest trail, because it's cute.
    - Time-of-day toggle (day / sunset / night), satellite drape toggle,
-     and 📸 export of the canvas as a PNG.
+     and PNG export of the canvas.
 
    PROGRESSIVE: terrain draws the moment heights arrive; trails, roads,
    buildings and courts stream in when their fetches land. Everything
@@ -563,25 +563,39 @@ const EveryParkIso = (() => {
              roadPieces: pathPieces(roadLines, null) };
   }
 
+  // Drawn icons for the corner controls — no emoji in the chrome either.
+  const SVG = {
+    day:    '<circle cx="12" cy="12" r="5"/><g stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 1v3M12 20v3M1 12h3M20 12h3M4.2 4.2l2 2M17.8 17.8l2 2M19.8 4.2l-2 2M6.2 17.8l-2 2"/></g>',
+    sunset: '<path d="M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><path d="M6.5 18a5.5 5.5 0 0 1 11 0z"/><g stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v3M4 9l2 1.6M20 9l-2 1.6"/></g>',
+    night:  '<path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/>',
+    summer: '<circle cx="12" cy="12" r="4.5"/><g stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></g>',
+    fall:   '<path d="M12 21c0-5 1-8 5-11 1.6-1.2 2.4-3.4 2.4-6-3.6 0-6.4.9-8.4 2.6C8.4 8.6 7.4 11.6 7.4 15c0 .5 0 1 .1 1.5"/><path d="M12 21c-1.5-2.5-3-4-5.5-5" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/>',
+    winter: '<g stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"><path d="M12 2v20M3.3 7l17.4 10M20.7 7L3.3 17"/><path d="M9 4.4L12 6l3-1.6M9 19.6L12 18l3 1.6M4.6 9.8l.6 3.3-2.4 2.3M19.4 14.2l-.6-3.3 2.4-2.3M4.6 14.2l.6-3.3-2.4-2.3M19.4 9.8l-.6 3.3 2.4 2.3"/></g>',
+    spring: '<circle cx="12" cy="12" r="2.6"/><ellipse cx="12" cy="6.4" rx="2.6" ry="3.6"/><ellipse cx="12" cy="17.6" rx="2.6" ry="3.6"/><ellipse cx="6.4" cy="12" rx="3.6" ry="2.6"/><ellipse cx="17.6" cy="12" rx="3.6" ry="2.6"/>'
+  };
+  const icon = name =>
+    `<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"
+          aria-hidden="true">${SVG[name]}</svg>`;
+
   // ---- Seasons (prototype) ----------------------------------------
   // Ground and tree colours transform per season; winter also frosts
   // the high ground. Applied before time-of-day.
   const SEASONS = [
-    { icon: "🌞", label: "Summer",
+    { icon: "summer", label: "Summer",
       ground: (r, g, b) => [r, g, b],
       canopy: h2 => [30 + 24 * h2, 96 + 24 * h2, 46 + 19 * h2] },
-    { icon: "🍂", label: "Fall",
+    { icon: "fall", label: "Fall",
       ground: (r, g, b) => [Math.min(255, r * 1.14 + 14), g * .92, b * .62],
       canopy: h2 => h2 < .45
         ? [172 + 60 * h2, 84 + 40 * h2, 26]           // maples turning
         : [40 + 20 * h2, 88 + 20 * h2, 44] },          // pines stay
-    { icon: "❄️", label: "Winter",
+    { icon: "winter", label: "Winter",
       ground: (r, g, b) => {
         const m = .68;                                  // frost mix
         return [r * (1 - m) + 226 * m, g * (1 - m) + 232 * m, b * (1 - m) + 238 * m];
       },
       canopy: h2 => [26 + 14 * h2, 58 + 16 * h2, 40 + 12 * h2] },
-    { icon: "🌸", label: "Spring",
+    { icon: "spring", label: "Spring",
       ground: (r, g, b) => [r * .92, Math.min(255, g * 1.08 + 8), b * .9],
       canopy: h2 => h2 < .3
         ? [214, 160 + 40 * h2, 190]                     // blossom
@@ -590,9 +604,9 @@ const EveryParkIso = (() => {
 
   // ---- Time of day ------------------------------------------------
   const TOD = [
-    { icon: "☀️", label: "Day",    fn: (r, g, b) => [r, g, b] },
-    { icon: "🌅", label: "Sunset", fn: (r, g, b) => [Math.min(255, r * 1.08 + 20), g * .82, b * .62] },
-    { icon: "🌙", label: "Night",  fn: (r, g, b) => [r * .30 + 8, g * .34 + 10, b * .52 + 34] }
+    { icon: "day", label: "Day",    fn: (r, g, b) => [r, g, b] },
+    { icon: "sunset", label: "Sunset", fn: (r, g, b) => [Math.min(255, r * 1.08 + 20), g * .82, b * .62] },
+    { icon: "night", label: "Night",  fn: (r, g, b) => [r * .30 + 8, g * .34 + 10, b * .52 + 34] }
   ];
 
   // ---- Drawn sprites (no emoji font anywhere in the scene) --------
@@ -1155,6 +1169,8 @@ const EveryParkIso = (() => {
         <h3>${p.name}</h3>
         <div class="iso-sub">Loading boundary and terrain…</div>
         <canvas width="840" height="540"></canvas>
+        <div class="iso-corner iso-corner-tl"><button id="isoTod" title="Time of day"></button></div>
+        <div class="iso-corner iso-corner-tr"><button id="isoSeason" title="Season"></button></div>
         <div class="iso-foot">
           <span class="iso-tools"></span>
           <button id="isoClose">Close</button>
@@ -1162,19 +1178,22 @@ const EveryParkIso = (() => {
       </div>`;
     document.body.appendChild(ov);
     const canvas = ov.querySelector("canvas");
-    // Full-bleed on phones: the panel is the screen, the canvas fills it.
-    if (window.innerWidth <= 760) {
-      ov.classList.add("iso-full");
-      const fit = () => {
-        const box = canvas.getBoundingClientRect();
-        if (box.width > 40) {
-          canvas.width = Math.round(box.width * Math.min(2, window.devicePixelRatio || 1));
-          canvas.height = Math.round(box.height * Math.min(2, window.devicePixelRatio || 1));
-        }
-      };
-      requestAnimationFrame(fit);
-      window.addEventListener("resize", fit);
-    }
+    // The backing store must match the box the browser gives the canvas,
+    // or the picture is stretched: CSS was scaling a fixed 840x540 buffer
+    // into a full-screen panel. A ResizeObserver keeps them in step.
+    if (window.innerWidth <= 760) ov.classList.add("iso-full");
+    const fit = () => {
+      const box = canvas.getBoundingClientRect();
+      if (box.width < 40 || box.height < 40) return;
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const w2 = Math.round(box.width * dpr), h2 = Math.round(box.height * dpr);
+      if (canvas.width !== w2 || canvas.height !== h2) {
+        canvas.width = w2; canvas.height = h2;
+      }
+    };
+    if (window.ResizeObserver) new ResizeObserver(fit).observe(canvas);
+    window.addEventListener("resize", fit);
+    requestAnimationFrame(fit);
     const sub = ov.querySelector(".iso-sub");
     const tools = ov.querySelector(".iso-tools");
     const spin = document.createElement("div");
@@ -1296,44 +1315,46 @@ const EveryParkIso = (() => {
     }).catch(() => { /* uniform cover fallback */ });
 
     // Toolbar: time of day, satellite drape, export.
-    const todBtn = document.createElement("button");
-    todBtn.className = "iso-tool";
-    todBtn.textContent = `${TOD[S.tod].icon} ${TOD[S.tod].label}`;
+    const todBtn = ov.querySelector("#isoTod");
+    const paintTod = () => {
+      todBtn.innerHTML = icon(TOD[S.tod].icon);
+      todBtn.title = "Time of day: " + TOD[S.tod].label;
+    };
+    paintTod();
     todBtn.addEventListener("click", () => {
-      S.tod = (S.tod + 1) % TOD.length;
-      todBtn.textContent = `${TOD[S.tod].icon} ${TOD[S.tod].label}`;
+      S.tod = (S.tod + 1) % TOD.length; paintTod();
     });
     const satBtn = document.createElement("button");
     satBtn.className = "iso-tool";
-    satBtn.textContent = "🛰 Satellite";
+    satBtn.textContent = "Satellite";
     satBtn.addEventListener("click", async () => {
       if (S.useSat) { S.useSat = false; satBtn.classList.remove("active"); return; }
       if (!S.tex) {
-        satBtn.textContent = "🛰 loading…";
+        satBtn.textContent = "Loading…";
         try {
           satSample = await fetchSatSample(bbox);
           S.tex = satTexFrom(satSample, bbox);
           S.treeMask = treeMaskFrom(S.tex, S.inside);
         }
-        catch (e) { satBtn.textContent = "🛰 unavailable"; return; }
-        satBtn.textContent = "🛰 Satellite";
+        catch (e) { satBtn.textContent = "No imagery"; return; }
+        satBtn.textContent = "Satellite";
       }
       S.useSat = true; satBtn.classList.add("active");
     });
     const shotBtn = document.createElement("button");
     shotBtn.className = "iso-tool";
-    shotBtn.textContent = "📸 Save";
+    shotBtn.textContent = "Save";
     shotBtn.addEventListener("click", () => {
       try {
         canvas.toBlob(blob => {
-          if (!blob) { shotBtn.textContent = "📸 unavailable"; return; }
+          if (!blob) { shotBtn.textContent = "Failed"; return; }
           const a = document.createElement("a");
           a.href = URL.createObjectURL(blob);
           a.download = `${p.name.replace(/[^\w ]+/g, "").trim() || "park"}.png`;
           a.click();
           setTimeout(() => URL.revokeObjectURL(a.href), 5000);
         });
-      } catch (e) { shotBtn.textContent = "📸 unavailable"; }
+      } catch (e) { shotBtn.textContent = "Failed"; }
     });
     // Block-size slider: a block is a real distance on the ground.
     // Big parks clamp at 240 cells per side, so a fixed 4-20 m range
@@ -1378,15 +1399,17 @@ const EveryParkIso = (() => {
       sliderTimer = setTimeout(rebuild, 160);
     });
 
-    const seasonBtn = document.createElement("button");
-    seasonBtn.className = "iso-tool";
-    seasonBtn.textContent = "🌞 Summer";
+    const seasonBtn = ov.querySelector("#isoSeason");
+    const paintSeason = () => {
+      seasonBtn.innerHTML = icon(SEASONS[S.season].icon);
+      seasonBtn.title = "Season: " + SEASONS[S.season].label;
+    };
+    paintSeason();
     seasonBtn.addEventListener("click", () => {
-      S.season = (S.season + 1) % SEASONS.length;
-      seasonBtn.textContent = `${SEASONS[S.season].icon} ${SEASONS[S.season].label}`;
+      S.season = (S.season + 1) % SEASONS.length; paintSeason();
     });
 
-    const SIDES_LABELS = ["🧱 Solid", "⬇️ Infinite", "🪜 Skirt", "▭ Tops"];
+    const SIDES_LABELS = ["Solid", "Infinite", "Skirt", "Tops"];
     const sidesBtn = document.createElement("button");
     sidesBtn.className = "iso-tool";
     sidesBtn.textContent = SIDES_LABELS[0];
@@ -1397,13 +1420,13 @@ const EveryParkIso = (() => {
 
     const smoothBtn = document.createElement("button");
     smoothBtn.className = "iso-tool";
-    smoothBtn.textContent = "⬜ Smooth";
+    smoothBtn.textContent = "Smooth";
     smoothBtn.addEventListener("click", () => {
       S.smooth = !S.smooth;
       smoothBtn.classList.toggle("active", S.smooth);
     });
 
-    tools.append(todBtn, seasonBtn, satBtn, smoothBtn, sidesBtn, shotBtn, sliderWrap);
+    tools.append(satBtn, smoothBtn, sidesBtn, shotBtn, sliderWrap);
 
     // Scroll to zoom, centred on the island.
     canvas.addEventListener("wheel", e => {
@@ -1414,10 +1437,10 @@ const EveryParkIso = (() => {
     const spinBtn = document.createElement("button");
     spinBtn.className = "iso-tool iso-spin-btn active";
     spinBtn.title = "Pause / resume the turntable";
-    spinBtn.textContent = "⏸";
+    spinBtn.textContent = "Pause";
     spinBtn.addEventListener("click", () => {
       S.spin = !S.spin;
-      spinBtn.textContent = S.spin ? "⏸" : "▶";
+      spinBtn.textContent = S.spin ? "Pause" : "Spin";
       spinBtn.classList.toggle("active", S.spin);
     });
     tools.appendChild(spinBtn);
