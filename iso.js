@@ -193,6 +193,41 @@ const EveryParkIso = (() => {
     }
   }
 
+  // Sport courts get a flat colour and a little emoji sprite.
+  const SPORT = [
+    [/baseball|softball/,      2, "#d9c186", "⚾"],
+    [/basketball/,             3, "#6b7d99", "🏀"],
+    [/tennis/,                 4, "#b85c48", "🎾"],
+    [/pickleball/,             5, "#4f9d8b", "🏓"],
+    [/soccer|football/,        6, "#5c9e57", "⚽"],
+    [/volleyball/,             7, "#c9a86b", "🏐"],
+    [/./,                      8, "#7fa06f", "🏃"]          // generic pitch
+  ];
+  const KIND = { playground: [9, "#d99a4e", "🛝"],
+                 swimming_pool: [10, "#4fa3c9", "🏊"],
+                 dog_park: [11, "#a08a6b", "🐕"],
+                 track: [12, "#b0876b", "🏃"] };
+  const COURT_COLOR = {};
+  for (const [, code, col] of SPORT) COURT_COLOR[code] = col;
+  for (const k in KIND) COURT_COLOR[KIND[k][0]] = KIND[k][1];
+
+  // Roads come straight from OpenStreetMap via Overpass — the ArcGIS
+  // mirrors don't publish a drivable-roads layer. Best-effort: a park
+  // with no reachable Overpass just renders without roads.
+  async function fetchRoads(bbox) {
+    const [w, s, e, n] = bbox;
+    const q = `[out:json][timeout:10];way[highway~"^(motorway|trunk|primary|` +
+      `secondary|tertiary|unclassified|residential|service|living_street)$"]` +
+      `(${s},${w},${n},${e});out geom 300;`;
+    const r = await fetch("https://overpass-api.de/api/interpreter",
+      { method: "POST", body: "data=" + encodeURIComponent(q),
+        headers: { "Content-Type": "application/x-www-form-urlencoded" } });
+    const j = await r.json();
+    return (j.elements || [])
+      .filter(el => el.geometry)
+      .map(el => ({ geometry: { paths: [el.geometry.map(g => [g.lon, g.lat])] } }));
+  }
+
   async function fetchDressing(bbox) {
     const [w, s, e, n] = bbox;
     const env = JSON.stringify({ xmin: w, ymin: s, xmax: e, ymax: n,
@@ -201,16 +236,23 @@ const EveryParkIso = (() => {
                      inSR: "4326", outSR: "4326", outFields: "",
                      returnGeometry: "true", maxAllowableOffset: "0.00008",
                      resultRecordCount: "400" };
-    const [trails, blue, water] = await Promise.allSettled([
+    const [trails, blue, water, leisure, roads] = await Promise.allSettled([
       arc(OSM6 + "OSM_NA_Trails/FeatureServer/0/query",
           { ...common, where: "highway IN ('path','track','bridleway')" }),
       arc(DEEP + "BlueBlazedHikingTrails/FeatureServer/0/query",
           { ...common, where: "1=1" }),
-      arc(OSM6 + "OSM_NA_Water/FeatureServer/0/query", { ...common, where: "1=1" })
+      arc(OSM6 + "OSM_NA_Water/FeatureServer/0/query", { ...common, where: "1=1" }),
+      arc(OSM6 + "OSM_NA_Leisure/FeatureServer/0/query",
+          { ...common, outFields: "leisure,sport",
+            where: "leisure IN ('pitch','playground','swimming_pool'," +
+                   "'dog_park','track')" }),
+      fetchRoads(bbox)
     ]);
     const trailM = new Uint8Array(GRID * GRID);
     for (const r of [trails, blue])
       if (r.status === "fulfilled") rasterisePaths(r.value, bbox, trailM);
+    const roadM = new Uint8Array(GRID * GRID);
+    if (roads.status === "fulfilled") rasterisePaths(roads.value, bbox, roadM);
     const waterM = new Uint8Array(GRID * GRID);
     if (water.status === "fulfilled")
       for (const f of water.value)
@@ -218,7 +260,65 @@ const EveryParkIso = (() => {
           const m2 = maskFromRings(f.geometry.rings, bbox);
           for (let i = 0; i < waterM.length; i++) if (m2[i]) waterM[i] = 1;
         }
-    return { trailM, waterM };
+    // Courts: rasterise each pitch into a per-sport colour code and pin
+    // an emoji sprite at its centroid cell.
+    const courtM = new Uint8Array(GRID * GRID);
+    const sprites = [];
+    if (leisure.status === "fulfilled")
+      for (const f of leisure.value) {
+        if (!f.geometry || !f.geometry.rings) continue;
+        const a = f.attributes || {};
+        let code, emoji;
+        if (a.leisure === "pitch") {
+          const sport = String(a.sport || "").toLowerCase();
+          const hit = SPORT.find(([re]) => re.test(sport)) || SPORT[SPORT.length - 1];
+          code = hit[1]; emoji = hit[3];
+        } else if (KIND[a.leisure]) {
+          code = KIND[a.leisure][0]; emoji = KIND[a.leisure][2];
+        } else continue;
+        const m2 = maskFromRings(f.geometry.rings, bbox);
+        for (let i = 0; i < courtM.length; i++) if (m2[i]) courtM[i] = code;
+        let sx = 0, sy = 0, np = 0;
+        for (const [x, y] of f.geometry.rings[0]) { sx += x; sy += y; np++; }
+        const [cgx, cgy] = cellOf(bbox, sx / np, sy / np);
+        if (cgx >= 0 && cgx < GRID && cgy >= 0 && cgy < GRID)
+          sprites.push({ gx: cgx, gy: cgy, emoji });
+      }
+    return { trailM, waterM, roadM, courtM, sprites };
+  }
+
+  // ---- Satellite drape: sample real imagery per cell -----------------
+  async function fetchSatTexture(bbox) {
+    const [w, s, e, n] = bbox;
+    const spanM = Math.max((e - w) * 111320 * Math.cos(s * Math.PI / 180),
+                           (n - s) * 111320);
+    const z = Math.max(13, Math.min(17, Math.round(17 - Math.log2(spanM / 700))));
+    const tl = tileXY(n, w, z), br = tileXY(s, e, z);
+    const x0 = Math.floor(tl.x), y0 = Math.floor(tl.y);
+    const cols = Math.floor(br.x) - x0 + 1, rows = Math.floor(br.y) - y0 + 1;
+    if (cols * rows > 20) throw new Error("too many imagery tiles");
+    const cv = document.createElement("canvas");
+    cv.width = cols * 256; cv.height = rows * 256;
+    const cx = cv.getContext("2d", { willReadFrequently: true });
+    await Promise.all([...Array(cols * rows)].map((_, i) => {
+      const tx = x0 + (i % cols), ty = y0 + Math.floor(i / cols);
+      return loadImage("https://server.arcgisonline.com/ArcGIS/rest/services/" +
+                       `World_Imagery/MapServer/tile/${z}/${ty}/${tx}`)
+        .then(im => cx.drawImage(im, (tx - x0) * 256, (ty - y0) * 256));
+    }));
+    const px = cx.getImageData(0, 0, cv.width, cv.height).data;
+    const tex = new Uint8ClampedArray(GRID * GRID * 3);
+    for (let gy = 0; gy < GRID; gy++)
+      for (let gx = 0; gx < GRID; gx++) {
+        const lng = w + (e - w) * gx / (GRID - 1);
+        const lat = n - (n - s) * gy / (GRID - 1);
+        const t = tileXY(lat, lng, z);
+        const ix = Math.min(cv.width - 1, Math.max(0, Math.round((t.x - x0) * 256)));
+        const iy = Math.min(cv.height - 1, Math.max(0, Math.round((t.y - y0) * 256)));
+        const k = (iy * cv.width + ix) * 4, o = (gy * GRID + gx) * 3;
+        tex[o] = px[k]; tex[o + 1] = px[k + 1]; tex[o + 2] = px[k + 2];
+      }
+    return tex;
   }
 
   // ---- 4. Drawing ------------------------------------------------
@@ -235,6 +335,10 @@ const EveryParkIso = (() => {
     if (c.includes("open")) return 0.03;
     return 0.07;
   }
+  const hexRgb = h => [parseInt(h.slice(1, 3), 16),
+                       parseInt(h.slice(3, 5), 16),
+                       parseInt(h.slice(5, 7), 16)];
+
   const hash = (gx, gy) => {
     let h = (gx * 73856093) ^ (gy * 19349663);
     h = (h ^ (h >> 13)) * 1274126177;
@@ -242,7 +346,9 @@ const EveryParkIso = (() => {
   };
 
   function draw(canvas, S, yaw) {
-    const { H, inside, trailM, waterM, dropM, edge, p } = S;
+    const { H, inside, trailM, waterM, roadM, courtM, dropM, edge, p,
+            spriteAt, tex } = S;
+    const useSat = S.useSat && tex;
     const ctx = canvas.getContext("2d");
     const W = canvas.width, Hh = canvas.height;
     ctx.clearRect(0, 0, W, Hh);
@@ -284,17 +390,34 @@ const EveryParkIso = (() => {
       const Y = cy + ry * s * .8 - t * zScale;
 
       let r, g, b;
-      if (isWater) {
+      const nb = H[gy * GRID + Math.max(0, gx - 1)];
+      const sh = Math.max(-14, Math.min(18, (h - nb) * 1.6));
+      if (useSat) {
+        // Real imagery draped over the height field, hillshade kept so
+        // the relief still reads. Water/trail/road/court tints blend in
+        // at half strength so the overlays stay legible on photo ground.
+        const o = i * 3;
+        r = tex[o] + sh; g = tex[o + 1] + sh; b = tex[o + 2] + sh;
+        let tint = null;
+        if (isWater) tint = [56, 116, 172];
+        else if (courtM[i]) tint = hexRgb(COURT_COLOR[courtM[i]]);
+        else if (roadM[i]) tint = [154, 160, 166];
+        else if (trailM[i]) tint = [196, 168, 122];
+        if (tint) { r = (r + tint[0]) / 2; g = (g + tint[1]) / 2; b = (b + tint[2]) / 2; }
+      } else if (isWater) {
         const rip = Math.sin(gx * 1.3 + gy * 2.1) * 6;
         r = 56 + rip; g = 116 + rip; b = 172;
+      } else if (courtM[i]) {
+        [r, g, b] = hexRgb(COURT_COLOR[courtM[i]]);
+        r += sh * .5; g += sh * .5; b += sh * .5;
+      } else if (roadM[i]) {
+        r = 148; g = 152; b = 158;                    // asphalt grey
       } else if (trailM[i]) {
         r = 196; g = 168; b = 122;                    // worn-path tan
       } else {
         r = pal.lo[0] + (pal.hi[0] - pal.lo[0]) * t;
         g = pal.lo[1] + (pal.hi[1] - pal.lo[1]) * t;
         b = pal.lo[2] + (pal.hi[2] - pal.lo[2]) * t;
-        const nb = H[gy * GRID + Math.max(0, gx - 1)];
-        const sh = Math.max(-14, Math.min(18, (h - nb) * 1.6));
         r += sh; g += sh; b += sh;
       }
       // Side face first: a darker column reaching down far enough that
@@ -311,7 +434,15 @@ const EveryParkIso = (() => {
 
       // A sprite tree, drawn straight after its own cell so nearer rows
       // paint over it correctly. Density follows the NLCD cover.
-      if (!isWater && !trailM[i] && hash(gx, gy) < density) {
+      const sp = spriteAt && spriteAt.get(i);
+      if (sp) {
+        // Court emoji, drawn straight after its cell for correct depth.
+        ctx.font = `${Math.max(14, s * 3.4) | 0}px system-ui`;
+        ctx.textAlign = "center";
+        ctx.fillText(sp, X, Y - s * .8);
+      }
+      if (!useSat && !sp && !isWater && !trailM[i] && !roadM[i] && !courtM[i]
+          && hash(gx, gy) < density) {
         const jx = (hash(gx + 7, gy) - .5) * w * .6;
         const th = s * (1.5 + hash(gx, gy + 3));      // tree height varies
         const half = s * .55;
@@ -403,14 +534,18 @@ const EveryParkIso = (() => {
     try { H = await fetchHeights(bbox); }
     catch (e) { H = proceduralHeights(p); }
     let dressing = { trailM: new Uint8Array(GRID * GRID),
-                     waterM: new Uint8Array(GRID * GRID) };
+                     waterM: new Uint8Array(GRID * GRID),
+                     roadM: new Uint8Array(GRID * GRID),
+                     courtM: new Uint8Array(GRID * GRID), sprites: [] };
     try { dressing = await fetchDressing(bbox); } catch (e) { /* optional */ }
 
     const nTrail = dressing.trailM.reduce((a, b) => a + b, 0);
     const nWater = dressing.waterM.reduce((a, b) => a + b, 0);
+    const nRoad = dressing.roadM.reduce((a, b) => a + b, 0);
     sub.textContent = [
       boundary ? `boundary: ${boundary.label}` : "no boundary found — square sample",
-      nTrail ? "trails" : null, nWater ? "water" : null,
+      nTrail ? "trails" : null, nRoad ? "roads" : null, nWater ? "water" : null,
+      dressing.sprites.length ? `${dressing.sprites.length} facilities` : null,
       ((p.attrs || {}).cover || null), "drag to rotate"
     ].filter(Boolean).join(" · ");
 
@@ -438,7 +573,31 @@ const EveryParkIso = (() => {
     spin.remove();
     canvas.style.display = "";
 
-    const S = { H, inside, ...dressing, dropM, edge, p };
+    // Sprite lookup by cell index, for depth-correct drawing.
+    const spriteAt = new Map();
+    for (const sp of dressing.sprites)
+      spriteAt.set(sp.gy * GRID + sp.gx, sp.emoji);
+
+    const S = { H, inside, ...dressing, dropM, edge, p, spriteAt,
+                useSat: false, tex: null };
+
+    // 🛰 toggle: drape real imagery over the terrain. Fetched lazily on
+    // first use; if the imagery can't be read (offline, CORS) the button
+    // apologises and stays in game mode.
+    const satBtn = document.createElement("button");
+    satBtn.id = "isoSat";
+    satBtn.textContent = "🛰 Satellite";
+    ov.querySelector(".iso-foot").insertBefore(satBtn, ov.querySelector("#isoClose"));
+    satBtn.addEventListener("click", async () => {
+      if (S.useSat) { S.useSat = false; satBtn.classList.remove("active"); return; }
+      if (!S.tex) {
+        satBtn.textContent = "🛰 loading…";
+        try { S.tex = await fetchSatTexture(bbox); }
+        catch (e) { satBtn.textContent = "🛰 unavailable"; return; }
+        satBtn.textContent = "🛰 Satellite";
+      }
+      S.useSat = true; satBtn.classList.add("active");
+    });
     let yaw = 0, target = 0, dragging = false, lastX = 0;
     canvas.addEventListener("pointerdown", e => { dragging = true; lastX = e.clientX; canvas.setPointerCapture(e.pointerId); });
     canvas.addEventListener("pointermove", e => { if (dragging) { target += (e.clientX - lastX) * .008; lastX = e.clientX; } });
