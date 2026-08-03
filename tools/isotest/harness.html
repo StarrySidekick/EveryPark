@@ -10,8 +10,20 @@
   // Offline determinism: every fetch fails, so the viewer falls back to
   // procedural terrain and a full-square island. That exercises the whole
   // renderer without any network, which is exactly what a regression
-  // check wants — the same scene every run.
-  window.fetch = () => Promise.reject(new Error("offline harness"));
+  // check wants — the same scene every run. The one exception: GNIS
+  // name queries get a canned answer, so the label pass renders too.
+  window.fetch = (url) => {
+    if (String(url).includes("geonames")) return Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({ features: [
+        { attributes: { gaz_name: "Test Hill", gaz_featureclass: "Summit" },
+          geometry: { points: [[-73.4835, 41.4205]] } },
+        { attributes: { gaz_name: "Mirror Lake", gaz_featureclass: "Lake" },
+          geometry: { points: [[-73.4745, 41.4165]] } }
+      ] })
+    });
+    return Promise.reject(new Error("offline harness"));
+  };
 </script>
 <script src="../../iso.js"></script>
 <script>

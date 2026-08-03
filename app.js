@@ -2381,14 +2381,15 @@
     e.currentTarget.classList.toggle("active", !layersPanel.hidden);
   });
 
-  // 🎲 Random park: fly somewhere that passes the current filters.
+  // Random park: fly somewhere that passes the current filters.
   (document.getElementById("randomBtn") || {addEventListener(){}}).addEventListener("click", () => {
-    // Only somewhere with terrain to look at — the whole point of the
-    // dice is landing somewhere you can immediately fly around in 3D.
-    // Somewhere you can definitely go, run by a public body, with terrain
-    // worth flying around — the dice should never land on a maybe.
+    // Somewhere you can definitely go, run by a public body, with
+    // terrain worth flying around AND a mapped trail to walk when you
+    // land (Timothy's spec, 2026-08-03) — the dice should never drop
+    // you somewhere with nothing to do.
     const pool = allParks.filter(p =>
       visible(p) && p.status === "park" && (p.attrs || {}).relief != null
+      && (p.attrs || {}).trails
       && ["town", "state", "national"].includes(p.type));
     const use = pool.length ? pool : allParks.filter(visible);
     if (!use.length) return;

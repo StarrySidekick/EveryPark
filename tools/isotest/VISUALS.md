@@ -28,7 +28,14 @@ change that looked correct.
 - Defaults on open: blocky (smooth off), sides Solid, summer, day,
   spin ON, ~10 m per block. Cemeteries open at dusk with headstones and
   ground mist.
-- Zoom: wheel and pinch, capped at 5x.
+- Zoom: wheel and pinch, capped at 9x.
+- **Landscape names** (v0.27.0): GNIS summits/ridges/gaps/cliffs and
+  lakes/reservoirs/falls, max 8 per park, drawn LAST (never hidden by
+  terrain). Uppercase monospace with a paper-coloured halo; water names
+  in lake-blue ink, land names in forest ink; a 1px tick pins each name
+  to its cell. Greedy spacing skips a name that would overlap one
+  already placed. The harness feeds two canned names (Test Hill,
+  Mirror Lake) so this pass renders offline.
 
 ## Blocky (voxel) mode
 

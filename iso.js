@@ -423,6 +423,43 @@ const EveryParkIso = (() => {
     return raw;
   }
 
+  // ---- GNIS: the names of the land itself --------------------------
+  // Summits, ridges, gaps and cliffs from the Landforms layer (5);
+  // lakes, reservoirs, swamps and falls from Other Hydrographic (7).
+  // GNIS is the federal gazetteer — the same names USGS prints on its
+  // topo maps, from the same nationalmap.gov family the elevation and
+  // imagery already come from.
+  async function fetchNames(bbox) {
+    const [w, s, e, n] = bbox;
+    const env = JSON.stringify({ xmin: w, ymin: s, xmax: e, ymax: n,
+                                 spatialReference: { wkid: 4326 } });
+    const common = { geometry: env, geometryType: "esriGeometryEnvelope",
+                     inSR: "4326", outSR: "4326",
+                     spatialRel: "esriSpatialRelIntersects",
+                     outFields: "gaz_name,gaz_featureclass",
+                     returnGeometry: "true", resultRecordCount: "40" };
+    const GAZ = "https://carto.nationalmap.gov/arcgis/rest/services/geonames/MapServer/";
+    const [land, hydro] = await Promise.allSettled([
+      arc(GAZ + "5/query", { ...common, where: "1=1" }),
+      arc(GAZ + "7/query", { ...common, where:
+        "gaz_featureclass IN ('Lake','Reservoir','Falls','Swamp','Bay','Beach')" })
+    ]);
+    const val = r => r.status === "fulfilled" ? r.value : [];
+    const out = [];
+    for (const f of [...val(land), ...val(hydro)]) {
+      const a = f.attributes || {};
+      const g = f.geometry || {};
+      // The gazetteer layers are multipoint; be tolerant of plain points.
+      const pt = (g.points && g.points[0]) || (g.x != null ? [g.x, g.y] : null);
+      if (!pt || !a.gaz_name) continue;
+      out.push({ name: a.gaz_name, cls: a.gaz_featureclass || "",
+                 water: /Lake|Reservoir|Falls|Swamp|Bay|Beach|Spring/i
+                        .test(a.gaz_featureclass || ""),
+                 lng: pt[0], lat: pt[1] });
+    }
+    return out;
+  }
+
   // Paths as VECTOR polylines in grid coords, split where they leave
   // the island. Drawn as strokes instead of rasterised cells, so a
   // trail reads as a line rather than a staircase of blocks.
@@ -1172,7 +1209,12 @@ const EveryParkIso = (() => {
         const dBuild = buildM[j] && !dWater;
         if (dWater) dh = waterLevel;
         if (dBuild) dh += 7;
-        const [dX, dY] = project(dgx, dgy, dh);
+        // Stand on the surface that is actually DRAWN. During a coarse
+        // pass the ground here is the anchor's block, not this cell's
+        // true height — a tree planted at its true height sinks into or
+        // floats over that block on slopes, and nearer blocks smear
+        // over its buried half. At full detail (st=1) they're the same.
+        const [dX, dY] = project(dgx, dgy, st > 1 ? h : dh);
 
         const sp = spriteAt && spriteAt.get(j);
         // Facility marks are drawn after the ways, so a court's icon is
@@ -1276,6 +1318,38 @@ const EveryParkIso = (() => {
     for (const [X, Y, sp] of deferred)
       facilitySprite(ctx, sp, X, Y - s * 1.5, Math.min(11, Math.max(4.5, s * 1.5)), tod);
 
+    // Landscape names — GNIS summits and lakes, drawn last so the land
+    // never hides its own name. Retro-topo style: uppercase mono over a
+    // paper-coloured halo, lake names in water ink, each pinned to its
+    // spot by a short tick. Greedy spacing: a name that would land on
+    // one already drawn is skipped this frame rather than overlapped.
+    if (S.labels && S.labels.length) {
+      const fs = Math.max(10, Math.min(17, s * 2.2));
+      ctx.font = `600 ${fs}px ui-monospace, Menlo, Consolas, monospace`;
+      ctx.textAlign = "center";
+      const inkC = tod(13, 42, 30), watC = tod(36, 84, 128),
+            haloC = tod(245, 242, 230);
+      const placed = [];
+      for (const L of S.labels) {
+        const [lx, lyG] = project(L.gx, L.gy, heightAtCell(L.gx, L.gy));
+        const ly = lyG - fs * .9;
+        if (placed.some(q => Math.abs(q[0] - lx) < fs * 7
+                          && Math.abs(q[1] - ly) < fs * 1.6)) continue;
+        placed.push([lx, ly]);
+        const t = L.text.toUpperCase();
+        ctx.lineJoin = "round";
+        ctx.lineWidth = Math.max(2.5, fs * .24);
+        ctx.strokeStyle = `rgba(${haloC[0] | 0},${haloC[1] | 0},${haloC[2] | 0},.85)`;
+        ctx.strokeText(t, lx, ly);
+        const c = L.water ? watC : inkC;
+        ctx.fillStyle = `rgb(${c[0] | 0},${c[1] | 0},${c[2] | 0})`;
+        ctx.fillText(t, lx, ly);
+        ctx.beginPath();
+        ctx.moveTo(lx, ly + fs * .35); ctx.lineTo(lx, lyG);
+        ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = 1; ctx.stroke();
+      }
+    }
+
     ctx.fillStyle = "rgba(255,255,255,.75)";
     ctx.font = "11px system-ui";
     ctx.textAlign = "left";
@@ -1300,7 +1374,8 @@ const EveryParkIso = (() => {
                  S.smooth ? 1 : 0, S.useSat ? 1 : 0, GRID,
                  Math.round((S.zoom || 1) * 200), cw, ch,
                  S.trailPieces ? S.trailPieces.length : 0,
-                 S.roadPieces ? S.roadPieces.length : 0].join(",");
+                 S.roadPieces ? S.roadPieces.length : 0,
+                 S.labels ? S.labels.length : 0].join(",");
     if (!S._cache || S._cache.width !== cw || S._cache.height !== ch) {
       S._cache = document.createElement("canvas");
       S._cache.width = cw; S._cache.height = ch;
@@ -1463,6 +1538,32 @@ const EveryParkIso = (() => {
     sub.textContent = baseSub + " · fetching trails, roads, buildings…";
 
     let rawDressing = null;
+    let rawNames = null;
+    // Names live in lat/lng; the grid they pin to changes with the
+    // block-size slider, so keep the raw list and re-pin on rebuild.
+    const buildLabels = () => {
+      if (!rawNames) return;
+      const order = c => /Summit/i.test(c) ? 0
+                       : /Lake|Reservoir/i.test(c) ? 1
+                       : /Ridge|Falls|Gap|Cliff/i.test(c) ? 2 : 3;
+      const seen = new Set();
+      const labels = [];
+      for (const nm of rawNames.slice()
+                         .sort((a, b) => order(a.cls) - order(b.cls))) {
+        const [gx, gy] = cellOf(bbox, nm.lng, nm.lat);
+        if (gx < 0 || gy < 0 || gx >= GRID || gy >= GRID) continue;
+        if (!S.inside[gy * GRID + gx]) continue;   // the island only
+        const k = nm.name.toLowerCase();
+        if (seen.has(k)) continue;
+        seen.add(k);
+        labels.push({ gx, gy, text: nm.name, water: nm.water });
+        if (labels.length >= 8) break;             // a map, not a phonebook
+      }
+      S.labels = labels;
+    };
+    fetchNames(bbox).then(ns => { rawNames = ns; buildLabels(); })
+                    .catch(() => { /* nameless land is fine */ });
+
     fetchRawDressing(bbox).then(raw => {
       rawDressing = raw;
       const d = buildDressing(raw, bbox, S.inside);
@@ -1567,6 +1668,7 @@ const EveryParkIso = (() => {
       S.tex = satSample ? satTexFrom(satSample, bbox) : null;
       S.treeMask = S.tex ? treeMaskFrom(S.tex, S.inside) : null;
       if (!S.tex) S.useSat = false;
+      buildLabels();          // re-pin names to the new grid
       labelBlocks();
     };
     S.cellM = defCell;
@@ -1609,7 +1711,7 @@ const EveryParkIso = (() => {
     // Scroll to zoom, centred on the island.
     canvas.addEventListener("wheel", e => {
       e.preventDefault();
-      S.zoom = Math.min(5, Math.max(.5, S.zoom * (e.deltaY < 0 ? 1.1 : 0.9)));
+      S.zoom = Math.min(9, Math.max(.5, S.zoom * (e.deltaY < 0 ? 1.1 : 0.9)));
     }, { passive: false });
 
     const spinBtn = document.createElement("button");
@@ -1644,7 +1746,7 @@ const EveryParkIso = (() => {
       if (pointers.size >= 2) {
         const d = spread();
         if (pinchDist > 0 && d > 0)
-          S.zoom = Math.min(5, Math.max(.5, S.zoom * (d / pinchDist)));
+          S.zoom = Math.min(9, Math.max(.5, S.zoom * (d / pinchDist)));
         pinchDist = d;
       } else if (dragging) {
         target += (e.clientX - lastX) * .008; lastX = e.clientX;
