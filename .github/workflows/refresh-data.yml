@@ -12,6 +12,15 @@ on:
         description: "Skip the tile rebuild (much faster; places only)"
         type: boolean
         default: false
+  # Git-based dispatch: committing data/refresh-request starts a full
+  # refresh. Exists because the sandbox sessions that maintain this repo
+  # can push over git but cannot reach the GitHub API to press the
+  # workflow_dispatch button. (Push events have no inputs, so this path
+  # always builds tiles — which is what a requested refresh wants anyway.)
+  push:
+    branches: [main]
+    paths:
+      - "data/refresh-request"
 
 permissions:
   contents: write
