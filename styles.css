@@ -355,13 +355,13 @@ main { flex: 1; display: flex; position: relative; min-height: 0; }
 }
 
 /* ---------- Guide panel ---------- */
-#guideBtn {
+#randomBtn, #guideBtn {
   background: rgba(255,255,255,.15);
   border: none; color: #fff; border-radius: 3px;
   padding: 6px 14px; font-size: .8rem; font-weight: 600; cursor: pointer;
   align-self: flex-end;
 }
-#guideBtn:hover { background: rgba(255,255,255,.3); }
+#randomBtn:hover, #guideBtn:hover { background: rgba(255,255,255,.3); }
 
 #guideOverlay {
   position: fixed; inset: 0; z-index: 2000;
@@ -560,3 +560,13 @@ header h1 { margin-right: 4px; }
   z-index: 1300; min-width: 320px;
 }
 #filtersPanel .chips { flex-wrap: wrap; }
+
+/* iso loading spinner */
+.iso-spin {
+  width: 44px; height: 44px; margin: 120px auto;
+  border: 4px solid rgba(255,255,255,.15);
+  border-top-color: #7fd493;
+  border-radius: 50%;
+  animation: iso-rot .8s linear infinite;
+}
+@keyframes iso-rot { to { transform: rotate(360deg); } }

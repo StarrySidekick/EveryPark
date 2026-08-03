@@ -26,7 +26,9 @@ const EveryParkIso = (() => {
   const DEEP = "https://services1.arcgis.com/FjPcSmEFuDYlIdKC/arcgis/rest/services/";
   const PADUS = "https://services.arcgis.com/v01gqwM5QqNysAAi/arcgis/rest/services/" +
                 "Manager_Name_PADUS/FeatureServer/0/query";
-  const GRID = 104;
+  // Grid density scales with park size (set per open): a 2,000-acre
+  // forest needs far more cells than a village green for the same detail.
+  let GRID = 104;
 
   let raf = null;
 
@@ -240,7 +242,7 @@ const EveryParkIso = (() => {
   };
 
   function draw(canvas, S, yaw) {
-    const { H, inside, trailM, waterM, p } = S;
+    const { H, inside, trailM, waterM, dropM, edge, p } = S;
     const ctx = canvas.getContext("2d");
     const W = canvas.width, Hh = canvas.height;
     ctx.clearRect(0, 0, W, Hh);
@@ -295,6 +297,15 @@ const EveryParkIso = (() => {
         const sh = Math.max(-14, Math.min(18, (h - nb) * 1.6));
         r += sh; g += sh; b += sh;
       }
+      // Side face first: a darker column reaching down far enough that
+      // the cells drawn in front always overlap it — so the terrain is a
+      // connected blocky solid instead of floating top faces you could
+      // see between. Edge columns drop further, giving the island sides.
+      const i2 = gy * GRID + gx;
+      const skirt = (dropM[i2] / span) * zScale
+                  + (edge[i2] ? zScale * .12 + s * 2.4 : 1.6);
+      ctx.fillStyle = `rgb(${r * .55 | 0},${g * .55 | 0},${b * .55 | 0})`;
+      ctx.fillRect(X - w / 2, Y, w + .7, skirt + hgt);
       ctx.fillStyle = `rgb(${r | 0},${g | 0},${b | 0})`;
       ctx.fillRect(X - w / 2, Y - hgt / 2, w + .7, hgt + .7);
 
@@ -348,6 +359,11 @@ const EveryParkIso = (() => {
     ov.querySelector("#isoClose").addEventListener("click", close);
     ov.addEventListener("click", e => { if (e.target === ov) close(); });
 
+    const spin = document.createElement("div");
+    spin.className = "iso-spin";
+    ov.querySelector("#isoPanel").insertBefore(spin, canvas);
+    canvas.style.display = "none";
+
     // Boundary → bbox → heights + dressing, all best-effort.
     let boundary = null;
     try { boundary = await fetchBoundary(p); } catch (e) { /* fall through */ }
@@ -371,6 +387,18 @@ const EveryParkIso = (() => {
       inside = new Uint8Array(GRID * GRID).fill(1);
     }
 
+    // Scale the voxel grid to the terrain: ~9 m per cell, clamped so a
+    // pocket park stays chunky-cute and a state forest stays smooth
+    // enough to read (and the per-frame sort stays affordable).
+    {
+      const [w, s2, e2, n2] = bbox;
+      const spanM = Math.max((e2 - w) * 111320 * Math.cos(s2 * Math.PI / 180),
+                             (n2 - s2) * 111320);
+      GRID = Math.max(96, Math.min(192, Math.round(spanM / 9)));
+      inside = boundary ? maskFromRings(boundary.rings, bbox)
+                        : new Uint8Array(GRID * GRID).fill(1);
+    }
+
     let H;
     try { H = await fetchHeights(bbox); }
     catch (e) { H = proceduralHeights(p); }
@@ -386,7 +414,31 @@ const EveryParkIso = (() => {
       ((p.attrs || {}).cover || null), "drag to rotate"
     ].filter(Boolean).join(" · ");
 
-    const S = { H, inside, ...dressing, p };
+    // Minecraft-style solid sides: how far each column must extend down
+    // so no gap opens between it and the cells drawn in front of it.
+    // Boundary columns get a thick skirt so the island reads as a slab.
+    const dropM = new Float32Array(GRID * GRID);
+    const edge = new Uint8Array(GRID * GRID);
+    for (let gy = 0; gy < GRID; gy++)
+      for (let gx = 0; gx < GRID; gx++) {
+        const i = gy * GRID + gx;
+        if (!inside[i]) continue;
+        let lo = H[i], isEdge = 0;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nx = gx + dx, ny = gy + dy;
+          if (nx < 0 || ny < 0 || nx >= GRID || ny >= GRID
+              || !inside[ny * GRID + nx]) { isEdge = 1; continue; }
+          const nh = H[ny * GRID + nx];
+          if (nh < lo) lo = nh;
+        }
+        dropM[i] = H[i] - lo;
+        edge[i] = isEdge;
+      }
+
+    spin.remove();
+    canvas.style.display = "";
+
+    const S = { H, inside, ...dressing, dropM, edge, p };
     let yaw = 0, target = 0, dragging = false, lastX = 0;
     canvas.addEventListener("pointerdown", e => { dragging = true; lastX = e.clientX; canvas.setPointerCapture(e.pointerId); });
     canvas.addEventListener("pointermove", e => { if (dragging) { target += (e.clientX - lastX) * .008; lastX = e.clientX; } });

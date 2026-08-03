@@ -2304,6 +2304,18 @@
     e.currentTarget.classList.toggle("active", !layersPanel.hidden);
   });
 
+  // 🎲 Random park: fly somewhere that passes the current filters.
+  (document.getElementById("randomBtn") || {addEventListener(){}}).addEventListener("click", () => {
+    const pool = allParks.filter(visible);
+    if (!pool.length) return;
+    const p = pool[Math.floor(Math.random() * pool.length)];
+    map.flyTo([p.lat, p.lng], Math.max(map.getZoom(), 14), { duration: 0.9 });
+    setTimeout(() => {
+      try { cluster.zoomToShowLayer(p.marker, () => p.marker.openPopup()); }
+      catch (e) { p.marker.openPopup(); }
+    }, 950);
+  });
+
   // Filters dropdown: the access + owner chip groups live in one panel.
   const filtersPanel = document.getElementById("filtersPanel");
   const filtersBtn = document.getElementById("filtersBtn");
@@ -2312,8 +2324,12 @@
       filtersPanel.hidden = !filtersPanel.hidden;
       filtersBtn.classList.toggle("active", !filtersPanel.hidden);
     });
-    document.addEventListener("click", e => {
-      if (!filtersPanel.hidden && !filtersPanel.contains(e.target) && e.target !== filtersBtn) {
+    // pointerdown, not click: iOS Safari doesn't deliver document-level
+    // click events for taps on non-clickable elements (like the map),
+    // which left the panel stuck open on phones.
+    document.addEventListener("pointerdown", e => {
+      if (!filtersPanel.hidden && !filtersPanel.contains(e.target)
+          && e.target !== filtersBtn && !filtersBtn.contains(e.target)) {
         filtersPanel.hidden = true;
         filtersBtn.classList.remove("active");
       }
