@@ -648,12 +648,22 @@ def main():
     add_path = os.path.join(args.data, "additions.json")
     if os.path.exists(add_path):
         for a in load(add_path).get("places") or []:
+            # Hand-added places are hand-verified by definition — carry the
+            # provenance so the card can say "checked by hand" like any
+            # researched place, instead of looking less trustworthy than
+            # the automated ones.
+            attrs = {"trails": bool(a.get("trails")), "parking": bool(a.get("parking")),
+                     "manual": True}
+            if a.get("source"):
+                attrs["researched"] = True
+                attrs["sources"] = a["source"]
+            if a.get("checked"):
+                attrs["checked"] = a["checked"]
             B.add(name=a["n"], type=a.get("type", "preserve"), subtype=a.get("t"),
                   lat=a["lat"], lng=a["lng"], town=a.get("town") or towns.find(a["lat"], a["lng"]),
                   acres=a.get("a"), url=a.get("url"), fee=a.get("fee"),
                   agency=a.get("agency"), note=a.get("note"),
-                  attrs={"trails": bool(a.get("trails")), "parking": bool(a.get("parking")),
-                         "manual": True})
+                  attrs=attrs)
 
     # --- 3. Federal land ----------------------------------------------
     for n in load(os.path.join(args.data, "national.json"))["parks"]:

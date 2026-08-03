@@ -1,16 +1,8 @@
 {
   "_readme": "Places that are real and public but missing from OpenStreetMap. Add entries here and they appear on the map immediately. Fields: n=name, t=subtype label, type=state|national|town|preserve|cemetery, lat/lng, town, a=acres, url, fee, agency, note, trails=true if it has a trail system.",
   "_source": "Verified against each organization's official site.",
-
   "_aliases_readme": "Local names for places whose official name is different. People know land by the road, farm or access point it's reached from, not the name on the deed. Each entry makes the alias findable in search.",
-  "aliases": [
-    {
-      "match": "Towner Hill Preserve",
-      "aka": ["Upland Pastures", "Upland Pastures Farm", "Upland Pastures Road"],
-      "why": "Reached from Upland Pastures Road in Sherman; locally known by the farm/road name rather than the preserve name."
-    }
-  ],
-
+  "aliases": [],
   "places": [
     {
       "n": "Deer Pond Farm",
@@ -25,7 +17,45 @@
       "agency": "Connecticut Audubon Society",
       "note": "15 miles of trails, 850 acres (half in Sherman CT, half in Pawling NY). Trails open dawn to dusk year round; visitor center and parking at 57 Wakeman Hill Road. No dogs, bikes or horses. Shown as a single point because no boundary for it exists in OpenStreetMap — turn on 'Protected land' to see the actual protected parcels covering this area.",
       "trails": true,
-      "parking": true
+      "parking": true,
+      "source": [
+        "https://www.ctaudubon.org/deer-pond-farm-home/"
+      ],
+      "checked": "2026-08-02"
+    },
+    {
+      "n": "Hadlow Preserve",
+      "type": "preserve",
+      "t": "Land Trust Preserve",
+      "town": "Sherman",
+      "lat": 41.55626,
+      "lng": -73.5004,
+      "a": 45,
+      "url": "https://ctland.org/our-trails-detail/hadlow-preserve-sherman/",
+      "agency": "Northwest Connecticut Land Conservancy",
+      "note": "A 45-acre working hayfield preserve where a mowed perimeter path of about 1 to 1.5 miles climbs past stone walls and sugar maples to a hilltop with westward views — NCLC calls it the best place for kite flying, and a favorite for picnics and fall hawk-watching. Roadside parking near the gate at 9 Cozier Hill Road; stay on the field perimeter (private land lies north of the stone wall) and respect farm equipment.",
+      "trails": true,
+      "parking": true,
+      "source": [
+        "https://ctland.org/our-trails-detail/hadlow-preserve-sherman/"
+      ],
+      "checked": "2026-08-02"
+    },
+    {
+      "n": "Upland Pastures",
+      "type": "preserve",
+      "t": "Conservation Land",
+      "town": "Sherman",
+      "lat": 41.58848,
+      "lng": -73.48474,
+      "a": 73.5,
+      "agency": "Northwest Connecticut Land Conservancy",
+      "note": "Former Osborne family land off Upland Pastures Road, deeded to Naromi Land Trust and now held by the Northwest Connecticut Land Conservancy. It is one of NCLC's non-trail conservation holdings — absent from their public hiking preserves and the Sherman hiking guide, with no marked trails or parking publicized, and USGS PAD-US codes its access as restricted. Contact NCLC before visiting; the adjacent Towner Hill Preserve has a public trail.",
+      "source": [
+        "https://ctland.org/our_trails/",
+        "https://ctland.org/our_lands/"
+      ],
+      "checked": "2026-08-02"
     }
   ]
 }
