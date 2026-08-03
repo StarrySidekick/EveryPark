@@ -392,6 +392,27 @@ const EveryParkIso = (() => {
     return raw;
   }
 
+  // Paths as VECTOR polylines in grid coords, split where they leave
+  // the island. Drawn as strokes instead of rasterised cells, so a
+  // trail reads as a line rather than a staircase of blocks.
+  function linesFrom(features, bbox, inside) {
+    const out = [];
+    for (const f of features)
+      for (const path of (f.geometry && f.geometry.paths) || []) {
+        let run = [];
+        for (const [x, y] of path) {
+          const gx = (x - bbox[0]) / (bbox[2] - bbox[0]) * (GRID - 1);
+          const gy = (bbox[3] - y) / (bbox[3] - bbox[1]) * (GRID - 1);
+          const cx = Math.round(gx), cy = Math.round(gy);
+          if (cx >= 0 && cy >= 0 && cx < GRID && cy < GRID
+              && inside[cy * GRID + cx]) run.push([gx, gy]);
+          else { if (run.length > 1) out.push(run); run = []; }
+        }
+        if (run.length > 1) out.push(run);
+      }
+    return out;
+  }
+
   function buildDressing(raw, bbox, inside) {
     const trailM = new Uint8Array(GRID * GRID);
     rasterisePaths(raw.trailFeats, bbox, trailM);
@@ -477,7 +498,9 @@ const EveryParkIso = (() => {
       }
       if (hikePath.length < 6) hikePath = null;
     }
-    return { trailM, waterM, roadM, buildM, parkM, courtM, sprites, hikePath };
+    return { trailM, waterM, roadM, buildM, parkM, courtM, sprites, hikePath,
+             trailLines: linesFrom(raw.trailFeats, bbox, inside),
+             roadLines: linesFrom(raw.roads, bbox, inside) };
   }
 
   // ---- Seasons (prototype) ----------------------------------------
@@ -608,11 +631,18 @@ const EveryParkIso = (() => {
     return M;
   }
 
+  // One consistent earth colour for every side face, everywhere. Per-cell
+  // wall shading made the hem look noisy and flickery as it rotated.
+  const WALL = [88, 76, 60];
+
   function draw(canvas, S, yaw) {
     const { H, inside, trailM, waterM, roadM, buildM, parkM, courtM,
             dropM, edge, p, spriteAt, tex } = S;
     const useSat = S.useSat && tex;
     const tod = TOD[S.tod].fn;
+    // Satellite is a photo — always drape it on the continuous mesh
+    // rather than on stepped columns.
+    const smooth = !!S.smooth || useSat;
     const ctx = canvas.getContext("2d");
     const W = canvas.width, Hh = canvas.height;
     drawSky(ctx, W, Hh, S.tod);
@@ -638,31 +668,76 @@ const EveryParkIso = (() => {
       return [cx + rx * s * 1.55,
               cy + ry * s * .8 - (h - min) / span * zScale];
     };
+    const depth = (fgx, fgy) => (fgx - GRID / 2) * sin + (fgy - GRID / 2) * cos;
 
+    // Terrain height a path or sprite should sit on.
+    const heightAtCell = (fgx, fgy) => {
+      const gx2 = Math.min(GRID - 1, Math.max(0, Math.round(fgx)));
+      const gy2 = Math.min(GRID - 1, Math.max(0, Math.round(fgy)));
+      const j = gy2 * GRID + gx2;
+      let h = H[j];
+      if (waterM[j] && h <= waterLevel + 4) h = waterLevel;
+      return h;
+    };
+
+    // Painter's order: terrain cells AND path segments together, so a
+    // trail disappears behind a ridge instead of floating over it.
     const order = [];
     for (let gy = 0; gy < GRID; gy++)
       for (let gx = 0; gx < GRID; gx++) {
         if (!inside[gy * GRID + gx]) continue;
         const rx = (gx - GRID / 2) * cos - (gy - GRID / 2) * sin;
-        const ry = (gx - GRID / 2) * sin + (gy - GRID / 2) * cos;
-        order.push([ry, rx, gx, gy]);
+        order.push([depth(gx, gy), rx, gx, gy]);
       }
+    const pushLines = (lines, kind) => {
+      for (const line of lines || [])
+        for (let k = 0; k + 1 < line.length; k++) {
+          const a = line[k], b = line[k + 1];
+          order.push([(depth(a[0], a[1]) + depth(b[0], b[1])) / 2,
+                      -1, { a, b, kind }, null]);
+        }
+    };
+    pushLines(S.trailLines, "trail");
+    pushLines(S.roadLines, "road");
     order.sort((a, b) => a[0] - b[0]);
 
     const w = s * 1.62, hgt = s * .92;
-    const smooth = !!S.smooth;
-    // Solid mode: every wall ends on ONE horizontal line just below the
-    // island's deepest projected point — a level display-stand hem, the
-    // same whichever way the island is rotated.
-    const maxRy = order.length ? order[order.length - 1][0] : 0;
+    // Infinite mode: one level line below the island's deepest point.
+    let maxRy = -Infinity;
+    for (const e2 of order) if (e2[0] > maxRy) maxRy = e2[0];
     const slabY = cy + maxRy * s * .8 + hgt * 2 + s * 1.2;
-    for (const [ry, rx, gx, gy] of order) {
+    const sides = S.sides == null ? 0 : S.sides;   // 0 solid 1 infinite 2 skirt 3 tops
+    const [wr, wg, wb] = tod(WALL[0], WALL[1], WALL[2]);
+    const wallFill = `rgb(${wr | 0},${wg | 0},${wb | 0})`;
+    const ribbon = zScale * .12 + s * 2.4;
+
+    const trailCol = (() => { const c = tod(196, 168, 122); return `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`; })();
+    const roadCol  = (() => { const c = tod(150, 154, 160); return `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`; })();
+
+    for (const entry of order) {
+      // --- a path segment ---
+      if (entry[1] === -1) {
+        const { a, b, kind } = entry[2];
+        const pa = project(a[0], a[1], heightAtCell(a[0], a[1]));
+        const pb = project(b[0], b[1], heightAtCell(b[0], b[1]));
+        ctx.strokeStyle = kind === "road" ? roadCol : trailCol;
+        ctx.lineWidth = kind === "road" ? Math.max(2, s * 1.7)
+                                        : Math.max(1.4, s * 1.0);
+        ctx.lineCap = "round"; ctx.lineJoin = "round";
+        ctx.beginPath();
+        ctx.moveTo(pa[0], pa[1] - s * .18);
+        ctx.lineTo(pb[0], pb[1] - s * .18);
+        ctx.stroke();
+        continue;
+      }
+
+      const [ry, rx, gx, gy] = entry;
       const i = gy * GRID + gx;
       let h = H[i];
       const isWater = waterM[i] && (h <= waterLevel + 4);
       const isBuild = buildM[i] && !isWater;
       if (isWater) h = waterLevel;
-      if (isBuild) h += 7;                            // extruded block
+      if (isBuild) h += 7;
       const t = (h - min) / span;
       const X = cx + rx * s * 1.55;
       const Y = cy + ry * s * .8 - t * zScale;
@@ -672,7 +747,7 @@ const EveryParkIso = (() => {
       const sh = Math.max(-14, Math.min(18, (h - nb) * 1.6));
       if (isBuild) {
         const v = 18 * hash(gx, gy);
-        r = 158 + v; g = 144 + v; b = 122 + v;        // roof
+        r = 158 + v; g = 144 + v; b = 122 + v;
       } else if (useSat) {
         const o = i * 3;
         r = tex[o] + sh; g = tex[o + 1] + sh; b = tex[o + 2] + sh;
@@ -680,8 +755,6 @@ const EveryParkIso = (() => {
         if (isWater) tint = [56, 116, 172];
         else if (courtM[i]) tint = hexRgb(COURT_COLOR[courtM[i]]);
         else if (parkM[i]) tint = [176, 178, 180];
-        else if (roadM[i]) tint = [154, 160, 166];
-        else if (trailM[i]) tint = [196, 168, 122];
         if (tint) { r = (r + tint[0]) / 2; g = (g + tint[1]) / 2; b = (b + tint[2]) / 2; }
       } else if (isWater) {
         const rip = Math.sin(gx * 1.3 + gy * 2.1) * 6;
@@ -690,83 +763,74 @@ const EveryParkIso = (() => {
         [r, g, b] = hexRgb(COURT_COLOR[courtM[i]]);
         r += sh * .5; g += sh * .5; b += sh * .5;
       } else if (parkM[i]) {
-        r = 176; g = 178; b = 180;                    // parking pad
-      } else if (roadM[i]) {
-        r = 148; g = 152; b = 158;                    // asphalt
-      } else if (trailM[i]) {
-        r = 196; g = 168; b = 122;                    // worn path
+        r = 176; g = 178; b = 180;
       } else {
         r = pal.lo[0] + (pal.hi[0] - pal.lo[0]) * t;
         g = pal.lo[1] + (pal.hi[1] - pal.lo[1]) * t;
         b = pal.lo[2] + (pal.hi[2] - pal.lo[2]) * t;
         r += sh; g += sh; b += sh;
       }
-      if (!useSat && !isWater && !courtM[i] && !parkM[i] && !roadM[i] && !isBuild)
+      if (!useSat && !isWater && !courtM[i] && !parkM[i] && !isBuild)
         [r, g, b] = SEASONS[S.season || 0].ground(r, g, b);
       [r, g, b] = tod(r, g, b);
+      const topFill = `rgb(${r | 0},${g | 0},${b | 0})`;
 
-      // 0 solid (down to the terrain's lowest point), 1 infinite (level
-      // slab line), 2 skirt (ribbon), 3 tops (no fill)
-      const sides = S.sides == null ? 0 : S.sides;
-      if (smooth && gx + 1 < GRID && gy + 1 < GRID
-          && inside[i + 1] && inside[i + GRID] && inside[i + GRID + 1]) {
-        // "Blockiness → infinity": fill the quad between this vertex and
-        // its three neighbours, so the surface is a continuous mesh.
-        const hE = isWater ? h : H[i + 1] + (buildM[i + 1] && !waterM[i + 1] ? 7 : 0);
-        const hS = isWater ? h : H[i + GRID] + (buildM[i + GRID] && !waterM[i + GRID] ? 7 : 0);
-        const hSE = isWater ? h : H[i + GRID + 1] + (buildM[i + GRID + 1] && !waterM[i + GRID + 1] ? 7 : 0);
-        const p00 = project(gx, gy, h), p10 = project(gx + 1, gy, hE);
-        const p11 = project(gx + 1, gy + 1, hSE), p01 = project(gx, gy + 1, hS);
-        ctx.fillStyle = `rgb(${r | 0},${g | 0},${b | 0})`;
+      if (smooth) {
+        // Every inside cell gets a quad — no blocky fallback at the
+        // boundary, which was the fringe of blocks around the shoreline.
+        // Missing neighbours reuse this cell's height so the mesh ends flat.
+        const hAt = (ax, ay) => {
+          if (ax < 0 || ay < 0 || ax >= GRID || ay >= GRID) return h;
+          const j = ay * GRID + ax;
+          if (!inside[j]) return h;
+          let hh = H[j];
+          if (waterM[j] && hh <= waterLevel + 4) hh = waterLevel;
+          else if (buildM[j]) hh += 7;
+          return hh;
+        };
+        const p00 = project(gx, gy, h);
+        const p10 = project(gx + 1, gy, hAt(gx + 1, gy));
+        const p11 = project(gx + 1, gy + 1, hAt(gx + 1, gy + 1));
+        const p01 = project(gx, gy + 1, hAt(gx, gy + 1));
+
+        if (sides !== 3 && edge[i]) {
+          const botOf = (pt, fgx, fgy) =>
+            sides === 0 ? project(fgx, fgy, min)[1] + s * .9
+          : sides === 1 ? slabY
+                        : pt[1] + ribbon;
+          const wall = (pa, pb, ax, ay, bx, by) => {
+            ctx.fillStyle = wallFill;
+            ctx.beginPath();
+            ctx.moveTo(pa[0], pa[1]); ctx.lineTo(pb[0], pb[1]);
+            ctx.lineTo(pb[0], botOf(pb, bx, by));
+            ctx.lineTo(pa[0], botOf(pa, ax, ay));
+            ctx.closePath(); ctx.fill();
+            ctx.strokeStyle = wallFill; ctx.lineWidth = 1; ctx.stroke();
+          };
+          if (gy === 0 || !inside[i - GRID])            wall(p00, p10, gx, gy, gx + 1, gy);
+          if (gx === 0 || !inside[i - 1])               wall(p00, p01, gx, gy, gx, gy + 1);
+          if (gx + 1 >= GRID || !inside[i + 1])         wall(p10, p11, gx + 1, gy, gx + 1, gy + 1);
+          if (gy + 1 >= GRID || !inside[i + GRID])      wall(p01, p11, gx, gy + 1, gx + 1, gy + 1);
+        }
+        ctx.fillStyle = topFill;
         ctx.beginPath();
         ctx.moveTo(p00[0], p00[1]); ctx.lineTo(p10[0], p10[1]);
         ctx.lineTo(p11[0], p11[1]); ctx.lineTo(p01[0], p01[1]);
         ctx.closePath(); ctx.fill();
-        // hairline stroke of the same colour hides seam cracks
-        ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = 1; ctx.stroke();
-        if (edge[i] && sides !== 3) {
-          // True wall polygons hung from each OUTWARD mesh edge, so the
-          // wall follows the surface instead of a jagged screen rect.
-          // Bottom: min-elevation plane (solid, sloped correctly per
-          // corner), the level slab line (infinite), or a ribbon (skirt).
-          const bot = (pt, fgx, fgy) =>
-            sides === 0 ? project(fgx, fgy, min)[1] + s * .9
-          : sides === 1 ? slabY
-          : Math.max(p00[1], p10[1], p11[1], p01[1]) + zScale * .12 + s * 2.4;
-          const wall = (pa, pb, ga, gaY, gb, gbY) => {
-            ctx.fillStyle = `rgb(${r * .5 | 0},${g * .5 | 0},${b * .5 | 0})`;
-            ctx.beginPath();
-            ctx.moveTo(pa[0], pa[1]); ctx.lineTo(pb[0], pb[1]);
-            ctx.lineTo(pb[0], bot(pb, gb, gbY)); ctx.lineTo(pa[0], bot(pa, ga, gaY));
-            ctx.closePath(); ctx.fill();
-          };
-          if (gy === 0 || !inside[i - GRID])          wall(p00, p10, gx, gy, gx + 1, gy);
-          if (gx === 0 || !inside[i - 1])             wall(p00, p01, gx, gy, gx, gy + 1);
-          if (gx + 2 >= GRID || !inside[i + 2])       wall(p10, p11, gx + 1, gy, gx + 1, gy + 1);
-          if (gy + 2 >= GRID || !inside[i + 2 * GRID]) wall(p01, p11, gx, gy + 1, gx + 1, gy + 1);
-          // repaint the top so walls sit behind it
-          ctx.fillStyle = `rgb(${r | 0},${g | 0},${b | 0})`;
-          ctx.beginPath();
-          ctx.moveTo(p00[0], p00[1]); ctx.lineTo(p10[0], p10[1]);
-          ctx.lineTo(p11[0], p11[1]); ctx.lineTo(p01[0], p01[1]);
-          ctx.closePath(); ctx.fill();
-        }
+        ctx.strokeStyle = topFill; ctx.lineWidth = 1; ctx.stroke();
       } else {
         if (sides !== 3) {
-          const skirt =
-            sides === 0
-              ? (edge[i] ? t * zScale + s * .9              // to min-elevation plane
-                         : (dropM[i] / span) * zScale + 1.6)
-            : sides === 1
-              ? (edge[i] ? Math.max(0, slabY - Y)           // level slab line
-                         : (dropM[i] / span) * zScale + 1.6)
-              : (dropM[i] / span) * zScale
-                + (edge[i] ? zScale * .12 + s * 2.4 : 1.6); // ribbon skirt
-          ctx.fillStyle = `rgb(${r * .55 | 0},${g * .55 | 0},${b * .55 | 0})`;
+          const drop =
+            sides === 0 ? (edge[i] ? t * zScale + s * .9
+                                   : (dropM[i] / span) * zScale + 1.6)
+          : sides === 1 ? (edge[i] ? Math.max(0, slabY - Y)
+                                   : (dropM[i] / span) * zScale + 1.6)
+                        : (dropM[i] / span) * zScale + (edge[i] ? ribbon : 1.6);
+          ctx.fillStyle = wallFill;
           ctx.fillRect(X - w / 2, Y, w + .7,
-                       skirt + hgt + (isBuild ? 7 / span * zScale : 0));
+                       drop + hgt + (isBuild ? 7 / span * zScale : 0));
         }
-        ctx.fillStyle = `rgb(${r | 0},${g | 0},${b | 0})`;
+        ctx.fillStyle = topFill;
         ctx.fillRect(X - w / 2, Y - hgt / 2, w + .7, hgt + .7);
       }
 
@@ -776,7 +840,9 @@ const EveryParkIso = (() => {
         ctx.textAlign = "center";
         ctx.fillText(sp, X, Y - s * .9);
       }
-      if (!useSat && !sp && !isWater && !isBuild && !trailM[i] && !roadM[i]
+      // Trees stay in satellite mode too — the drape is the ground, the
+      // sprites are the forest standing on it.
+      if (!sp && !isWater && !isBuild && !trailM[i] && !roadM[i]
           && !courtM[i] && !parkM[i] && hash(gx, gy) < density
           && (!S.treeMask || S.treeMask[i])) {
         const jx = (hash(gx + 7, gy) - .5) * w * .6;
@@ -803,29 +869,25 @@ const EveryParkIso = (() => {
       }
     }
 
-    // The hiker 🚶 walks the longest trail, back and forth, bobbing.
     if (S.hikePath && S.hikePath.length > 3) {
       const path = S.hikePath;
-      const tt = S.hikeT < 0.5 ? S.hikeT * 2 : (1 - S.hikeT) * 2;   // ping-pong
+      const tt = S.hikeT < 0.5 ? S.hikeT * 2 : (1 - S.hikeT) * 2;
       const fi = tt * (path.length - 1);
       const i0 = Math.min(path.length - 2, Math.floor(fi));
       const fr = fi - i0;
       const fgx = path[i0][0] + (path[i0 + 1][0] - path[i0][0]) * fr;
       const fgy = path[i0][1] + (path[i0 + 1][1] - path[i0][1]) * fr;
-      const cgx = Math.min(GRID - 1, Math.max(0, Math.round(fgx)));
-      const cgy = Math.min(GRID - 1, Math.max(0, Math.round(fgy)));
-      const hh = H[cgy * GRID + cgx];
-      const [hx, hy] = project(fgx, fgy, hh);
+      const [hx, hy] = project(fgx, fgy, heightAtCell(fgx, fgy));
       const bob = Math.sin(S.hikeT * 240) * 1.5;
       ctx.font = `${Math.min(32, Math.max(11, s * 4)) | 0}px system-ui`;
       ctx.textAlign = "center";
-      ctx.fillText("🚶", hx, hy - s * 1.1 + bob);
+      ctx.fillText("\u{1F6B6}", hx, hy - s * 1.1 + bob);
     }
 
     ctx.fillStyle = "rgba(255,255,255,.75)";
     ctx.font = "11px system-ui";
     ctx.textAlign = "left";
-    ctx.fillText(`${Math.round(min)}–${Math.round(max)} m`, 10, Hh - 10);
+    ctx.fillText(`${Math.round(min)}\u2013${Math.round(max)} m`, 10, Hh - 10);
   }
 
   // ---- Open --------------------------------------------------------
@@ -925,6 +987,7 @@ const EveryParkIso = (() => {
     const S = { H, inside, dropM, edge, p,
                 trailM: empty(), waterM: empty(), roadM: empty(),
                 buildM: empty(), parkM: empty(), courtM: empty(),
+                trailLines: [], roadLines: [],
                 spriteAt: new Map(), hikePath: null, hikeT: 0,
                 useSat: false, tex: null, tod: 0, zoom: 1, cellM: 10,
                 smooth: false, mPerBlock: 10, sides: 0, treeMask: null,
