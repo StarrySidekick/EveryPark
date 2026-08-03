@@ -588,3 +588,7 @@ header h1 { margin-right: 4px; }
 .iso-slider { display: inline-flex; align-items: center; gap: 8px;
               color: #9fb3a7; font-size: .72rem; font-weight: 600; }
 .iso-slider input { width: 110px; accent-color: #4f9d8b; }
+
+/* THE dropdown bug: display:flex on #filtersPanel overrode the UA's
+   [hidden]{display:none}, so .hidden=true never visually closed it. */
+#filtersPanel[hidden] { display: none !important; }

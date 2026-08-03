@@ -220,13 +220,28 @@ const EveryParkIso = (() => {
     return inside;
   }
 
+  // Scanline fill: O(rows × vertices) instead of testing every cell
+  // against every edge — the per-cell version froze the tab for many
+  // seconds on big multi-thousand-vertex boundaries like state forests.
   function maskFromRings(rings, bbox) {
     const M = new Uint8Array(GRID * GRID);
-    for (let gy = 0; gy < GRID; gy++)
-      for (let gx = 0; gx < GRID; gx++) {
-        const [lng, lat] = gridToLL(bbox, gx, gy);
-        if (insideRings(rings, lng, lat)) M[gy * GRID + gx] = 1;
+    const [w, s, e, n] = bbox;
+    for (let gy = 0; gy < GRID; gy++) {
+      const lat = n - (n - s) * gy / (GRID - 1);
+      const xs = [];
+      for (const ring of rings)
+        for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+          const yi = ring[i][1], yj = ring[j][1];
+          if ((yi > lat) !== (yj > lat))
+            xs.push(ring[i][0] + (ring[j][0] - ring[i][0]) * (lat - yi) / (yj - yi));
+        }
+      xs.sort((a, b) => a - b);
+      for (let k = 0; k + 1 < xs.length; k += 2) {
+        const g0 = Math.max(0, Math.ceil((xs[k] - w) / (e - w) * (GRID - 1)));
+        const g1 = Math.min(GRID - 1, Math.floor((xs[k + 1] - w) / (e - w) * (GRID - 1)));
+        for (let gx = g0; gx <= g1; gx++) M[gy * GRID + gx] = 1;
       }
+    }
     return M;
   }
 
@@ -380,23 +395,55 @@ const EveryParkIso = (() => {
       if (cc) sprites.push({ gx: cc[0], gy: cc[1], emoji: c.emoji });
     }
 
-    // The hiker's route: the longest trail polyline, in grid coords.
+    // The hiker's route: from every trail polyline, take the longest
+    // CONTIGUOUS stretch that stays on the island (a polyline that dips
+    // off-island used to make him cut across open terrain), then
+    // resample it at half-block spacing so he walks at constant speed.
+    const toGrid = ([x, y]) =>
+      [(x - bbox[0]) / (bbox[2] - bbox[0]) * (GRID - 1),
+       (bbox[3] - y) / (bbox[3] - bbox[1]) * (GRID - 1)];
+    const onIsland = ([gx, gy]) => {
+      const cx2 = Math.round(gx), cy2 = Math.round(gy);
+      return cx2 >= 0 && cy2 >= 0 && cx2 < GRID && cy2 < GRID
+          && inside[cy2 * GRID + cx2];
+    };
     let best = null, bestLen = 0;
     for (const f of raw.trailFeats)
       for (const path of (f.geometry && f.geometry.paths) || []) {
-        let len = 0;
-        for (let i = 1; i < path.length; i++)
-          len += Math.hypot(path[i][0] - path[i - 1][0],
-                            path[i][1] - path[i - 1][1]);
-        if (len > bestLen) { bestLen = len; best = path; }
+        const g = path.map(toGrid);
+        let run = [];
+        const flush = () => {
+          if (run.length > 3) {
+            let len = 0;
+            for (let i = 1; i < run.length; i++)
+              len += Math.hypot(run[i][0] - run[i - 1][0],
+                                run[i][1] - run[i - 1][1]);
+            if (len > bestLen) { bestLen = len; best = run; }
+          }
+          run = [];
+        };
+        for (const pt of g) { if (onIsland(pt)) run.push(pt); else flush(); }
+        flush();
       }
     let hikePath = null;
-    if (best && best.length > 3) {
-      hikePath = best.map(([x, y]) =>
-        [(x - bbox[0]) / (bbox[2] - bbox[0]) * (GRID - 1),
-         (bbox[3] - y) / (bbox[3] - bbox[1]) * (GRID - 1)])
-        .filter(([gx, gy]) => gx > -2 && gy > -2 && gx < GRID + 2 && gy < GRID + 2);
-      if (hikePath.length < 4) hikePath = null;
+    if (best) {
+      // Uniform resample: one point every half block, so index speed IS
+      // ground speed.
+      hikePath = [best[0]];
+      let carry = 0;
+      for (let i = 1; i < best.length; i++) {
+        let [x0, y0] = hikePath[hikePath.length - 1];
+        const [x1, y1] = best[i];
+        let seg = Math.hypot(x1 - x0, y1 - y0);
+        while (carry + seg >= 0.5) {
+          const t = (0.5 - carry) / seg;
+          const nx = x0 + (x1 - x0) * t, ny = y0 + (y1 - y0) * t;
+          hikePath.push([nx, ny]);
+          seg -= (0.5 - carry); carry = 0; x0 = nx; y0 = ny;
+        }
+        carry += seg;
+      }
+      if (hikePath.length < 6) hikePath = null;
     }
     return { trailM, waterM, roadM, buildM, parkM, courtM, sprites, hikePath };
   }
@@ -516,6 +563,7 @@ const EveryParkIso = (() => {
     order.sort((a, b) => a[0] - b[0]);
 
     const w = s * 1.62, hgt = s * .92;
+    const smooth = !!S.smooth;
     for (const [ry, rx, gx, gy] of order) {
       const i = gy * GRID + gx;
       let h = H[i];
@@ -563,17 +611,40 @@ const EveryParkIso = (() => {
       }
       [r, g, b] = tod(r, g, b);
 
-      const skirt = (dropM[i] / span) * zScale
-                  + (edge[i] ? zScale * .12 + s * 2.4 : 1.6)
-                  + (isBuild ? 7 / span * zScale : 0);
-      ctx.fillStyle = `rgb(${r * .55 | 0},${g * .55 | 0},${b * .55 | 0})`;
-      ctx.fillRect(X - w / 2, Y, w + .7, skirt + hgt);
-      ctx.fillStyle = `rgb(${r | 0},${g | 0},${b | 0})`;
-      ctx.fillRect(X - w / 2, Y - hgt / 2, w + .7, hgt + .7);
+      if (smooth && gx + 1 < GRID && gy + 1 < GRID
+          && inside[i + 1] && inside[i + GRID] && inside[i + GRID + 1]) {
+        // "Blockiness → infinity": fill the quad between this vertex and
+        // its three neighbours, so the surface is a continuous mesh.
+        const hE = isWater ? h : H[i + 1] + (buildM[i + 1] && !waterM[i + 1] ? 7 : 0);
+        const hS = isWater ? h : H[i + GRID] + (buildM[i + GRID] && !waterM[i + GRID] ? 7 : 0);
+        const hSE = isWater ? h : H[i + GRID + 1] + (buildM[i + GRID + 1] && !waterM[i + GRID + 1] ? 7 : 0);
+        const p00 = project(gx, gy, h), p10 = project(gx + 1, gy, hE);
+        const p11 = project(gx + 1, gy + 1, hSE), p01 = project(gx, gy + 1, hS);
+        ctx.fillStyle = `rgb(${r | 0},${g | 0},${b | 0})`;
+        ctx.beginPath();
+        ctx.moveTo(p00[0], p00[1]); ctx.lineTo(p10[0], p10[1]);
+        ctx.lineTo(p11[0], p11[1]); ctx.lineTo(p01[0], p01[1]);
+        ctx.closePath(); ctx.fill();
+        // hairline stroke of the same colour hides seam cracks
+        ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = 1; ctx.stroke();
+        if (edge[i]) {
+          ctx.fillStyle = `rgb(${r * .5 | 0},${g * .5 | 0},${b * .5 | 0})`;
+          ctx.fillRect(Math.min(p00[0], p01[0]), Math.max(p00[1], p01[1], p10[1], p11[1]) - 1,
+                       Math.abs(p10[0] - p01[0]) + 2, zScale * .12 + s * 2.4);
+        }
+      } else {
+        const skirt = (dropM[i] / span) * zScale
+                    + (edge[i] ? zScale * .12 + s * 2.4 : 1.6)
+                    + (isBuild ? 7 / span * zScale : 0);
+        ctx.fillStyle = `rgb(${r * .55 | 0},${g * .55 | 0},${b * .55 | 0})`;
+        ctx.fillRect(X - w / 2, Y, w + .7, skirt + hgt);
+        ctx.fillStyle = `rgb(${r | 0},${g | 0},${b | 0})`;
+        ctx.fillRect(X - w / 2, Y - hgt / 2, w + .7, hgt + .7);
+      }
 
       const sp = spriteAt && spriteAt.get(i);
       if (sp) {
-        ctx.font = `${Math.max(15, s * 3.6) | 0}px system-ui`;
+        ctx.font = `${Math.min(30, Math.max(10, s * 3.6)) | 0}px system-ui`;
         ctx.textAlign = "center";
         ctx.fillText(sp, X, Y - s * .9);
       }
@@ -616,7 +687,7 @@ const EveryParkIso = (() => {
       const hh = H[cgy * GRID + cgx];
       const [hx, hy] = project(fgx, fgy, hh);
       const bob = Math.sin(S.hikeT * 240) * 1.5;
-      ctx.font = `${Math.max(16, s * 4) | 0}px system-ui`;
+      ctx.font = `${Math.min(32, Math.max(11, s * 4)) | 0}px system-ui`;
       ctx.textAlign = "center";
       ctx.fillText("🚶", hx, hy - s * 1.1 + bob);
     }
@@ -713,7 +784,7 @@ const EveryParkIso = (() => {
       return { inside, H, dropM, edge };
     };
 
-    GRID = gridFor(8);                       // default: 1 block ≈ 8 m
+    GRID = gridFor(10);                      // default: 1 block ≈ 10 m
     const { inside, H, dropM, edge } = buildTerrain();
 
     // TERRAIN FIRST. Trails/roads/buildings/courts stream in after —
@@ -725,7 +796,8 @@ const EveryParkIso = (() => {
                 trailM: empty(), waterM: empty(), roadM: empty(),
                 buildM: empty(), parkM: empty(), courtM: empty(),
                 spriteAt: new Map(), hikePath: null, hikeT: 0,
-                useSat: false, tex: null, tod: 0, zoom: 1, cellM: 8 };
+                useSat: false, tex: null, tod: 0, zoom: 1, cellM: 10,
+                smooth: false, mPerBlock: 10 };
     const baseSub = boundary ? `boundary: ${boundary.label}`
                              : "no boundary found — square sample";
     sub.textContent = baseSub + " · fetching trails, roads, buildings…";
@@ -793,11 +865,13 @@ const EveryParkIso = (() => {
     const sliderWrap = document.createElement("label");
     sliderWrap.className = "iso-slider";
     sliderWrap.innerHTML = `<span class="iso-slider-lab"></span>
-      <input type="range" min="4" max="20" step="2" value="8">`;
+      <input type="range" min="4" max="20" step="2" value="10">`;
     const slider = sliderWrap.querySelector("input");
     const sliderLab = sliderWrap.querySelector(".iso-slider-lab");
-    const labelBlocks = () =>
-      sliderLab.textContent = `1 block ≈ ${Math.round(spanM / GRID)} m`;
+    const labelBlocks = () => {
+      S.mPerBlock = spanM / GRID;
+      sliderLab.textContent = `1 block ≈ ${Math.round(S.mPerBlock)} m`;
+    };
     labelBlocks();
 
     let satSample = null;
@@ -822,7 +896,15 @@ const EveryParkIso = (() => {
       sliderTimer = setTimeout(rebuild, 160);
     });
 
-    tools.append(todBtn, satBtn, shotBtn, sliderWrap);
+    const smoothBtn = document.createElement("button");
+    smoothBtn.className = "iso-tool";
+    smoothBtn.textContent = "⬜ Smooth";
+    smoothBtn.addEventListener("click", () => {
+      S.smooth = !S.smooth;
+      smoothBtn.classList.toggle("active", S.smooth);
+    });
+
+    tools.append(todBtn, satBtn, smoothBtn, shotBtn, sliderWrap);
 
     // Scroll to zoom, centred on the island.
     canvas.addEventListener("wheel", e => {
@@ -838,7 +920,12 @@ const EveryParkIso = (() => {
       if (!document.getElementById("isoOverlay")) return;
       if (!dragging) target += 0.0012;
       yaw += (target - yaw) * .15;
-      S.hikeT = (S.hikeT + 0.0009) % 1;
+      // Walking pace: ~1.3 m/s of real ground, whatever the block size.
+      if (S.hikePath) {
+        const mPerBlock = S.mPerBlock || 10;
+        const step = (1.3 / 60) / (mPerBlock * 0.5) / S.hikePath.length;
+        S.hikeT = (S.hikeT + step) % 1;
+      }
       draw(canvas, S, yaw);
       raf = requestAnimationFrame(loop);
     };
