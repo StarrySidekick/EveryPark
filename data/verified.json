@@ -761,12 +761,13 @@
      -73.50321
     ]
    },
-   "note": "Not listed among NCLC's public trail preserves or the Town of Sherman's recreation pages; no trail map, trailhead or access policy could be verified. Likely conservation land without formal public trails — check with the town or NCLC before visiting.",
+   "note": "Despite the “nature preserve” label in source data, parcel records show this is Town of Sherman property at 43 Route 39 North — the public-works town garage and its surrounding undeveloped wet meadow. It has no trails, parking or recreational designation and does not appear in Sherman's hiking guide.",
    "source": [
-    "https://ctland.org/our_trails/",
-    "https://www.shermanct.gov/entities/conservation-commission"
+    "https://data.ct.gov/resource/rny9-6ak2.json?$where=link%20like%20'68310-023-015%25'",
+    "https://municipal-documents.s3.amazonaws.com/uploads/sherman-ct/conservation-commission/documents/generals/125153/ShermanHikingGuide.pdf"
    ],
-   "checked": "2026-08-02"
+   "checked": "2026-08-02",
+   "agency": "Town of Sherman"
   },
   {
    "match": {
@@ -918,8 +919,9 @@
     ]
    },
    "agency": "Northwest Connecticut Land Conservancy",
-   "note": "An NCLC-owned conservation parcel in southwestern Sherman that does not match any of the conservancy's publicized trail preserves; no name, trail or access point is documented for it. Conservation land, but no established public access is published.",
+   "note": "Owned by the Northwest Connecticut Land Conservancy, which distinguishes its “over 300 wildlife sanctuaries” from its “31 nature preserves open to the public with hiking trails.” This parcel is not among the public trail preserves, so treat it as a sanctuary without established visitor access; contact NCLC before visiting.",
    "source": [
+    "https://ctland.org/our_lands/",
     "https://ctland.org/our_trails/"
    ],
    "checked": "2026-08-02"
@@ -935,10 +937,10 @@
     ]
    },
    "agency": "Northwest Connecticut Land Conservancy",
-   "note": "A former Naromi Land Trust parcel off Spring Lake Road, now NCLC after the trusts' 2020 merger. It is not among NCLC's listed trail preserves and no trailhead or access information is published.",
+   "note": "Owned by the Northwest Connecticut Land Conservancy, which distinguishes its “over 300 wildlife sanctuaries” from its “31 nature preserves open to the public with hiking trails.” This parcel is not among the public trail preserves, so treat it as a sanctuary without established visitor access; contact NCLC before visiting.",
    "source": [
-    "https://ctland.org/our_trails/",
-    "https://ctland.org/our-new-name-and-merger-with-naromi-land-trust/"
+    "https://ctland.org/our_lands/",
+    "https://ctland.org/our_trails/"
    ],
    "checked": "2026-08-02"
   },
@@ -956,10 +958,10 @@
    "water": true,
    "waterName": "Candlewood Lake",
    "waterType": "lake",
-   "note": "A former Naromi Land Trust parcel now held by NCLC; state records show part of its acreage lies under Candlewood Lake. It is not among NCLC's listed trail preserves, so on-the-ground access is unverified — the nearby Irene's Woods preserve does have a public trail.",
+   "note": "Owned by the Northwest Connecticut Land Conservancy, which distinguishes its “over 300 wildlife sanctuaries” from its “31 nature preserves open to the public with hiking trails.” This parcel is not among the public trail preserves, so treat it as a sanctuary without established visitor access; contact NCLC before visiting. Part of its acreage lies under Candlewood Lake.",
    "source": [
-    "https://ctland.org/our_trails/",
-    "https://ctland.org/our-new-name-and-merger-with-naromi-land-trust/"
+    "https://ctland.org/our_lands/",
+    "https://ctland.org/our_trails/"
    ],
    "checked": "2026-08-02"
   },
@@ -974,10 +976,10 @@
     ]
    },
    "agency": "Northwest Connecticut Land Conservancy",
-   "note": "A former Naromi Land Trust holding on Route 37 South, now owned by NCLC. It is not among the conservancy's public trail preserves, so it is likely a sanctuary without formal visitor access; contact NCLC before visiting.",
+   "note": "Owned by the Northwest Connecticut Land Conservancy, which distinguishes its “over 300 wildlife sanctuaries” from its “31 nature preserves open to the public with hiking trails.” This parcel is not among the public trail preserves, so treat it as a sanctuary without established visitor access; contact NCLC before visiting.",
    "source": [
-    "https://ctland.org/our_trails/",
-    "https://ctland.org/our-new-name-and-merger-with-naromi-land-trust/"
+    "https://ctland.org/our_lands/",
+    "https://ctland.org/our_trails/"
    ],
    "checked": "2026-08-02"
   },
@@ -992,10 +994,10 @@
     ]
    },
    "agency": "Northwest Connecticut Land Conservancy",
-   "note": "A former Naromi Land Trust parcel on Wagon Wheel Road, now owned by NCLC. It does not appear on the conservancy's list of preserves with public hiking trails, so visitor access is unverified.",
+   "note": "Owned by the Northwest Connecticut Land Conservancy, which distinguishes its “over 300 wildlife sanctuaries” from its “31 nature preserves open to the public with hiking trails.” This parcel is not among the public trail preserves, so treat it as a sanctuary without established visitor access; contact NCLC before visiting.",
    "source": [
-    "https://ctland.org/our_trails/",
-    "https://ctland.org/our-new-name-and-merger-with-naromi-land-trust/"
+    "https://ctland.org/our_lands/",
+    "https://ctland.org/our_trails/"
    ],
    "checked": "2026-08-02"
   },
@@ -1052,10 +1054,10 @@
     ]
    },
    "agency": "Northwest Connecticut Land Conservancy",
-   "note": "A former Naromi Land Trust parcel off Spring Lake Road, now owned by NCLC. It does not appear on the conservancy's list of public trail preserves, so visitor access is unverified.",
+   "note": "Owned by the Northwest Connecticut Land Conservancy, which distinguishes its “over 300 wildlife sanctuaries” from its “31 nature preserves open to the public with hiking trails.” This parcel is not among the public trail preserves, so treat it as a sanctuary without established visitor access; contact NCLC before visiting.",
    "source": [
-    "https://ctland.org/our_trails/",
-    "https://ctland.org/our-new-name-and-merger-with-naromi-land-trust/"
+    "https://ctland.org/our_lands/",
+    "https://ctland.org/our_trails/"
    ],
    "checked": "2026-08-02"
   },
