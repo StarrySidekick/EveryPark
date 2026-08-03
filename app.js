@@ -2514,9 +2514,19 @@
     const statusLookup = new Map();
     const normNm = t => String(t).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
     for (const p of data.places) {
-      if (p.status) statusLookup.set(normNm(p.name), p.status);
       if (p.attrs && p.attrs.byPermission && !p.note) p.note = PADUS_NOTE;
       scoreAccess(p);          // sets visitable + accessNote, then classifies
+      // Verdict tier for the tile layer: open / permission / unverified /
+      // fee — the fill colour system. aka names are registered too, so a
+      // polygon carrying an upstream name still resolves after a rename.
+      if (p.status) {
+        const tier = p.status === "park"
+          ? (p.access === "permission" ? "permission" : "open")
+          : p.status;
+        statusLookup.set(normNm(p.name), tier);
+        for (const alt of p.aka || [])
+          if (!statusLookup.has(normNm(alt))) statusLookup.set(normNm(alt), tier);
+      }
       terrainFromData(p);
       // Mirror land cover into plain flags so the filter chips, which read
       // attrs directly, work without special-casing.

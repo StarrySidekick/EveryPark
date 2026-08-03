@@ -17,14 +17,18 @@ const CONFIG = {
   //   BORDER colour = who owns and maintains it
   //   ICON   glyph  = what kind of place it is
   visual: {
-    publicFill: "#43a047",        // green: confirmed a park
+    publicFill: "#43a047",        // green: verified open — just go
+    // Amber: you can probably go — open by the owner's permission (or
+    // paid). Matches the PAD-US "restricted" amber in the access layer.
+    permissionFill: "#e8a33d",
     // Cemeteries fill purple — the colour of their category — instead of
     // park green; the border still says who owns/runs the ground.
     cemeteryFill: "#8464c9",
-    // Amber: public land we can't confirm is visitable — no mapped way in,
-    // or no known boundary. Honest uncertainty rather than a confident lie.
-    unverifiedFill: "#f5b301",
-    unverifiedBorder: "#b8860b",
+    // Grey: unverified — we have no data either way. Deliberately not
+    // amber: amber now means "probably yes, by permission", and claiming
+    // that for a place with no evidence would be a confident lie.
+    unverifiedFill: "#8e9a93",
+    unverifiedBorder: "#66716b",
     fillOpen: 0.32,
     // Open and open-by-permission look identical: for a walker the
     // practical answer is the same, and the popup explains the nuance.
@@ -164,7 +168,7 @@ const CONFIG = {
   // Shown in the top-right corner. Bumped by hand on every code change,
   // so there's visible proof of which build is actually loaded rather
   // than guessing whether a cached copy is being served.
-  siteVersion: "v0.10.0",
+  siteVersion: "v0.11.0",
 
   // ---- VECTOR TILES --------------------------------------------------
   // Every boundary and trail, pre-cut into map tiles and packed into one

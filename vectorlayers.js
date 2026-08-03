@@ -14,9 +14,10 @@
 const EveryParkTiles = (() => {
   let layer = null, map = null, active = null;
   let hoverKey = null, hoverLabelEl = null;
-  // normalised name -> "park" | "unverified" | "fee". The tiles carry
-  // geometry and source attributes but not our verdict, so the verdict is
-  // handed in from the place list and matched by name.
+  // normalised name -> "open" | "permission" | "unverified" | "fee".
+  // The tiles carry geometry and source attributes but not our verdict,
+  // so the verdict is handed in from the place list and matched by name
+  // (including each place's aka names, so renamed places still resolve).
   let statusBy = null;
   // Given a feature's name and where it was clicked, hands back the popup
   // for the actual place record. The tiles carry only geometry and a few
@@ -74,13 +75,15 @@ const EveryParkTiles = (() => {
 
   const normName = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
-  // Unverified land is drawn amber, not green: we can't confirm you can
-  // actually walk it, and saying so is more useful than a confident colour.
+  // Three honest tiers (Timothy's colour system, 2026-08-03):
+  //   green  = verified open, just go
+  //   amber  = you can probably go — by the owner's permission (or paid)
+  //   grey   = unverified: we have no data either way
   const statusOf = f => {
     try {
-      if (!statusBy) return "park";
+      if (!statusBy) return "open";
       return statusBy.get(normName(nameOf(f))) || "unverified";
-    } catch (e) { return "park"; }
+    } catch (e) { return "open"; }
   };
 
   const visible = (dataLayer, f) => {
@@ -94,11 +97,22 @@ const EveryParkTiles = (() => {
   // PAD-US covers everything, including land already drawn from DEEP
   // and OpenStreetMap. Restricting it to non-government owners fills
   // the land-trust gap without stacking duplicate parcels.
+  // PAD-US easement designation classes: a conservation/agricultural/
+  // forest easement restricts what the owner may build — it is not a
+  // right of way, and the land stays private. The place builder already
+  // excludes these; the tiles were still drawing them, which is how
+  // "Korsant Easement" showed up as an amber shape nobody could ever
+  // verify. Hidden unless a real place record exists for the name (so a
+  // fee-owned parcel PAD-US mislabels, like Upland Pastures, still draws).
+  const EASEMENT = new Set(["CONE", "AGRE", "FORE", "PAGR", "UNKE"]);
+
   const padusOk = f => {
     const p = f.props || {};
     if (p.Pub_Access === "XA") return false;
     if (!p.Unit_Nm || p.Unit_Nm === "Unknown") return false;
     if (p.Own_Name === "TRIB" || p.Mang_Name === "TRIB") return false;
+    if (EASEMENT.has(p.Des_Tp) && statusBy
+        && !statusBy.has(normName(p.Unit_Nm))) return false;
     return ["NGO", "PVT", "JNT", "OTHR", "UNK"].includes(p.Own_Name);
   };
 
@@ -113,25 +127,24 @@ const EveryParkTiles = (() => {
       // extra paint rules: adding rules for the same dataLayer stopped the
       // layer loading tiles at all.
       symbolizer: new protomapsL.PolygonSymbolizer({
-        // Cemeteries fill their category purple even when verified — the
-        // green/amber verdict system still applies to everything else.
-        fill: (z, f) => keyOf(dataLayer, f) === hoverKey
-                      ? (H.fill || "#c8f5cf")
-                      : (statusOf(f) !== "park"
-                          ? V.unverifiedFill || "#f5b301"
-                          : dataLayer === "cemeteries"
-                            ? (V.cemeteryFill || "#8464c9")
-                            : V.publicFill),
+        // Fill = the verdict tier; cemeteries keep their category purple
+        // when verified. Border = who owns it, except grey unverified.
+        fill: (z, f) => {
+          if (keyOf(dataLayer, f) === hoverKey) return H.fill || "#c8f5cf";
+          const s = statusOf(f);
+          if (s === "unverified") return V.unverifiedFill || "#8e9a93";
+          if (dataLayer === "cemeteries") return V.cemeteryFill || "#8464c9";
+          if (s === "permission" || s === "fee") return V.permissionFill || "#e8a33d";
+          return V.publicFill;
+        },
         opacity: (z, f) => keyOf(dataLayer, f) === hoverKey
                          ? (H.fillOpacity != null ? H.fillOpacity : 0.62)
                          : V.fillOpen,
-        stroke: (z, f) => keyOf(dataLayer, f) === hoverKey
-                        ? (H.stroke || "#ffffff")
-                        : (statusOf(f) !== "park"
-                            ? V.unverifiedBorder || "#b8860b"
-                            : dataLayer === "cemeteries"
-                              ? cemeteryBorder(f)
-                              : border),
+        stroke: (z, f) => {
+          if (keyOf(dataLayer, f) === hoverKey) return H.stroke || "#ffffff";
+          if (statusOf(f) === "unverified") return V.unverifiedBorder || "#66716b";
+          return dataLayer === "cemeteries" ? cemeteryBorder(f) : border;
+        },
         width: (z, f) => keyOf(dataLayer, f) === hoverKey
                        ? (H.width || 6) : V.borderWeight
       })
