@@ -583,3 +583,8 @@ header h1 { margin-right: 4px; }
 .iso-tool:hover { background: #33443b; }
 .iso-tool.active { background: #4f9d8b; }
 #isoPanel .iso-foot { gap: 10px; }
+
+/* iso block-size slider */
+.iso-slider { display: inline-flex; align-items: center; gap: 8px;
+              color: #9fb3a7; font-size: .72rem; font-weight: 600; }
+.iso-slider input { width: 110px; accent-color: #4f9d8b; }
