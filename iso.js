@@ -1047,10 +1047,13 @@ const EveryParkIso = (() => {
           else if (buildM[j]) hh += 7;
           return hh;
         };
+        // Quads must span the same stride the loop steps, or coarse
+        // motion-LOD passes leave a gap between every pair of tiles —
+        // that was the "smooth mode shattered while spinning" bug.
         const p00 = project(gx, gy, h);
-        const p10 = project(gx + 1, gy, hAt(gx + 1, gy));
-        const p11 = project(gx + 1, gy + 1, hAt(gx + 1, gy + 1));
-        const p01 = project(gx, gy + 1, hAt(gx, gy + 1));
+        const p10 = project(gx + st, gy, hAt(gx + st, gy));
+        const p11 = project(gx + st, gy + st, hAt(gx + st, gy + st));
+        const p01 = project(gx, gy + st, hAt(gx, gy + st));
 
         if (sides !== 3 && edge[i]) {
           const botOf = (pt, fgx, fgy) =>
@@ -1066,10 +1069,10 @@ const EveryParkIso = (() => {
             ctx.closePath(); ctx.fill();
             ctx.strokeStyle = wallFill; ctx.lineWidth = 1; ctx.stroke();
           };
-          if (gy === 0 || !inside[i - GRID])            wall(p00, p10, gx, gy, gx + 1, gy);
-          if (gx === 0 || !inside[i - 1])               wall(p00, p01, gx, gy, gx, gy + 1);
-          if (gx + 1 >= GRID || !inside[i + 1])         wall(p10, p11, gx + 1, gy, gx + 1, gy + 1);
-          if (gy + 1 >= GRID || !inside[i + GRID])      wall(p01, p11, gx, gy + 1, gx + 1, gy + 1);
+          if (gy === 0 || !inside[i - GRID])              wall(p00, p10, gx, gy, gx + st, gy);
+          if (gx === 0 || !inside[i - 1])                 wall(p00, p01, gx, gy, gx, gy + st);
+          if (gx + st >= GRID || !inside[i + st])         wall(p10, p11, gx + st, gy, gx + st, gy + st);
+          if (gy + st >= GRID || !inside[i + st * GRID])  wall(p01, p11, gx, gy + st, gx + st, gy + st);
         }
         ctx.fillStyle = topFill;
         ctx.beginPath();
@@ -1119,6 +1122,11 @@ const EveryParkIso = (() => {
             ctx.moveTo(pa[0], pa[1]); ctx.lineTo(pb[0], pb[1]);
             ctx.lineTo(pb[0], yb); ctx.lineTo(pa[0], ya);
             ctx.closePath(); ctx.fill();
+            // Deliberately NO same-colour stroke here: a stroke bleeds
+            // the dark wall half a pixel sideways over the lit top of
+            // the neighbouring column, drawing a hairline up every
+            // pillar. Abutting fills share exact projected corners, so
+            // they need no seam cover.
           };
           // Only the camera-facing pair: which two those are follows the
           // rotation, so the lit and shaded sides swap as you spin.
