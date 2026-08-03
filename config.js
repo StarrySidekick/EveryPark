@@ -183,7 +183,7 @@ const CONFIG = {
   // Shown in the top-right corner. Bumped by hand on every code change,
   // so there's visible proof of which build is actually loaded rather
   // than guessing whether a cached copy is being served.
-  siteVersion: "v0.25.0",
+  siteVersion: "v0.25.1",
 
   // ---- VECTOR TILES --------------------------------------------------
   // Every boundary and trail, pre-cut into map tiles and packed into one

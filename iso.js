@@ -1007,23 +1007,58 @@ const EveryParkIso = (() => {
         ctx.closePath(); ctx.fill();
         ctx.strokeStyle = topFill; ctx.lineWidth = 1; ctx.stroke();
       } else {
+        // TRUE voxel columns. Both faces used to be screen-aligned
+        // fillRects, so every block presented the same flat rectangle to
+        // the camera however far you rotated — that is the "all blocks
+        // face me" bug. Now the top is the projected diamond of the
+        // cell's footprint, and the two side faces that actually point
+        // at the camera are drawn as quads, each at its own shade: the
+        // three-tone top/left/right split is what reads as a cube.
+        const P00 = project(gx - .5, gy - .5, h), P10 = project(gx + .5, gy - .5, h),
+              P11 = project(gx + .5, gy + .5, h), P01 = project(gx - .5, gy + .5, h);
+        const nH = (ax, ay) => {
+          if (ax < 0 || ay < 0 || ax >= GRID || ay >= GRID) return null;
+          const j = ay * GRID + ax;
+          if (!inside[j]) return null;
+          let hh = H[j];
+          if (waterM[j] && hh <= waterLevel + 4) hh = waterLevel;
+          else if (buildM[j]) hh += 7;
+          return hh;
+        };
         if (sides !== 3) {
-          const drop =
-            sides === 0 ? (edge[i] ? t * zScale + s * .9
-                                   : (dropM[i] / span) * zScale + 1.6)
-          : sides === 1 ? (edge[i] ? Math.max(0, slabY - Y)
-                                   : (dropM[i] / span) * zScale + 1.6)
-                        : (dropM[i] / span) * zScale + (edge[i] ? ribbon : 1.6);
-          // The island's OUTER walls stay the one uniform earth colour;
-          // interior micro-sides keep each block's own darkened face —
-          // that per-block shading is what makes blocks read as blocks.
-          ctx.fillStyle = edge[i] ? wallFill
-            : `rgb(${r * .55 | 0},${g * .55 | 0},${b * .55 | 0})`;
-          ctx.fillRect(X - wallW / 2, Y, wallW,
-                       drop + hgt + (isBuild ? 7 / span * zScale : 0));
+          const botFor = (pt, fgx, fgy, nh) => {
+            // Against a lower neighbour the wall stops on its roof —
+            // that step is the block's visible height. At the island's
+            // rim it runs to whatever the side mode asks for.
+            if (nh != null) return pt[1] + Math.max(0, (h - nh) / span * zScale) + 1;
+            return sides === 0 ? project(fgx, fgy, min)[1] + s * .9
+                 : sides === 1 ? slabY
+                               : pt[1] + ribbon;
+          };
+          const face = (pa, pb, ax, ay, bx, by, nh, shade) => {
+            const ya = botFor(pa, ax, ay, nh), yb = botFor(pb, bx, by, nh);
+            if (ya <= pa[1] + .5 && yb <= pb[1] + .5) return;
+            ctx.fillStyle = (nh == null && edge[i]) ? wallFill
+              : `rgb(${r * shade | 0},${g * shade | 0},${b * shade | 0})`;
+            ctx.beginPath();
+            ctx.moveTo(pa[0], pa[1]); ctx.lineTo(pb[0], pb[1]);
+            ctx.lineTo(pb[0], yb); ctx.lineTo(pa[0], ya);
+            ctx.closePath(); ctx.fill();
+            ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = 1; ctx.stroke();
+          };
+          // Only the camera-facing pair: which two those are follows the
+          // rotation, so the lit and shaded sides swap as you spin.
+          if (cos > 0) face(P01, P11, gx - .5, gy + .5, gx + .5, gy + .5, nH(gx, gy + 1), .58);
+          else         face(P00, P10, gx - .5, gy - .5, gx + .5, gy - .5, nH(gx, gy - 1), .58);
+          if (sin > 0) face(P10, P11, gx + .5, gy - .5, gx + .5, gy + .5, nH(gx + 1, gy), .76);
+          else         face(P00, P01, gx - .5, gy - .5, gx - .5, gy + .5, nH(gx - 1, gy), .76);
         }
         ctx.fillStyle = topFill;
-        ctx.fillRect(X - w / 2, Y - hgt / 2, w + .7, hgt + .7);
+        ctx.beginPath();
+        ctx.moveTo(P00[0], P00[1]); ctx.lineTo(P10[0], P10[1]);
+        ctx.lineTo(P11[0], P11[1]); ctx.lineTo(P01[0], P01[1]);
+        ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = topFill; ctx.lineWidth = 1; ctx.stroke();
       }
 
       const sp = spriteAt && spriteAt.get(i);
