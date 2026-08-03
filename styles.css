@@ -575,3 +575,11 @@ header h1 { margin-right: 4px; }
           padding: 6px 12px; font-weight: 700; cursor: pointer; margin-right: 7px; }
 #isoSat:hover { background: #33443b; }
 #isoSat.active { background: #4f9d8b; }
+
+/* iso toolbar buttons (time of day, satellite, save) */
+.iso-tools { display: flex; gap: 7px; }
+.iso-tool { background: #26332c; border: 0; color: #fff; border-radius: 3px;
+            padding: 6px 12px; font-weight: 700; cursor: pointer; }
+.iso-tool:hover { background: #33443b; }
+.iso-tool.active { background: #4f9d8b; }
+#isoPanel .iso-foot { gap: 10px; }

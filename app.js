@@ -2327,13 +2327,15 @@
     // pointerdown, not click: iOS Safari doesn't deliver document-level
     // click events for taps on non-clickable elements (like the map),
     // which left the panel stuck open on phones.
+    // Capture phase: fires before any widget can stop propagation, so
+    // the panel closes no matter what was clicked (map, popup, canvas).
     document.addEventListener("pointerdown", e => {
       if (!filtersPanel.hidden && !filtersPanel.contains(e.target)
           && e.target !== filtersBtn && !filtersBtn.contains(e.target)) {
         filtersPanel.hidden = true;
         filtersBtn.classList.remove("active");
       }
-    });
+    }, true);
   }
   document.addEventListener("click", (e) => {
     if (layersPanel && !layersPanel.hidden && !layersPanel.contains(e.target) &&

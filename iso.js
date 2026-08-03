@@ -1,23 +1,25 @@
 /* ============================================================
-   EVERYPARK — ISOMETRIC TERRAIN VIEW, v2
+   EVERYPARK — ISOMETRIC TERRAIN VIEW, v3
 
-   Opens from the ⛰ button on a place card. Now renders the park's
-   REAL boundary as a floating island — not a square sample:
+   Opens from the ⛰ button on a place card. Renders the park's real
+   boundary as a Minecraft-style floating island and dresses it with
+   everything we can fetch about the place:
 
-   1. Boundary: fetched on demand by point-in-polygon query against
-      the same public services the pipeline uses (CT DEEP, the OSM
-      mirrors, PAD-US). Best candidate wins: name match first, then
-      the smallest polygon containing the pin. No boundary found →
-      falls back to an acreage-sized square, labelled as such.
-   2. Elevation: AWS Terrain Tiles (Mapzen terrarium), fetched for
-      the polygon's bbox; procedural fallback offline.
-   3. Dressing: trails (OSM + Blue-Blazed) rasterised onto the
-      terrain as tan paths, water polygons flattened and tinted,
-      and little sprite trees scattered to match the place's NLCD
-      cover ("mostly wooded" → dense pines).
+   - Boundary: point-in-polygon against CT DEEP / OSM mirrors / PAD-US.
+   - Elevation: AWS Terrain Tiles (terrarium); procedural fallback.
+   - Trails (OSM + Blue-Blazed) as worn tan paths; water flattened blue.
+   - Roads, buildings and parking lots from one Overpass query: roads
+     asphalt grey, buildings extruded blocks, parking pads with 🅿.
+   - Sport courts from the OSM leisure layer, sport-coloured with an
+     emoji sprite each (⚾🏀🎾🏓⚽…).
+   - A little hiker 🚶 walking the longest trail, because it's cute.
+   - Time-of-day toggle (day / sunset / night), satellite drape toggle,
+     and 📸 export of the canvas as a PNG.
 
-   Everything is fetched only when the button is pressed; the map
-   itself still loads nothing at runtime.
+   PROGRESSIVE: terrain draws the moment heights arrive; trails, roads,
+   buildings and courts stream in when their fetches land. Everything
+   is click-time only and best-effort — a failed fetch just means that
+   layer doesn't appear.
    ============================================================ */
 
 const EveryParkIso = (() => {
@@ -33,6 +35,14 @@ const EveryParkIso = (() => {
   let raf = null;
 
   const norm = s => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const hexRgb = h => [parseInt(h.slice(1, 3), 16),
+                       parseInt(h.slice(3, 5), 16),
+                       parseInt(h.slice(5, 7), 16)];
+  const hash = (gx, gy) => {
+    let h = (gx * 73856093) ^ (gy * 19349663);
+    h = (h ^ (h >> 13)) * 1274126177;
+    return ((h ^ (h >> 16)) >>> 0) / 4294967295;
+  };
 
   async function arc(url, params) {
     const body = new URLSearchParams({ f: "json", ...params });
@@ -43,7 +53,25 @@ const EveryParkIso = (() => {
     return j.features || [];
   }
 
-  // ---- 1. The real boundary --------------------------------------
+  // ---- Sport courts: colour code + emoji per sport ----------------
+  const SPORT = [
+    [/baseball|softball/, 2, "#d9c186", "⚾"],
+    [/basketball/,        3, "#6b7d99", "🏀"],
+    [/tennis/,            4, "#b85c48", "🎾"],
+    [/pickleball/,        5, "#4f9d8b", "🏓"],
+    [/soccer|football/,   6, "#5c9e57", "⚽"],
+    [/volleyball/,        7, "#c9a86b", "🏐"],
+    [/./,                 8, "#7fa06f", "🏃"]
+  ];
+  const KIND = { playground: [9, "#d99a4e", "🛝"],
+                 swimming_pool: [10, "#4fa3c9", "🏊"],
+                 dog_park: [11, "#a08a6b", "🐕"],
+                 track: [12, "#b0876b", "🏃"] };
+  const COURT_COLOR = {};
+  for (const [, code, col] of SPORT) COURT_COLOR[code] = col;
+  for (const k in KIND) COURT_COLOR[KIND[k][0]] = KIND[k][1];
+
+  // ---- Boundary ---------------------------------------------------
   async function fetchBoundary(p) {
     const pt = JSON.stringify({ x: p.lng, y: p.lat,
                                 spatialReference: { wkid: 4326 } });
@@ -68,7 +96,6 @@ const EveryParkIso = (() => {
                           label: s.label })))));
     const cands = results.flatMap(r => r.status === "fulfilled" ? r.value : []);
     if (!cands.length) return null;
-
     const area = c => Math.abs(c.rings.reduce((s2, ring) => {
       let a = 0;
       for (let i = 0; i < ring.length - 1; i++)
@@ -78,13 +105,11 @@ const EveryParkIso = (() => {
     const wanted = new Set([norm(p.name), ...(p.aka || []).map(norm)]);
     const named = cands.filter(c => wanted.has(norm(c.name)));
     const pool = named.length ? named : cands;
-    // Named: biggest wins (a preserve is many parcels; show the property).
-    // Unnamed fallback: smallest containing polygon is the most specific.
     pool.sort((a, b) => named.length ? area(b) - area(a) : area(a) - area(b));
     return pool[0];
   }
 
-  // ---- 2. Elevation ----------------------------------------------
+  // ---- Elevation & imagery ----------------------------------------
   function tileXY(lat, lng, z) {
     const n = 2 ** z;
     const latR = lat * Math.PI / 180;
@@ -97,36 +122,67 @@ const EveryParkIso = (() => {
     im.onload = () => res(im); im.onerror = rej; im.src = url;
   });
 
-  async function fetchHeights(bbox) {
+  async function sampleTiles(bbox, urlFor, maxTiles, zoom) {
     const [w, s, e, n] = bbox;
-    const spanM = Math.max((e - w) * 111320 * Math.cos(s * Math.PI / 180),
-                           (n - s) * 111320);
-    const z = spanM > 3000 ? 12 : spanM > 1200 ? 13 : 14;
-    const tl = tileXY(n, w, z), br = tileXY(s, e, z);
+    const tl = tileXY(n, w, zoom), br = tileXY(s, e, zoom);
     const x0 = Math.floor(tl.x), y0 = Math.floor(tl.y);
     const cols = Math.floor(br.x) - x0 + 1, rows = Math.floor(br.y) - y0 + 1;
-    if (cols * rows > 12) throw new Error("area too large");
+    if (cols * rows > maxTiles) throw new Error("area too large");
     const cv = document.createElement("canvas");
     cv.width = cols * 256; cv.height = rows * 256;
     const cx = cv.getContext("2d", { willReadFrequently: true });
     await Promise.all([...Array(cols * rows)].map((_, i) => {
       const tx = x0 + (i % cols), ty = y0 + Math.floor(i / cols);
-      return loadImage(`${TILE(z)}${tx}/${ty}.png`)
+      return loadImage(urlFor(zoom, tx, ty))
         .then(im => cx.drawImage(im, (tx - x0) * 256, (ty - y0) * 256));
     }));
     const px = cx.getImageData(0, 0, cv.width, cv.height).data;
+    return { px, w: cv.width, h: cv.height, x0, y0, zoom };
+  }
+
+  const gridToLL = (bbox, gx, gy) => {
+    const [w, s, e, n] = bbox;
+    return [w + (e - w) * gx / (GRID - 1), n - (n - s) * gy / (GRID - 1)];
+  };
+
+  async function fetchHeights(bbox) {
+    const [w, s, e, n] = bbox;
+    const spanM = Math.max((e - w) * 111320 * Math.cos(s * Math.PI / 180),
+                           (n - s) * 111320);
+    const z = spanM > 3000 ? 12 : spanM > 1200 ? 13 : 14;
+    const t = await sampleTiles(bbox, (zz, tx, ty) => `${TILE(zz)}${tx}/${ty}.png`, 12, z);
     const H = new Float32Array(GRID * GRID);
     for (let gy = 0; gy < GRID; gy++)
       for (let gx = 0; gx < GRID; gx++) {
-        const lng = w + (e - w) * gx / (GRID - 1);
-        const lat = n - (n - s) * gy / (GRID - 1);
-        const t = tileXY(lat, lng, z);
-        const ix = Math.min(cv.width - 1, Math.max(0, Math.round((t.x - x0) * 256)));
-        const iy = Math.min(cv.height - 1, Math.max(0, Math.round((t.y - y0) * 256)));
-        const k = (iy * cv.width + ix) * 4;
-        H[gy * GRID + gx] = px[k] * 256 + px[k + 1] + px[k + 2] / 256 - 32768;
+        const [lng, lat] = gridToLL(bbox, gx, gy);
+        const tt = tileXY(lat, lng, z);
+        const ix = Math.min(t.w - 1, Math.max(0, Math.round((tt.x - t.x0) * 256)));
+        const iy = Math.min(t.h - 1, Math.max(0, Math.round((tt.y - t.y0) * 256)));
+        const k = (iy * t.w + ix) * 4;
+        H[gy * GRID + gx] = t.px[k] * 256 + t.px[k + 1] + t.px[k + 2] / 256 - 32768;
       }
     return H;
+  }
+
+  async function fetchSatTexture(bbox) {
+    const [w, s, e, n] = bbox;
+    const spanM = Math.max((e - w) * 111320 * Math.cos(s * Math.PI / 180),
+                           (n - s) * 111320);
+    const z = Math.max(13, Math.min(17, Math.round(17 - Math.log2(spanM / 700))));
+    const t = await sampleTiles(bbox, (zz, tx, ty) =>
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/" +
+      `MapServer/tile/${zz}/${ty}/${tx}`, 20, z);
+    const tex = new Uint8ClampedArray(GRID * GRID * 3);
+    for (let gy = 0; gy < GRID; gy++)
+      for (let gx = 0; gx < GRID; gx++) {
+        const [lng, lat] = gridToLL(bbox, gx, gy);
+        const tt = tileXY(lat, lng, z);
+        const ix = Math.min(t.w - 1, Math.max(0, Math.round((tt.x - t.x0) * 256)));
+        const iy = Math.min(t.h - 1, Math.max(0, Math.round((tt.y - t.y0) * 256)));
+        const k = (iy * t.w + ix) * 4, o = (gy * GRID + gx) * 3;
+        tex[o] = t.px[k]; tex[o + 1] = t.px[k + 1]; tex[o + 2] = t.px[k + 2];
+      }
+    return tex;
   }
 
   function proceduralHeights(p) {
@@ -144,8 +200,7 @@ const EveryParkIso = (() => {
     return H;
   }
 
-  // ---- 3. Rasterise helpers --------------------------------------
-  // Even-odd point-in-rings test — handles holes for free.
+  // ---- Rasterise helpers ------------------------------------------
   function insideRings(rings, x, y) {
     let inside = false;
     for (const ring of rings)
@@ -158,12 +213,10 @@ const EveryParkIso = (() => {
   }
 
   function maskFromRings(rings, bbox) {
-    const [w, s, e, n] = bbox;
     const M = new Uint8Array(GRID * GRID);
     for (let gy = 0; gy < GRID; gy++)
       for (let gx = 0; gx < GRID; gx++) {
-        const lng = w + (e - w) * gx / (GRID - 1);
-        const lat = n - (n - s) * gy / (GRID - 1);
+        const [lng, lat] = gridToLL(bbox, gx, gy);
         if (insideRings(rings, lng, lat)) M[gy * GRID + gx] = 1;
       }
     return M;
@@ -193,42 +246,48 @@ const EveryParkIso = (() => {
     }
   }
 
-  // Sport courts get a flat colour and a little emoji sprite.
-  const SPORT = [
-    [/baseball|softball/,      2, "#d9c186", "⚾"],
-    [/basketball/,             3, "#6b7d99", "🏀"],
-    [/tennis/,                 4, "#b85c48", "🎾"],
-    [/pickleball/,             5, "#4f9d8b", "🏓"],
-    [/soccer|football/,        6, "#5c9e57", "⚽"],
-    [/volleyball/,             7, "#c9a86b", "🏐"],
-    [/./,                      8, "#7fa06f", "🏃"]          // generic pitch
-  ];
-  const KIND = { playground: [9, "#d99a4e", "🛝"],
-                 swimming_pool: [10, "#4fa3c9", "🏊"],
-                 dog_park: [11, "#a08a6b", "🐕"],
-                 track: [12, "#b0876b", "🏃"] };
-  const COURT_COLOR = {};
-  for (const [, code, col] of SPORT) COURT_COLOR[code] = col;
-  for (const k in KIND) COURT_COLOR[KIND[k][0]] = KIND[k][1];
+  // Snap a sprite to the nearest island cell so a court whose centroid
+  // rounds just outside the boundary still shows.
+  function snapInside(inside, gx, gy) {
+    if (gx >= 0 && gy >= 0 && gx < GRID && gy < GRID && inside[gy * GRID + gx])
+      return [gx, gy];
+    for (let r = 1; r <= 4; r++)
+      for (let dy = -r; dy <= r; dy++)
+        for (let dx = -r; dx <= r; dx++) {
+          const nx = gx + dx, ny = gy + dy;
+          if (nx >= 0 && ny >= 0 && nx < GRID && ny < GRID
+              && inside[ny * GRID + nx]) return [nx, ny];
+        }
+    return null;
+  }
 
-  // Roads come straight from OpenStreetMap via Overpass — the ArcGIS
-  // mirrors don't publish a drivable-roads layer. Best-effort: a park
-  // with no reachable Overpass just renders without roads.
-  async function fetchRoads(bbox) {
+  // ---- Overpass: roads + buildings + parking in one query ---------
+  async function fetchOverpass(bbox) {
     const [w, s, e, n] = bbox;
-    const q = `[out:json][timeout:10];way[highway~"^(motorway|trunk|primary|` +
-      `secondary|tertiary|unclassified|residential|service|living_street)$"]` +
-      `(${s},${w},${n},${e});out geom 300;`;
+    const q = `[out:json][timeout:12];(` +
+      `way[highway~"^(motorway|trunk|primary|secondary|tertiary|` +
+      `unclassified|residential|service|living_street)$"](${s},${w},${n},${e});` +
+      `way[building](${s},${w},${n},${e});` +
+      `way[amenity=parking](${s},${w},${n},${e});` +
+      `);out geom 700;`;
     const r = await fetch("https://overpass-api.de/api/interpreter",
       { method: "POST", body: "data=" + encodeURIComponent(q),
         headers: { "Content-Type": "application/x-www-form-urlencoded" } });
     const j = await r.json();
-    return (j.elements || [])
-      .filter(el => el.geometry)
-      .map(el => ({ geometry: { paths: [el.geometry.map(g => [g.lon, g.lat])] } }));
+    const roads = [], buildings = [], parking = [];
+    for (const el of j.elements || []) {
+      if (!el.geometry) continue;
+      const pts = el.geometry.map(g => [g.lon, g.lat]);
+      const tags = el.tags || {};
+      if (tags.building) buildings.push([pts]);
+      else if (tags.amenity === "parking") parking.push([pts]);
+      else if (tags.highway) roads.push({ geometry: { paths: [pts] } });
+    }
+    return { roads, buildings, parking };
   }
 
-  async function fetchDressing(bbox) {
+  // ---- Trails + water + courts (ArcGIS) + Overpass extras ---------
+  async function fetchDressing(bbox, inside) {
     const [w, s, e, n] = bbox;
     const env = JSON.stringify({ xmin: w, ymin: s, xmax: e, ymax: n,
                                  spatialReference: { wkid: 4326 } });
@@ -236,7 +295,7 @@ const EveryParkIso = (() => {
                      inSR: "4326", outSR: "4326", outFields: "",
                      returnGeometry: "true", maxAllowableOffset: "0.00008",
                      resultRecordCount: "400" };
-    const [trails, blue, water, leisure, roads] = await Promise.allSettled([
+    const [trails, blue, water, leisure, over] = await Promise.allSettled([
       arc(OSM6 + "OSM_NA_Trails/FeatureServer/0/query",
           { ...common, where: "highway IN ('path','track','bridleway')" }),
       arc(DEEP + "BlueBlazedHikingTrails/FeatureServer/0/query",
@@ -246,13 +305,39 @@ const EveryParkIso = (() => {
           { ...common, outFields: "leisure,sport",
             where: "leisure IN ('pitch','playground','swimming_pool'," +
                    "'dog_park','track')" }),
-      fetchRoads(bbox)
+      fetchOverpass(bbox)
     ]);
+
     const trailM = new Uint8Array(GRID * GRID);
+    const trailPaths = [];
     for (const r of [trails, blue])
-      if (r.status === "fulfilled") rasterisePaths(r.value, bbox, trailM);
+      if (r.status === "fulfilled") {
+        rasterisePaths(r.value, bbox, trailM);
+        for (const f of r.value)
+          for (const path of (f.geometry && f.geometry.paths) || [])
+            trailPaths.push(path);
+      }
+
     const roadM = new Uint8Array(GRID * GRID);
-    if (roads.status === "fulfilled") rasterisePaths(roads.value, bbox, roadM);
+    const buildM = new Uint8Array(GRID * GRID);
+    const parkM = new Uint8Array(GRID * GRID);
+    const sprites = [];
+    if (over.status === "fulfilled") {
+      rasterisePaths(over.value.roads, bbox, roadM);
+      for (const rings of over.value.buildings) {
+        const m2 = maskFromRings(rings, bbox);
+        for (let i = 0; i < buildM.length; i++) if (m2[i]) buildM[i] = 1;
+      }
+      for (const rings of over.value.parking) {
+        const m2 = maskFromRings(rings, bbox);
+        for (let i = 0; i < parkM.length; i++) if (m2[i]) parkM[i] = 1;
+        let sx = 0, sy = 0, np = 0;
+        for (const [x, y] of rings[0]) { sx += x; sy += y; np++; }
+        const cc = snapInside(inside, ...cellOf(bbox, sx / np, sy / np));
+        if (cc) sprites.push({ gx: cc[0], gy: cc[1], emoji: "🅿️" });
+      }
+    }
+
     const waterM = new Uint8Array(GRID * GRID);
     if (water.status === "fulfilled")
       for (const f of water.value)
@@ -260,10 +345,8 @@ const EveryParkIso = (() => {
           const m2 = maskFromRings(f.geometry.rings, bbox);
           for (let i = 0; i < waterM.length; i++) if (m2[i]) waterM[i] = 1;
         }
-    // Courts: rasterise each pitch into a per-sport colour code and pin
-    // an emoji sprite at its centroid cell.
+
     const courtM = new Uint8Array(GRID * GRID);
-    const sprites = [];
     if (leisure.status === "fulfilled")
       for (const f of leisure.value) {
         if (!f.geometry || !f.geometry.rings) continue;
@@ -280,48 +363,38 @@ const EveryParkIso = (() => {
         for (let i = 0; i < courtM.length; i++) if (m2[i]) courtM[i] = code;
         let sx = 0, sy = 0, np = 0;
         for (const [x, y] of f.geometry.rings[0]) { sx += x; sy += y; np++; }
-        const [cgx, cgy] = cellOf(bbox, sx / np, sy / np);
-        if (cgx >= 0 && cgx < GRID && cgy >= 0 && cgy < GRID)
-          sprites.push({ gx: cgx, gy: cgy, emoji });
+        const cc = snapInside(inside, ...cellOf(bbox, sx / np, sy / np));
+        if (cc) sprites.push({ gx: cc[0], gy: cc[1], emoji });
       }
-    return { trailM, waterM, roadM, courtM, sprites };
+
+    // The hiker's route: the longest trail polyline, in grid coords.
+    let best = null, bestLen = 0;
+    for (const path of trailPaths) {
+      let len = 0;
+      for (let i = 1; i < path.length; i++)
+        len += Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]);
+      if (len > bestLen) { bestLen = len; best = path; }
+    }
+    let hikePath = null;
+    if (best && best.length > 3) {
+      hikePath = best.map(([x, y]) => {
+        return [(x - bbox[0]) / (bbox[2] - bbox[0]) * (GRID - 1),
+                (bbox[3] - y) / (bbox[3] - bbox[1]) * (GRID - 1)];
+      }).filter(([gx, gy]) => gx > -2 && gy > -2 && gx < GRID + 2 && gy < GRID + 2);
+      if (hikePath.length < 4) hikePath = null;
+    }
+
+    return { trailM, waterM, roadM, buildM, parkM, courtM, sprites, hikePath };
   }
 
-  // ---- Satellite drape: sample real imagery per cell -----------------
-  async function fetchSatTexture(bbox) {
-    const [w, s, e, n] = bbox;
-    const spanM = Math.max((e - w) * 111320 * Math.cos(s * Math.PI / 180),
-                           (n - s) * 111320);
-    const z = Math.max(13, Math.min(17, Math.round(17 - Math.log2(spanM / 700))));
-    const tl = tileXY(n, w, z), br = tileXY(s, e, z);
-    const x0 = Math.floor(tl.x), y0 = Math.floor(tl.y);
-    const cols = Math.floor(br.x) - x0 + 1, rows = Math.floor(br.y) - y0 + 1;
-    if (cols * rows > 20) throw new Error("too many imagery tiles");
-    const cv = document.createElement("canvas");
-    cv.width = cols * 256; cv.height = rows * 256;
-    const cx = cv.getContext("2d", { willReadFrequently: true });
-    await Promise.all([...Array(cols * rows)].map((_, i) => {
-      const tx = x0 + (i % cols), ty = y0 + Math.floor(i / cols);
-      return loadImage("https://server.arcgisonline.com/ArcGIS/rest/services/" +
-                       `World_Imagery/MapServer/tile/${z}/${ty}/${tx}`)
-        .then(im => cx.drawImage(im, (tx - x0) * 256, (ty - y0) * 256));
-    }));
-    const px = cx.getImageData(0, 0, cv.width, cv.height).data;
-    const tex = new Uint8ClampedArray(GRID * GRID * 3);
-    for (let gy = 0; gy < GRID; gy++)
-      for (let gx = 0; gx < GRID; gx++) {
-        const lng = w + (e - w) * gx / (GRID - 1);
-        const lat = n - (n - s) * gy / (GRID - 1);
-        const t = tileXY(lat, lng, z);
-        const ix = Math.min(cv.width - 1, Math.max(0, Math.round((t.x - x0) * 256)));
-        const iy = Math.min(cv.height - 1, Math.max(0, Math.round((t.y - y0) * 256)));
-        const k = (iy * cv.width + ix) * 4, o = (gy * GRID + gx) * 3;
-        tex[o] = px[k]; tex[o + 1] = px[k + 1]; tex[o + 2] = px[k + 2];
-      }
-    return tex;
-  }
+  // ---- Time of day ------------------------------------------------
+  const TOD = [
+    { icon: "☀️", label: "Day",    fn: (r, g, b) => [r, g, b] },
+    { icon: "🌅", label: "Sunset", fn: (r, g, b) => [Math.min(255, r * 1.08 + 20), g * .82, b * .62] },
+    { icon: "🌙", label: "Night",  fn: (r, g, b) => [r * .30 + 8, g * .34 + 10, b * .52 + 34] }
+  ];
 
-  // ---- 4. Drawing ------------------------------------------------
+  // ---- Drawing ----------------------------------------------------
   function coverPalette(p) {
     const c = ((p.attrs || {}).cover || "").toLowerCase();
     if (c.includes("wood")) return { lo: [52, 96, 62], hi: [140, 182, 118] };
@@ -335,20 +408,12 @@ const EveryParkIso = (() => {
     if (c.includes("open")) return 0.03;
     return 0.07;
   }
-  const hexRgb = h => [parseInt(h.slice(1, 3), 16),
-                       parseInt(h.slice(3, 5), 16),
-                       parseInt(h.slice(5, 7), 16)];
-
-  const hash = (gx, gy) => {
-    let h = (gx * 73856093) ^ (gy * 19349663);
-    h = (h ^ (h >> 13)) * 1274126177;
-    return ((h ^ (h >> 16)) >>> 0) / 4294967295;
-  };
 
   function draw(canvas, S, yaw) {
-    const { H, inside, trailM, waterM, roadM, courtM, dropM, edge, p,
-            spriteAt, tex } = S;
+    const { H, inside, trailM, waterM, roadM, buildM, parkM, courtM,
+            dropM, edge, p, spriteAt, tex } = S;
     const useSat = S.useSat && tex;
+    const tod = TOD[S.tod].fn;
     const ctx = canvas.getContext("2d");
     const W = canvas.width, Hh = canvas.height;
     ctx.clearRect(0, 0, W, Hh);
@@ -368,6 +433,12 @@ const EveryParkIso = (() => {
     const zScale = Math.min(60, 9000 / span) * (span / 90);
     const cx = W / 2, cy = Hh * 0.60;
     const cos = Math.cos(yaw), sin = Math.sin(yaw);
+    const project = (fgx, fgy, h) => {
+      const rx = (fgx - GRID / 2) * cos - (fgy - GRID / 2) * sin;
+      const ry = (fgx - GRID / 2) * sin + (fgy - GRID / 2) * cos;
+      return [cx + rx * s * 1.55,
+              cy + ry * s * .8 - (h - min) / span * zScale];
+    };
 
     const order = [];
     for (let gy = 0; gy < GRID; gy++)
@@ -384,7 +455,9 @@ const EveryParkIso = (() => {
       const i = gy * GRID + gx;
       let h = H[i];
       const isWater = waterM[i] && (h <= waterLevel + 4);
+      const isBuild = buildM[i] && !isWater;
       if (isWater) h = waterLevel;
+      if (isBuild) h += 7;                            // extruded block
       const t = (h - min) / span;
       const X = cx + rx * s * 1.55;
       const Y = cy + ry * s * .8 - t * zScale;
@@ -392,15 +465,16 @@ const EveryParkIso = (() => {
       let r, g, b;
       const nb = H[gy * GRID + Math.max(0, gx - 1)];
       const sh = Math.max(-14, Math.min(18, (h - nb) * 1.6));
-      if (useSat) {
-        // Real imagery draped over the height field, hillshade kept so
-        // the relief still reads. Water/trail/road/court tints blend in
-        // at half strength so the overlays stay legible on photo ground.
+      if (isBuild) {
+        const v = 18 * hash(gx, gy);
+        r = 158 + v; g = 144 + v; b = 122 + v;        // roof
+      } else if (useSat) {
         const o = i * 3;
         r = tex[o] + sh; g = tex[o + 1] + sh; b = tex[o + 2] + sh;
         let tint = null;
         if (isWater) tint = [56, 116, 172];
         else if (courtM[i]) tint = hexRgb(COURT_COLOR[courtM[i]]);
+        else if (parkM[i]) tint = [176, 178, 180];
         else if (roadM[i]) tint = [154, 160, 166];
         else if (trailM[i]) tint = [196, 168, 122];
         if (tint) { r = (r + tint[0]) / 2; g = (g + tint[1]) / 2; b = (b + tint[2]) / 2; }
@@ -410,46 +484,46 @@ const EveryParkIso = (() => {
       } else if (courtM[i]) {
         [r, g, b] = hexRgb(COURT_COLOR[courtM[i]]);
         r += sh * .5; g += sh * .5; b += sh * .5;
+      } else if (parkM[i]) {
+        r = 176; g = 178; b = 180;                    // parking pad
       } else if (roadM[i]) {
-        r = 148; g = 152; b = 158;                    // asphalt grey
+        r = 148; g = 152; b = 158;                    // asphalt
       } else if (trailM[i]) {
-        r = 196; g = 168; b = 122;                    // worn-path tan
+        r = 196; g = 168; b = 122;                    // worn path
       } else {
         r = pal.lo[0] + (pal.hi[0] - pal.lo[0]) * t;
         g = pal.lo[1] + (pal.hi[1] - pal.lo[1]) * t;
         b = pal.lo[2] + (pal.hi[2] - pal.lo[2]) * t;
         r += sh; g += sh; b += sh;
       }
-      // Side face first: a darker column reaching down far enough that
-      // the cells drawn in front always overlap it — so the terrain is a
-      // connected blocky solid instead of floating top faces you could
-      // see between. Edge columns drop further, giving the island sides.
-      const i2 = gy * GRID + gx;
-      const skirt = (dropM[i2] / span) * zScale
-                  + (edge[i2] ? zScale * .12 + s * 2.4 : 1.6);
+      [r, g, b] = tod(r, g, b);
+
+      const skirt = (dropM[i] / span) * zScale
+                  + (edge[i] ? zScale * .12 + s * 2.4 : 1.6)
+                  + (isBuild ? 7 / span * zScale : 0);
       ctx.fillStyle = `rgb(${r * .55 | 0},${g * .55 | 0},${b * .55 | 0})`;
       ctx.fillRect(X - w / 2, Y, w + .7, skirt + hgt);
       ctx.fillStyle = `rgb(${r | 0},${g | 0},${b | 0})`;
       ctx.fillRect(X - w / 2, Y - hgt / 2, w + .7, hgt + .7);
 
-      // A sprite tree, drawn straight after its own cell so nearer rows
-      // paint over it correctly. Density follows the NLCD cover.
       const sp = spriteAt && spriteAt.get(i);
       if (sp) {
-        // Court emoji, drawn straight after its cell for correct depth.
-        ctx.font = `${Math.max(14, s * 3.4) | 0}px system-ui`;
+        ctx.font = `${Math.max(15, s * 3.6) | 0}px system-ui`;
         ctx.textAlign = "center";
-        ctx.fillText(sp, X, Y - s * .8);
+        ctx.fillText(sp, X, Y - s * .9);
       }
-      if (!useSat && !sp && !isWater && !trailM[i] && !roadM[i] && !courtM[i]
-          && hash(gx, gy) < density) {
+      if (!useSat && !sp && !isWater && !isBuild && !trailM[i] && !roadM[i]
+          && !courtM[i] && !parkM[i] && hash(gx, gy) < density) {
         const jx = (hash(gx + 7, gy) - .5) * w * .6;
-        const th = s * (1.5 + hash(gx, gy + 3));      // tree height varies
+        const th = s * (1.5 + hash(gx, gy + 3));
         const half = s * .55;
         const shade = 24 * hash(gx + 1, gy + 1);
-        ctx.fillStyle = `rgb(${58 + shade | 0},${44 + shade * .6 | 0},30)`;
+        let tr = 58 + shade, tg2 = 44 + shade * .6, tb = 30;
+        let cr = 30 + shade, cg = 96 + shade, cb = 46 + shade * .8;
+        [tr, tg2, tb] = tod(tr, tg2, tb); [cr, cg, cb] = tod(cr, cg, cb);
+        ctx.fillStyle = `rgb(${tr | 0},${tg2 | 0},${tb | 0})`;
         ctx.fillRect(X + jx - s * .08, Y - th * .35, s * .16, th * .4);
-        ctx.fillStyle = `rgb(${30 + shade | 0},${96 + shade | 0},${46 + shade * .8 | 0})`;
+        ctx.fillStyle = `rgb(${cr | 0},${cg | 0},${cb | 0})`;
         ctx.beginPath();
         ctx.moveTo(X + jx, Y - th);
         ctx.lineTo(X + jx - half, Y - th * .3);
@@ -463,12 +537,32 @@ const EveryParkIso = (() => {
       }
     }
 
+    // The hiker 🚶 walks the longest trail, back and forth, bobbing.
+    if (S.hikePath && S.hikePath.length > 3) {
+      const path = S.hikePath;
+      const tt = S.hikeT < 0.5 ? S.hikeT * 2 : (1 - S.hikeT) * 2;   // ping-pong
+      const fi = tt * (path.length - 1);
+      const i0 = Math.min(path.length - 2, Math.floor(fi));
+      const fr = fi - i0;
+      const fgx = path[i0][0] + (path[i0 + 1][0] - path[i0][0]) * fr;
+      const fgy = path[i0][1] + (path[i0 + 1][1] - path[i0][1]) * fr;
+      const cgx = Math.min(GRID - 1, Math.max(0, Math.round(fgx)));
+      const cgy = Math.min(GRID - 1, Math.max(0, Math.round(fgy)));
+      const hh = H[cgy * GRID + cgx];
+      const [hx, hy] = project(fgx, fgy, hh);
+      const bob = Math.sin(S.hikeT * 240) * 1.5;
+      ctx.font = `${Math.max(16, s * 4) | 0}px system-ui`;
+      ctx.textAlign = "center";
+      ctx.fillText("🚶", hx, hy - s * 1.1 + bob);
+    }
+
     ctx.fillStyle = "rgba(255,255,255,.75)";
     ctx.font = "11px system-ui";
+    ctx.textAlign = "left";
     ctx.fillText(`${Math.round(min)}–${Math.round(max)} m`, 10, Hh - 10);
   }
 
-  // ---- 5. Open ----------------------------------------------------
+  // ---- Open --------------------------------------------------------
   async function open(p) {
     if (document.getElementById("isoOverlay")) return;
     const ov = document.createElement("div");
@@ -479,26 +573,25 @@ const EveryParkIso = (() => {
         <div class="iso-sub">Loading boundary and terrain…</div>
         <canvas width="840" height="540"></canvas>
         <div class="iso-foot">
-          <span>Elevation: AWS Terrain Tiles · boundary &amp; features fetched on demand</span>
+          <span class="iso-tools"></span>
           <button id="isoClose">Close</button>
         </div>
       </div>`;
     document.body.appendChild(ov);
     const canvas = ov.querySelector("canvas");
     const sub = ov.querySelector(".iso-sub");
-    const close = () => { cancelAnimationFrame(raf); ov.remove(); };
-    ov.querySelector("#isoClose").addEventListener("click", close);
-    ov.addEventListener("click", e => { if (e.target === ov) close(); });
-
+    const tools = ov.querySelector(".iso-tools");
     const spin = document.createElement("div");
     spin.className = "iso-spin";
     ov.querySelector("#isoPanel").insertBefore(spin, canvas);
     canvas.style.display = "none";
+    const close = () => { cancelAnimationFrame(raf); ov.remove(); };
+    ov.querySelector("#isoClose").addEventListener("click", close);
+    ov.addEventListener("click", e => { if (e.target === ov) close(); });
 
-    // Boundary → bbox → heights + dressing, all best-effort.
     let boundary = null;
     try { boundary = await fetchBoundary(p); } catch (e) { /* fall through */ }
-    let bbox, inside;
+    let bbox;
     if (boundary) {
       let w = 180, s2 = 90, e2 = -180, n2 = -90;
       for (const ring of boundary.rings)
@@ -508,50 +601,26 @@ const EveryParkIso = (() => {
         }
       const padX = (e2 - w) * .08 + 1e-4, padY = (n2 - s2) * .08 + 1e-4;
       bbox = [w - padX, s2 - padY, e2 + padX, n2 + padY];
-      inside = maskFromRings(boundary.rings, bbox);
     } else {
       const acres = Number(p.acres) || 60;
       const sideM = Math.min(Math.max(Math.sqrt(acres * 4046.86) * 1.6, 500), 6000);
       const mPerDeg = 111320 * Math.cos(p.lat * Math.PI / 180);
       const dLng = sideM / mPerDeg / 2, dLat = sideM / 111320 / 2;
       bbox = [p.lng - dLng, p.lat - dLat, p.lng + dLng, p.lat + dLat];
-      inside = new Uint8Array(GRID * GRID).fill(1);
     }
-
-    // Scale the voxel grid to the terrain: ~9 m per cell, clamped so a
-    // pocket park stays chunky-cute and a state forest stays smooth
-    // enough to read (and the per-frame sort stays affordable).
     {
       const [w, s2, e2, n2] = bbox;
       const spanM = Math.max((e2 - w) * 111320 * Math.cos(s2 * Math.PI / 180),
                              (n2 - s2) * 111320);
       GRID = Math.max(96, Math.min(192, Math.round(spanM / 9)));
-      inside = boundary ? maskFromRings(boundary.rings, bbox)
-                        : new Uint8Array(GRID * GRID).fill(1);
     }
+    const inside = boundary ? maskFromRings(boundary.rings, bbox)
+                            : new Uint8Array(GRID * GRID).fill(1);
 
     let H;
     try { H = await fetchHeights(bbox); }
     catch (e) { H = proceduralHeights(p); }
-    let dressing = { trailM: new Uint8Array(GRID * GRID),
-                     waterM: new Uint8Array(GRID * GRID),
-                     roadM: new Uint8Array(GRID * GRID),
-                     courtM: new Uint8Array(GRID * GRID), sprites: [] };
-    try { dressing = await fetchDressing(bbox); } catch (e) { /* optional */ }
 
-    const nTrail = dressing.trailM.reduce((a, b) => a + b, 0);
-    const nWater = dressing.waterM.reduce((a, b) => a + b, 0);
-    const nRoad = dressing.roadM.reduce((a, b) => a + b, 0);
-    sub.textContent = [
-      boundary ? `boundary: ${boundary.label}` : "no boundary found — square sample",
-      nTrail ? "trails" : null, nRoad ? "roads" : null, nWater ? "water" : null,
-      dressing.sprites.length ? `${dressing.sprites.length} facilities` : null,
-      ((p.attrs || {}).cover || null), "drag to rotate"
-    ].filter(Boolean).join(" · ");
-
-    // Minecraft-style solid sides: how far each column must extend down
-    // so no gap opens between it and the cells drawn in front of it.
-    // Boundary columns get a thick skirt so the island reads as a slab.
     const dropM = new Float32Array(GRID * GRID);
     const edge = new Uint8Array(GRID * GRID);
     for (let gy = 0; gy < GRID; gy++)
@@ -570,24 +639,48 @@ const EveryParkIso = (() => {
         edge[i] = isEdge;
       }
 
+    // TERRAIN FIRST. Trails/roads/buildings/courts stream in after —
+    // this is what makes the view feel fast.
     spin.remove();
     canvas.style.display = "";
+    const empty = () => new Uint8Array(GRID * GRID);
+    const S = { H, inside, dropM, edge, p,
+                trailM: empty(), waterM: empty(), roadM: empty(),
+                buildM: empty(), parkM: empty(), courtM: empty(),
+                spriteAt: new Map(), hikePath: null, hikeT: 0,
+                useSat: false, tex: null, tod: 0 };
+    const baseSub = boundary ? `boundary: ${boundary.label}`
+                             : "no boundary found — square sample";
+    sub.textContent = baseSub + " · fetching trails, roads, buildings…";
 
-    // Sprite lookup by cell index, for depth-correct drawing.
-    const spriteAt = new Map();
-    for (const sp of dressing.sprites)
-      spriteAt.set(sp.gy * GRID + sp.gx, sp.emoji);
+    fetchDressing(bbox, inside).then(d => {
+      Object.assign(S, d);
+      S.spriteAt = new Map();
+      for (const sp of d.sprites) S.spriteAt.set(sp.gy * GRID + sp.gx, sp.emoji);
+      const bits = [baseSub];
+      if (d.trailM.some(v => v)) bits.push("trails");
+      if (d.roadM.some(v => v)) bits.push("roads");
+      if (d.waterM.some(v => v)) bits.push("water");
+      if (d.buildM.some(v => v)) bits.push("buildings");
+      if (d.sprites.length) bits.push(`${d.sprites.length} facilities`);
+      if ((p.attrs || {}).cover) bits.push(p.attrs.cover);
+      bits.push("drag to rotate");
+      sub.textContent = bits.join(" · ");
+    }).catch(() => {
+      sub.textContent = baseSub + " · extras unavailable · drag to rotate";
+    });
 
-    const S = { H, inside, ...dressing, dropM, edge, p, spriteAt,
-                useSat: false, tex: null };
-
-    // 🛰 toggle: drape real imagery over the terrain. Fetched lazily on
-    // first use; if the imagery can't be read (offline, CORS) the button
-    // apologises and stays in game mode.
+    // Toolbar: time of day, satellite drape, export.
+    const todBtn = document.createElement("button");
+    todBtn.className = "iso-tool";
+    todBtn.textContent = "☀️ Day";
+    todBtn.addEventListener("click", () => {
+      S.tod = (S.tod + 1) % TOD.length;
+      todBtn.textContent = `${TOD[S.tod].icon} ${TOD[S.tod].label}`;
+    });
     const satBtn = document.createElement("button");
-    satBtn.id = "isoSat";
+    satBtn.className = "iso-tool";
     satBtn.textContent = "🛰 Satellite";
-    ov.querySelector(".iso-foot").insertBefore(satBtn, ov.querySelector("#isoClose"));
     satBtn.addEventListener("click", async () => {
       if (S.useSat) { S.useSat = false; satBtn.classList.remove("active"); return; }
       if (!S.tex) {
@@ -598,6 +691,23 @@ const EveryParkIso = (() => {
       }
       S.useSat = true; satBtn.classList.add("active");
     });
+    const shotBtn = document.createElement("button");
+    shotBtn.className = "iso-tool";
+    shotBtn.textContent = "📸 Save";
+    shotBtn.addEventListener("click", () => {
+      try {
+        canvas.toBlob(blob => {
+          if (!blob) { shotBtn.textContent = "📸 unavailable"; return; }
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(blob);
+          a.download = `${p.name.replace(/[^\w ]+/g, "").trim() || "park"}.png`;
+          a.click();
+          setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+        });
+      } catch (e) { shotBtn.textContent = "📸 unavailable"; }
+    });
+    tools.append(todBtn, satBtn, shotBtn);
+
     let yaw = 0, target = 0, dragging = false, lastX = 0;
     canvas.addEventListener("pointerdown", e => { dragging = true; lastX = e.clientX; canvas.setPointerCapture(e.pointerId); });
     canvas.addEventListener("pointermove", e => { if (dragging) { target += (e.clientX - lastX) * .008; lastX = e.clientX; } });
@@ -606,6 +716,7 @@ const EveryParkIso = (() => {
       if (!document.getElementById("isoOverlay")) return;
       if (!dragging) target += 0.0012;
       yaw += (target - yaw) * .15;
+      S.hikeT = (S.hikeT + 0.0009) % 1;
       draw(canvas, S, yaw);
       raf = requestAnimationFrame(loop);
     };
