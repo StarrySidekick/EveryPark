@@ -325,10 +325,24 @@ const EveryParkIso = (() => {
       `way[building](${s},${w},${n},${e});` +
       `way[amenity=parking](${s},${w},${n},${e});` +
       `);out geom 700;`;
-    const r = await fetch("https://overpass-api.de/api/interpreter",
-      { method: "POST", body: "data=" + encodeURIComponent(q),
-        headers: { "Content-Type": "application/x-www-form-urlencoded" } });
-    const j = await r.json();
+    // Mirrors: the main endpoint rate-limits and times out often, which
+    // silently cost every road on the island while ArcGIS-sourced trails
+    // kept working — the "roads broken on some maps" report.
+    const ENDPOINTS = ["https://overpass-api.de/api/interpreter",
+                       "https://overpass.kumi.systems/api/interpreter",
+                       "https://overpass.osm.jp/api/interpreter"];
+    let j = null, lastErr = null;
+    for (const url of ENDPOINTS) {
+      try {
+        const r = await fetch(url, { method: "POST",
+          body: "data=" + encodeURIComponent(q),
+          headers: { "Content-Type": "application/x-www-form-urlencoded" } });
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        j = await r.json();
+        if (j && j.elements) break;
+      } catch (e) { lastErr = e; j = null; }
+    }
+    if (!j) throw lastErr || new Error("no overpass endpoint answered");
     const roads = [], buildings = [], parking = [];
     for (const el of j.elements || []) {
       if (!el.geometry) continue;
@@ -395,7 +409,19 @@ const EveryParkIso = (() => {
   // Paths as VECTOR polylines in grid coords, split where they leave
   // the island. Drawn as strokes instead of rasterised cells, so a
   // trail reads as a line rather than a staircase of blocks.
-  function linesFrom(features, bbox, inside) {
+  function linesFrom(features, bbox, inside, margin) {
+    const near = (cx, cy) => {
+      if (cx < 0 || cy < 0 || cx >= GRID || cy >= GRID) return false;
+      if (inside[cy * GRID + cx]) return true;
+      if (!margin) return false;
+      for (let dy = -margin; dy <= margin; dy++)
+        for (let dx = -margin; dx <= margin; dx++) {
+          const nx = cx + dx, ny = cy + dy;
+          if (nx >= 0 && ny >= 0 && nx < GRID && ny < GRID
+              && inside[ny * GRID + nx]) return true;
+        }
+      return false;
+    };
     const out = [];
     for (const f of features)
       for (const path of (f.geometry && f.geometry.paths) || []) {
@@ -404,8 +430,7 @@ const EveryParkIso = (() => {
           const gx = (x - bbox[0]) / (bbox[2] - bbox[0]) * (GRID - 1);
           const gy = (bbox[3] - y) / (bbox[3] - bbox[1]) * (GRID - 1);
           const cx = Math.round(gx), cy = Math.round(gy);
-          if (cx >= 0 && cy >= 0 && cx < GRID && cy < GRID
-              && inside[cy * GRID + cx]) {
+          if (near(cx, cy)) {
             const prev = run[run.length - 1];
             const cum = prev
               ? prev[2] + Math.hypot(gx - prev[0], gy - prev[1]) : 0;
@@ -528,8 +553,11 @@ const EveryParkIso = (() => {
       }
       if (hikePath.length < 6) hikePath = null;
     }
-    const trailLines = linesFrom(raw.trailFeats, bbox, inside);
-    const roadLines = linesFrom(raw.roads, bbox, inside);
+    const trailLines = linesFrom(raw.trailFeats, bbox, inside, 1);
+    // Roads usually run along a park's edge rather than through it —
+    // clipping them strictly inside deleted exactly the road you want to
+    // see. A few blocks of margin keeps the access road visible.
+    const roadLines = linesFrom(raw.roads, bbox, inside, 4);
     return { trailM, waterM, roadM, buildM, parkM, courtM, sprites, hikePath,
              trailLines, roadLines,
              trailPieces: pathPieces(trailLines, [1.5, 1.1]),
@@ -722,13 +750,6 @@ const EveryParkIso = (() => {
         const rx = (gx - GRID / 2) * cos - (gy - GRID / 2) * sin;
         order.push([depth(gx, gy), rx, gx, gy]);
       }
-    const pushPieces = (pieces, kind) => {
-      for (const pc of pieces || [])
-        order.push([(depth(pc[0], pc[1]) + depth(pc[2], pc[3])) / 2,
-                    -1, { pc, kind }, null]);
-    };
-    pushPieces(S.trailPieces, "trail");
-    pushPieces(S.roadPieces, "road");
     order.sort((a, b) => a[0] - b[0]);
 
     const w = s * 1.62, hgt = s * .92;
@@ -753,13 +774,11 @@ const EveryParkIso = (() => {
     const roadEdge = (() => { const c = tod(96, 100, 106); return `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`; })();
     const pxPerGrid = s * 1.55;
 
-    for (const entry of order) {
-      // --- a path segment ---
-      if (entry[1] === -1) {
-        // A ribbon DRAPED on the ground: both ends widened perpendicular
-        // in grid space, then all four corners projected at their own
-        // terrain height, so it hugs the slope instead of hovering.
-        const { pc, kind } = entry[2];
+    // A ribbon DRAPED on the ground: widened perpendicular in grid space,
+    // then every corner projected at its own terrain height, so it hugs
+    // the slope instead of hovering.
+    const drawRibbon = (pc, kind) => {
+      {
         const [x1, y1, x2, y2] = pc;
         const dx = x2 - x1, dy = y2 - y1;
         const L = Math.hypot(dx, dy) || 1;
@@ -780,9 +799,10 @@ const EveryParkIso = (() => {
         };
         if (kind === "road") { band(0.62, roadEdge); band(0.42, roadCol); }
         else band(0.26, trailCol);
-        continue;
       }
+    };
 
+    for (const entry of order) {
       const [ry, rx, gx, gy] = entry;
       const i = gy * GRID + gx;
       let h = H[i];
@@ -921,6 +941,17 @@ const EveryParkIso = (() => {
       }
     }
 
+    // Ways in, drawn last so nothing hides them: trees, buildings and
+    // ridges can obscure a trail exactly when you need to trace it.
+    // Sorted by depth among themselves so crossings stack sensibly.
+    const ways = [];
+    for (const pc of S.roadPieces || []) ways.push([pc, "road"]);
+    for (const pc of S.trailPieces || []) ways.push([pc, "trail"]);
+    ways.sort((a, b) =>
+      (depth(a[0][0], a[0][1]) + depth(a[0][2], a[0][3]))
+      - (depth(b[0][0], b[0][1]) + depth(b[0][2], b[0][3])));
+    for (const [pc, kind] of ways) drawRibbon(pc, kind);
+
     if (S.hikePath && S.hikePath.length > 3) {
       const path = S.hikePath;
       const tt = S.hikeT < 0.5 ? S.hikeT * 2 : (1 - S.hikeT) * 2;
@@ -1057,7 +1088,8 @@ const EveryParkIso = (() => {
       for (const sp of d.sprites) S.spriteAt.set(sp.gy * GRID + sp.gx, sp.emoji);
       const bits = [baseSub];
       if (d.trailM.some(v => v)) bits.push("trails");
-      if (d.roadM.some(v => v)) bits.push("roads");
+      bits.push((d.roadPieces && d.roadPieces.length) ? "roads"
+                                                        : "roads unavailable");
       if (d.waterM.some(v => v)) bits.push("water");
       if (d.buildM.some(v => v)) bits.push("buildings");
       if (d.sprites.length) bits.push(`${d.sprites.length} facilities`);
