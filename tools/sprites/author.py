@@ -87,6 +87,54 @@ BUSH = [
     "....oooo....",
 ]
 
+ROCKS = [[
+    "...oooo.....",
+    "..oaabbbo...",
+    ".oaaabbbbo..",
+    "oaaaabbbbbo.",
+    "oaaabbbbbbbo",
+    ".ooaabbbbbo.",
+    "...oooooooo.",
+], [
+    "....oo......",
+    "..ooaabo....",
+    ".oaaabbbo...",
+    "oaaabbbbbo..",
+    ".ooabbbbbo..",
+    "...oooooo...",
+]]
+
+# Slabs, not cartoons: a headstone reads by silhouette at this size.
+STONES = [[
+    "..oooo..",
+    ".oaaabo.",
+    "oaaaabbo",
+    "oaaaabbo",
+    "oaaaabbo",
+    "oaaaabbo",
+    "oaaaabbo",
+    "oooooooo",
+], [
+    "...oo...",
+    "..oaao..",
+    ".oaaabo.",
+    "oaaaabbo",
+    "oaoaaboo",
+    "oaaaabbo",
+    "oaaaabbo",
+    "oooooooo",
+], [
+    ".oooooo.",
+    "oaaaabbo",
+    "oaaaabbo",
+    "oaaaabbo",
+    "oaaaabbo",
+    "oooooooo",
+]]
+
+ROCK_PAL = {"o": "#3a3a36", "a": "#9a978c", "b": "#6f6d66"}
+STONE_PAL = {"o": "#3c4254", "a": "#bac4da", "b": "#848ea6"}
+
 TREES = [CONIFER, BROADLEAF, SLIM, BUSH]
 
 # Four frames: contact, pass, contact (mirrored), pass. Small enough that
@@ -205,17 +253,26 @@ def preview(path):
     S = 10
     cols = [render(t, SEASONS[s], S) for s in SEASONS for t in TREES]
     frames = [render(f, HIKER_PAL, S) for f in HIKER]
+    extras = ([render(r, ROCK_PAL, S) for r in ROCKS]
+              + [render(t, STONE_PAL, S) for t in STONES])
     pad = 8
     tw = max(c.width for c in cols) + pad
     th = max(c.height for c in cols) + pad
     sheet = Image.new("RGBA", (tw * len(TREES), th * len(SEASONS) + th // 2 + 90),
-                      (46, 52, 46, 255))
+                      (46, 52, 46, 255)) if False else Image.new(
+        "RGBA", (max(tw * len(TREES), 700), th * len(SEASONS) + 260),
+        (46, 52, 46, 255))
     for i, img in enumerate(cols):
         r, c = divmod(i, len(TREES))
         sheet.alpha_composite(img, (c * tw + pad // 2, r * th + pad // 2))
     y = th * len(SEASONS) + 10
     for i, img in enumerate(frames):
         sheet.alpha_composite(img, (i * (img.width + pad) + pad // 2, y))
+    y2 = y + max(f.height for f in frames) + 16
+    x2 = pad // 2
+    for img in extras:
+        sheet.alpha_composite(img, (x2, y2))
+        x2 += img.width + pad
     sheet.save(path)
     print(f"preview -> {path} ({sheet.width}x{sheet.height})")
 
@@ -230,6 +287,8 @@ def emit():
         return "\n".join(out)
     print(js("PIX_TREES", TREES))
     print(js("PIX_HIKER", HIKER))
+    print(js("PIX_ROCKS", ROCKS))
+    print(js("PIX_STONES", STONES))
     for s, pal in SEASONS.items():
         print(f'  // {s}: {pal}')
 
@@ -239,7 +298,7 @@ if __name__ == "__main__":
     ap.add_argument("--preview")
     ap.add_argument("--emit", action="store_true")
     a = ap.parse_args()
-    for t in TREES + HIKER:
+    for t in TREES + HIKER + ROCKS + STONES:
         norm(t)
     if a.preview:
         preview(a.preview)

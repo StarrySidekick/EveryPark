@@ -157,7 +157,8 @@
     wooded:   "M32 8 L44 30 H38 L48 50 H16 L26 30 H20 Z M29 50 h6 v8 h-6 z",
     field:    "M8 44 C20 34 26 46 34 38 C40 32 50 40 56 34 M8 52 h48",
     mountain: "M6 50 L24 20 L36 38 L44 26 L58 50 Z",
-    sports:   "M32 10 a22 22 0 1 0 0 44 a22 22 0 1 0 0-44 M10 32 h44 M32 10 v44",
+    sports:   "M32 10 a22 22 0 1 0 0 44 a22 22 0 1 0 0-44 " +
+              "M17 16 a26 26 0 0 1 0 32 M47 16 a26 26 0 0 0 0 32",
     beach:    "M6 44 c7-5 13-5 20 0 s13 5 20 0 s13-5 12 0 M40 12 a12 12 0 0 0-24 0 z M40 12 v22",
     grave:    "M32 8 c-9 0-14 7-14 15 v33 h28 V23 c0-8-5-15-14-15 M28 20 h8 v6 h6 v8 h-6 v10 h-8 V34 h-6 v-8 h6 z"
   };
@@ -2796,10 +2797,20 @@
           fillOpacity: f.properties.landmark ? 0.18 : 0.13,
           interactive: true
         }),
-        onEachFeature: (f, lyr) => lyr.on("click", e => {
-          L.DomEvent.stop(e);
-          districtCard(f.properties, e.latlng);
-        })
+        onEachFeature: (f, lyr) => {
+          lyr.on("click", e => {
+            L.DomEvent.stop(e);
+            districtCard(f.properties, e.latlng);
+          });
+          // Same affordance as the park polygons: the shape brightens
+          // and thickens so you can tell what you are about to click.
+          lyr.on("mouseover", () => {
+            lyr.setStyle({ weight: f.properties.landmark ? 4 : 3.4,
+                           color: "#7d3a26", fillOpacity: 0.3 });
+            lyr.bringToFront();
+          });
+          lyr.on("mouseout", () => districtLayer && districtLayer.resetStyle(lyr));
+        }
       });
       return districtLayer;
     } catch (e) {

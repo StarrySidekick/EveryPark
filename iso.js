@@ -947,7 +947,8 @@ const EveryParkIso = (() => {
     return cv;
   }
 
-  function hikerSprite(ctx, X, Y, r, tod, phase, todIdx) {
+  function hikerSprite(ctx, X, Y, r, tod, phase, todIdx, pixel) {
+    if (pixel === false) return classicHiker(ctx, X, Y, r, tod, phase);
     const at = hikerFrames(todIdx == null ? 0 : todIdx, tod);
     // Four frames on a two-beat walk. The phase already advances with
     // the hiker's progress along the trail, so the feet keep time with
@@ -991,6 +992,17 @@ const EveryParkIso = (() => {
     { o: [30, 53, 36],  a: [143, 201, 95], b: [92, 156, 70],  c: [63, 119, 53],
       t: [107, 74, 47], u: [67, 48, 31] }    // spring
   ];
+  const PIX_ROCKS = [
+    ["...oooo.....","..oaabbbo...",".oaaabbbbo..","oaaaabbbbbo.","oaaabbbbbbbo",".ooaabbbbbo.","...oooooooo."],
+    ["....oo......","..ooaabo....",".oaaabbbo...","oaaabbbbbo..",".ooabbbbbo..","...oooooo..."],
+  ];
+  const PIX_STONES = [
+    ["..oooo..",".oaaabo.","oaaaabbo","oaaaabbo","oaaaabbo","oaaaabbo","oaaaabbo","oooooooo"],
+    ["...oo...","..oaao..",".oaaabo.","oaaaabbo","oaoaaboo","oaaaabbo","oaaaabbo","oooooooo"],
+    [".oooooo.","oaaaabbo","oaaaabbo","oaaaabbo","oaaaabbo","oooooooo"],
+  ];
+  const PIX_ROCK_PAL  = { o: [58, 58, 54],  a: [154, 151, 140], b: [111, 109, 102] };
+  const PIX_STONE_PAL = { o: [60, 66, 84],  a: [186, 196, 218], b: [132, 142, 166] };
   const PIX_HIKER_PAL = { o: [32, 33, 31], h: [194, 69, 47], s: [224, 176, 136],
                           c: [217, 164, 65], p: [77, 107, 60], l: [55, 80, 107] };
 
@@ -1018,6 +1030,91 @@ const EveryParkIso = (() => {
         c2.fillRect(ox + x * k, oy + y * k, k, k);
       }
     }
+  }
+
+  // Props (boulders, headstones) take one palette, so they only need
+  // rebuilding when the light changes.
+  const propCache = new Map();
+  function propAtlas(shapes, pal, todIdx, tod, tag) {
+    const key = tag + "|" + todIdx;
+    let cv = propCache.get(key);
+    if (cv) return cv;
+    const cells = shapes.map(rows => ({ w: rows[0].length * PIX_K,
+                                        h: rows.length * PIX_K, rows }));
+    cv = document.createElement("canvas");
+    cv.width = cells.reduce((a, c) => a + c.w, 0);
+    cv.height = Math.max(...cells.map(c => c.h));
+    const c2 = cv.getContext("2d");
+    let x = 0;
+    for (const c of cells) { c.x = x; pixDraw(c2, c.rows, pal, x, 0, PIX_K, tod); x += c.w; }
+    cv.cells = cells;
+    if (propCache.size > 8) propCache.clear();
+    propCache.set(key, cv);
+    return cv;
+  }
+
+  // The pre-pixel look, kept so it can be switched back to. Same atlas
+  // shape as the pixel one, so the draw code does not care which is in
+  // use — only `cells` and a per-variant scale differ.
+  const CLASSIC_W = 44, CLASSIC_H = 74, CLASSIC_N = 4;
+  let classicAtlas = null, classicKey = "";
+  function classicTrees(season, todIdx, tod) {
+    const key = season + "|" + todIdx;
+    if (classicKey === key && classicAtlas) return classicAtlas;
+    const cv = document.createElement("canvas");
+    cv.width = CLASSIC_W * CLASSIC_N; cv.height = CLASSIC_H;
+    const c2 = cv.getContext("2d");
+    const cells = [];
+    for (let v = 0; v < CLASSIC_N; v++) {
+      const h2 = (v + .5) / CLASSIC_N;
+      const ox = v * CLASSIC_W + CLASSIC_W / 2;
+      const base = CLASSIC_H - 2;
+      const th = CLASSIC_H * (.72 + .2 * h2);
+      const half = CLASSIC_W * .42;
+      const shade = 24 * h2;
+      const [tr, tg2, tb] = tod(58 + shade, 44 + shade * .6, 30);
+      const [cr, cg, cb] = tod(...SEASONS[season].canopy(h2));
+      c2.fillStyle = `rgb(${tr | 0},${tg2 | 0},${tb | 0})`;
+      c2.fillRect(ox - CLASSIC_W * .06, base - th * .32, CLASSIC_W * .12, th * .34);
+      c2.fillStyle = `rgb(${cr | 0},${cg | 0},${cb | 0})`;
+      c2.beginPath();
+      c2.moveTo(ox, base - th * .74);
+      c2.lineTo(ox - half, base - th * .22);
+      c2.lineTo(ox + half, base - th * .22);
+      c2.closePath(); c2.fill();
+      c2.beginPath();
+      c2.moveTo(ox, base - th);
+      c2.lineTo(ox - half * .72, base - th * .53);
+      c2.lineTo(ox + half * .72, base - th * .53);
+      c2.closePath(); c2.fill();
+      cells.push({ x: v * CLASSIC_W, w: CLASSIC_W, h: CLASSIC_H });
+    }
+    cv.cells = cells;
+    classicAtlas = cv; classicKey = key;
+    return cv;
+  }
+  const CLASSIC_TREE_SCALE = [1, 1, 1, 1];
+
+  function classicHiker(ctx, X, Y, r, tod, phase) {
+    const t = tod(250, 248, 240);
+    const light = `rgb(${t[0]|0},${t[1]|0},${t[2]|0})`;
+    const t2 = tod(38, 62, 48);
+    const dark = `rgb(${t2[0]|0},${t2[1]|0},${t2[2]|0})`;
+    const sw = Math.max(1.4, r * .34);
+    ctx.save();
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    const sp = Math.sin(phase * 9) * r * .55;
+    for (const [col, wdt] of [[dark, sw * 1.9], [light, sw]]) {
+      ctx.strokeStyle = col; ctx.lineWidth = wdt;
+      ctx.beginPath();
+      ctx.moveTo(X, Y - r * 1.5); ctx.lineTo(X, Y - r * .1);
+      ctx.moveTo(X, Y - r * .1); ctx.lineTo(X - sp, Y + r * .9);
+      ctx.moveTo(X, Y - r * .1); ctx.lineTo(X + sp, Y + r * .9);
+      ctx.stroke();
+    }
+    ctx.fillStyle = light;
+    ctx.beginPath(); ctx.arc(X, Y - r * 1.95, r * .48, 0, 7); ctx.fill();
+    ctx.restore();
   }
 
   // Trees are the densest thing on screen — thousands of them. They are
@@ -1164,6 +1261,33 @@ const EveryParkIso = (() => {
       return h;
     };
 
+    // Height for a corner that is off the island. It MUST depend only on
+    // the corner, never on which cell is asking: when it returned the
+    // asking cell's own height, the two quads either side of a shoreline
+    // corner placed it at two different heights and the mesh tore. That
+    // is the smooth-mode stitching.
+    const fillCache = new Map();
+    const hFill = (ax, ay) => {
+      const k = ay * GRID + ax;
+      let v = fillCache.get(k);
+      if (v !== undefined) return v;
+      let sum = 0, n = 0;
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = ax + dx, ny = ay + dy;
+          if (nx < 0 || ny < 0 || nx >= GRID || ny >= GRID) continue;
+          const j = ny * GRID + nx;
+          if (!inside[j]) continue;
+          let hh = H[j];
+          if (waterM[j] && hh <= waterLevel + 4) hh = waterLevel;
+          else if (buildM[j]) hh += 7;
+          sum += hh; n++;
+        }
+      v = n ? sum / n : min;
+      fillCache.set(k, v);
+      return v;
+    };
+
     // Painter's order without building or sorting 50,000 entries every
     // frame. Depth rises monotonically with gx along sin and gy along
     // cos, so walking each axis in the sign of its term visits cells
@@ -1174,11 +1298,15 @@ const EveryParkIso = (() => {
     const st = Math.max(1, S.lod || 1);
     const dirX = sin >= 0 ? 1 : -1, dirY = cos >= 0 ? 1 : -1;
     const stepX = dirX * st, stepY = dirY * st;
-    const gxA = dirX > 0 ? 0 : GRID - 1;
-    const gyA = dirY > 0 ? 0 : GRID - 1;
+    const lastAnchor = Math.floor((GRID - 1) / st) * st;
+    const gxA = dirX > 0 ? 0 : lastAnchor;
+    const gyA = dirY > 0 ? 0 : lastAnchor;
     const inX = gx => dirX > 0 ? gx < GRID : gx >= 0;
     const inY = gy => dirY > 0 ? gy < GRID : gy >= 0;
-    const half = st / 2;
+    // An anchor owns the cells [gx, gx+st), so its column is centred half
+    // a cell before it and spans st cells — not centred ON it, which
+    // would offset the block from the cells it represents.
+    const c0 = -0.5, c1 = -0.5 + st;
 
     const w = s * 1.62 * st, hgt = s * .92 * st;
     // Infinite mode: one level line below the island's deepest point.
@@ -1203,7 +1331,14 @@ const EveryParkIso = (() => {
     // read as strings of cylinders.
     const deferred = [];        // facility marks, painted above the ways
     const decor = [];           // sprites, painted after ALL terrain
-    const atlas = treeSprites(S.season || 0, S.tod, tod);
+    const pixelMode = S.pixel !== false;
+    const atlas = pixelMode ? treeSprites(S.season || 0, S.tod, tod)
+                            : classicTrees(S.season || 0, S.tod, tod);
+    const treeScale = pixelMode ? PIX_TREE_SCALE : CLASSIC_TREE_SCALE;
+    const rockAtlas = pixelMode
+      ? propAtlas(PIX_ROCKS, PIX_ROCK_PAL, S.tod, tod, "rock") : null;
+    const stoneAtlas = (pixelMode && p.type === "cemetery")
+      ? propAtlas(PIX_STONES, PIX_STONE_PAL, S.tod, tod, "stone") : null;
     const trailCol = (() => { const c = tod(232, 196, 74); return `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`; })();
     const roadCol  = (() => { const c = tod(146, 148, 150); return `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`; })();
     const roadEdge = (() => { const c = tod(104, 104, 104); return `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`; })();
@@ -1299,9 +1434,9 @@ const EveryParkIso = (() => {
         // boundary, which was the fringe of blocks around the shoreline.
         // Missing neighbours reuse this cell's height so the mesh ends flat.
         const hAt = (ax, ay) => {
-          if (ax < 0 || ay < 0 || ax >= GRID || ay >= GRID) return h;
+          if (ax < 0 || ay < 0 || ax >= GRID || ay >= GRID) return hFill(ax, ay);
           const j = ay * GRID + ax;
-          if (!inside[j]) return h;
+          if (!inside[j]) return hFill(ax, ay);
           let hh = H[j];
           if (waterM[j] && hh <= waterLevel + 4) hh = waterLevel;
           else if (buildM[j]) hh += 7;
@@ -1355,8 +1490,8 @@ const EveryParkIso = (() => {
         // cell's footprint, and the two side faces that actually point
         // at the camera are drawn as quads, each at its own shade: the
         // three-tone top/left/right split is what reads as a cube.
-        const P00 = project(gx - half, gy - half, h), P10 = project(gx + half, gy - half, h),
-              P11 = project(gx + half, gy + half, h), P01 = project(gx - half, gy + half, h);
+        const P00 = project(gx + c0, gy + c0, h), P10 = project(gx + c1, gy + c0, h),
+              P11 = project(gx + c1, gy + c1, h), P01 = project(gx + c0, gy + c1, h);
         const nH = (ax, ay) => {
           if (ax < 0 || ay < 0 || ax >= GRID || ay >= GRID) return null;
           const j = ay * GRID + ax;
@@ -1401,10 +1536,10 @@ const EveryParkIso = (() => {
           };
           // Only the camera-facing pair: which two those are follows the
           // rotation, so the lit and shaded sides swap as you spin.
-          if (cos > 0) face(P01, P11, gx - half, gy + half, gx + half, gy + half, nH(gx, gy + st), .58);
-          else         face(P00, P10, gx - half, gy - half, gx + half, gy - half, nH(gx, gy - st), .58);
-          if (sin > 0) face(P10, P11, gx + half, gy - half, gx + half, gy + half, nH(gx + st, gy), .76);
-          else         face(P00, P01, gx - half, gy - half, gx - half, gy + half, nH(gx - st, gy), .76);
+          if (cos > 0) face(P01, P11, gx + c0, gy + c1, gx + c1, gy + c1, nH(gx, gy + st), .58);
+          else         face(P00, P10, gx + c0, gy + c0, gx + c1, gy + c0, nH(gx, gy - st), .58);
+          if (sin > 0) face(P10, P11, gx + c1, gy + c0, gx + c1, gy + c1, nH(gx + st, gy), .76);
+          else         face(P00, P01, gx + c0, gy + c0, gx + c0, gy + c1, nH(gx - st, gy), .76);
         }
         ctx.fillStyle = topFill;
         ctx.beginPath();
@@ -1423,7 +1558,7 @@ const EveryParkIso = (() => {
       // terrain never eats them.
       for (let sy = 0; sy < st; sy++)
       for (let sx = 0; sx < st; sx++) {
-        const dgx = gx + sx * dirX, dgy = gy + sy * dirY;
+        const dgx = gx + sx, dgy = gy + sy;
         if (dgx < 0 || dgy < 0 || dgx >= GRID || dgy >= GRID) continue;
         const j = dgy * GRID + dgx;
         if (!inside[j]) continue;
@@ -1432,12 +1567,12 @@ const EveryParkIso = (() => {
         const dBuild = buildM[j] && !dWater;
         if (dWater) dh = waterLevel;
         if (dBuild) dh += 7;
-        // Stand on the surface that is actually DRAWN. During a coarse
-        // pass the ground here is the anchor's block, not this cell's
-        // true height — a tree planted at its true height sinks into or
-        // floats over that block on slopes. At full detail (st=1)
-        // they're the same.
-        const [dX, dY] = project(dgx, dgy, st > 1 ? h : dh);
+        // Stand on this cell's OWN height, at every stride. Borrowing the
+        // anchor's height tied each tree to whichever block happened to
+        // own it, so the whole forest stepped up and down as the stride
+        // or the lattice changed. Sprites paint above the terrain
+        // anyway, so a coarse block underneath costs nothing.
+        const [dX, dY] = project(dgx, dgy, dh);
         const dd = depth(dgx, dgy);
 
         const sp = spriteAt && spriteAt.get(j);
@@ -1455,11 +1590,11 @@ const EveryParkIso = (() => {
             && (!S.treeMask || S.treeMask[j])
             && (S.treeMask || !COVER_NO_TREES.has(cvr))) {
           const jx = (hash(dgx + 7, dgy) - .5) * s * .97;
-          const v = (hash(dgx + 1, dgy + 1) * TREE_N) | 0;
+          const v = (hash(dgx + 1, dgy + 1) * atlas.cells.length) | 0;
           const cell = atlas.cells[v];
           // Each variant keeps its own proportions and its own height:
           // sharing one atlas cell size drew every bush as tall as a pine.
-          const th = s * (1.5 + hash(dgx, dgy + 3)) * 1.35 * PIX_TREE_SCALE[v];
+          const th = s * (1.5 + hash(dgx, dgy + 3)) * 1.35 * treeScale[v];
           const tw = th * (cell.w / cell.h);
           decor.push({ d: dd, f: () => {
             ctx.imageSmoothingEnabled = false;
@@ -1476,6 +1611,19 @@ const EveryParkIso = (() => {
           const stoneH = s * (.7 + .35 * hash(dgx, dgy + 5));
           const stoneW = s * .42;
           const crooked = hash(dgx + 9, dgy + 9) < 0.14;
+          if (stoneAtlas) {
+            const sv = (hash(dgx + 4, dgy + 6) * stoneAtlas.cells.length) | 0;
+            const sc = stoneAtlas.cells[sv];
+            const sh2 = s * 1.5 * (.8 + .4 * hash(dgx, dgy + 5));
+            const sw2 = sh2 * (sc.w / sc.h);
+            decor.push({ d: dd, f: () => {
+              ctx.imageSmoothingEnabled = false;
+              ctx.drawImage(stoneAtlas, sc.x, 0, sc.w, sc.h,
+                            dX - sw2 / 2, dY - sh2, sw2, sh2);
+              ctx.imageSmoothingEnabled = true;
+            } });
+            continue;
+          }
           decor.push({ d: dd, f: () => {
             let [gr2, gg2, gb2] = tod(198, 200, 196);
             ctx.fillStyle = `rgb(${gr2 | 0},${gg2 | 0},${gb2 | 0})`;
@@ -1543,6 +1691,18 @@ const EveryParkIso = (() => {
             const rx2 = (hash(dgx + 5, dgy + 11) - .5) * s * .81;
             const rs = s * (.5 + .5 * hash(dgx + 3, dgy + 9));
             const v = 26 * hash(dgx + 13, dgy + 2);
+            if (rockAtlas) {
+              const rv = (hash(dgx + 8, dgy + 4) * rockAtlas.cells.length) | 0;
+              const rc = rockAtlas.cells[rv];
+              const rh2 = rs * 1.7, rw2 = rh2 * (rc.w / rc.h);
+              decor.push({ d: dd, f: () => {
+                ctx.imageSmoothingEnabled = false;
+                ctx.drawImage(rockAtlas, rc.x, 0, rc.w, rc.h,
+                              dX + rx2 - rw2 / 2, dY - rh2, rw2, rh2);
+                ctx.imageSmoothingEnabled = true;
+              } });
+              continue;
+            }
             decor.push({ d: dd, f: () => {
               let [kr, kg, kb] = tod(126 + v, 122 + v, 114 + v);
               ctx.fillStyle = `rgb(${kr | 0},${kg | 0},${kb | 0})`;
@@ -1682,7 +1842,7 @@ const EveryParkIso = (() => {
     // resolution and scale it up: motion hides the softness, and it is
     // the cheapest way to keep a turntable of 25,000 columns fluid. The
     // moment it settles, one full-resolution pass replaces it.
-    S.lod = S.moving ? 2 : 1;
+    S.lod = window.__forceLod != null ? window.__forceLod : (S.moving ? 2 : 1);
     const q = S.moving ? 0.7 : 1;
     const cw = Math.max(2, Math.round(W * q)), ch = Math.max(2, Math.round(Hh * q));
     const sig = [Math.round(yaw * 500), S.lod, S.tod, S.season, S.sides,
@@ -1692,7 +1852,8 @@ const EveryParkIso = (() => {
                  S.roadPieces ? S.roadPieces.length : 0,
                  S.labels ? S.labels.length : 0,
                  S.coverM ? 1 : 0, S.treeMask ? 1 : 0,
-                 S.publics ? S.publics.length : 0].join(",");
+                 S.publics ? S.publics.length : 0,
+                 S.pixel === false ? 0 : 1].join(",");
     if (!S._cache || S._cache.width !== cw || S._cache.height !== ch) {
       S._cache = document.createElement("canvas");
       S._cache.width = cw; S._cache.height = ch;
@@ -1723,7 +1884,7 @@ const EveryParkIso = (() => {
       // pixel just shimmers. The walk cycle carries the motion instead.
       hikerSprite(ctx, hx0 * inv, (hy0 - P.s * .5) * inv,
                   Math.min(9, Math.max(3.6, P.s * 1.2)) * inv, P.tod,
-                  S.hikeT * 100, S.tod);
+                  S.hikeT * 100, S.tod, S.pixel !== false);
     }
   }
 
@@ -2029,6 +2190,16 @@ const EveryParkIso = (() => {
       sidesBtn.textContent = SIDES_LABELS[S.sides];
     });
 
+    const pixBtn = document.createElement("button");
+    pixBtn.className = "iso-tool active";
+    pixBtn.textContent = "Pixel";
+    pixBtn.title = "Pixel-art sprites, or the original drawn ones";
+    pixBtn.addEventListener("click", () => {
+      S.pixel = S.pixel === false;
+      pixBtn.classList.toggle("active", S.pixel !== false);
+      pixBtn.textContent = S.pixel === false ? "Classic" : "Pixel";
+    });
+
     const smoothBtn = document.createElement("button");
     smoothBtn.className = "iso-tool";
     smoothBtn.textContent = "Smooth";
@@ -2037,7 +2208,7 @@ const EveryParkIso = (() => {
       smoothBtn.classList.toggle("active", S.smooth);
     });
 
-    tools.append(satBtn, smoothBtn, sidesBtn, shotBtn, sliderWrap);
+    tools.append(satBtn, pixBtn, smoothBtn, sidesBtn, shotBtn, sliderWrap);
 
     // Scroll to zoom, centred on the island.
     canvas.addEventListener("wheel", e => {
@@ -2058,6 +2229,11 @@ const EveryParkIso = (() => {
     S.spin = true;
 
     let yaw = 0, target = 0, dragging = false, lastX = 0;
+    // Test hooks for tools/isotest. The rotation-stability check has to
+    // drive yaw to exact values either side of a quadrant boundary,
+    // which no user gesture can do repeatably.
+    window.__isoS = S;
+    window.__isoSetYaw = v => { yaw = target = v; draw(canvas, S, yaw); };
     // One finger rotates, two fingers pinch to zoom.
     const pointers = new Map();
     let pinchDist = 0;

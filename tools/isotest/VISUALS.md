@@ -48,7 +48,14 @@ change that looked correct.
   read at 20 px tall. `imageSmoothingEnabled` MUST be false around every
   blit or the pixels turn to mush. The hiker is a four-frame walk cycle
   with no vertical bob: a pixel sprite moving by fractions of a pixel
-  just shimmers.
+  just shimmers. Boulders and headstones are pixel art too, via
+  `propAtlas` (one palette, rebuilt only when the light changes).
+  Cemetery stone is biased BLUE because cemeteries open at dusk and a
+  neutral grey came out salmon once tinted.
+- **The Pixel/Classic toggle must keep working.** `classicTrees` and
+  `classicHiker` are the pre-v0.32 drawn look, kept deliberately. Both
+  atlases expose the same `cells` shape so the draw code never branches
+  on which is in use — only the atlas and a per-variant scale differ.
 - **No emojis anywhere.** Every icon is drawn (canvas sprite or inline
   SVG).
 - Sky is a plain gradient. Time-of-day button top-LEFT corner, season
@@ -92,12 +99,32 @@ change that looked correct.
   Quads and their rim-wall tests must span the same stride the LOD walk
   steps (`st`), or coarse passes shatter the surface into isolated tiles
   with vertical gaps. (The v0.26.0 regression.)
-- Every inside cell gets a quad; missing neighbours reuse the cell's own
-  height so the mesh ends flat — no blocky fringe at the shoreline.
+- Every inside cell gets a quad. A corner that falls off the island takes
+  a fill height that depends ONLY on that corner (the mean of its inside
+  neighbours, memoised) — never on which cell is asking. When it returned
+  the asking cell's own height, the two quads either side of a shoreline
+  corner placed it at two different heights and the mesh tore. That was
+  the smooth-mode stitching.
 - Rim walls appear wherever the neighbouring QUAD (one stride away) is
   missing — not wherever `edge[]` says.
 
 ## Motion LOD (perf) — the rules that keep it invisible
+
+- **Anchors sit on a FIXED lattice** (multiples of `st`), and only the
+  ORDER of the walk follows the rotation. When the start cell depended on
+  the walk direction, stride 2 put anchors on even cells going one way
+  and odd cells going the other, so crossing a quadrant while rotating
+  flipped the parity of the whole grid and every column and tree jumped a
+  cell. Measured with `flipdiff.mjs`: mean abs pixel difference across
+  the quadrant boundary was 8.30 vs 7.45 for an identical rotation
+  elsewhere; after the fix, 7.48 vs 7.45. (Only shows when GRID is even —
+  at odd GRID the two lattices coincide, which is why the first A/B
+  looked clean.)
+- **Decorations stand at their OWN cell's height**, at every stride.
+  Borrowing the anchor block's height tied each tree to whichever block
+  owned it, so the forest stepped up and down as the stride changed.
+- Dropping the stride entirely is NOT an option: measured 12 fps at
+  stride 2 vs 4.6 fps at stride 1 on a wooded 90 m-relief park.
 
 - While moving: grid stride 2, render scale 0.7, then ONE full-detail
   pass on settling. The only acceptable visible difference while moving
