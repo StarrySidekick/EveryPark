@@ -22,6 +22,23 @@
           geometry: { points: [[-73.4745, 41.4165]] } }
       ] })
     });
+    // Canned NLCD raster: grassland ground with patches of wetland,
+    // scrub, sand and crops, so every class-driven effect renders
+    // offline (official NLCD palette colours).
+    if (String(url).includes("mrlc.gov")) {
+      const cv = document.createElement("canvas");
+      cv.width = 128; cv.height = 128;
+      const c = cv.getContext("2d");
+      c.fillStyle = "rgb(223,223,194)"; c.fillRect(0, 0, 128, 128);    // grassland
+      c.fillStyle = "rgb(104,171,95)";  c.fillRect(40, 10, 60, 50);    // forest
+      c.fillStyle = "rgb(108,159,184)"; c.fillRect(84, 88, 44, 40);    // herb wetland
+      c.fillStyle = "rgb(184,217,235)"; c.fillRect(60, 96, 24, 32);    // woody wetland
+      c.fillStyle = "rgb(204,184,121)"; c.fillRect(0, 0, 34, 36);      // scrub
+      c.fillStyle = "rgb(179,172,159)"; c.fillRect(104, 0, 24, 26);    // barren/sand
+      c.fillStyle = "rgb(171,108,40)";  c.fillRect(0, 92, 40, 36);     // crops
+      return new Promise(res => cv.toBlob(b =>
+        res({ ok: true, blob: () => Promise.resolve(b) })));
+    }
     return Promise.reject(new Error("offline harness"));
   };
 </script>

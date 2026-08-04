@@ -14,6 +14,24 @@ change that looked correct.
   facility marks) are seeded per FULL-RESOLUTION grid cell; if they follow
   the coarse LOD lattice the forest visibly reshuffles and flickers every
   time the spin starts or crosses a quadrant. (Broken in v0.26.1.)
+- **Decorations are video-game SPRITES (v0.28.0, Timothy's spec).** Trees,
+  boulders, headstones, reeds and bushes paint AFTER every terrain
+  column, sorted far-to-near — their full face is always shown; the
+  ground never eats a sprite while the view turns. (Before this, trees
+  on away-facing slopes sank into the hillside mid-rotation.) The known
+  trade: a sprite whose ground is hidden behind a ridge stands on the
+  silhouette instead of vanishing — accepted.
+- **NLCD ground classes (v0.28.0).** Per-cell land cover from MRLC's WMS
+  (same raster the pipeline samples for the cover label): wetlands get a
+  swampy tint + marsh reeds (class 95), scrub gets olive tint + low
+  bushes (51/52), barren reads as sand, grassland/pasture as meadow,
+  crops warm tan, developed grey. Tints blend 55/45 into the height
+  palette BEFORE season/time-of-day so relief shading stays readable and
+  autumn still turns. Forest classes carry no tint. Without a canopy
+  mask, no trees are invented on marsh/sand/crops/pavement. If mrlc.gov
+  refuses cross-origin reads the whole thing silently degrades to the
+  uniform palette — that is the designed fallback, not a bug. The
+  harness serves a canned NLCD raster so every class renders offline.
 - **The island rim is one continuous earth-brown ring** — the wall colour
   (`WALL`), never terrain green — at rest and mid-spin, in blocky and
   smooth and satellite modes alike. (Broken in v0.26.1: rim edge tests

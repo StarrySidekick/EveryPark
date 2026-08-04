@@ -423,6 +423,69 @@ const EveryParkIso = (() => {
     return raw;
   }
 
+  // ---- NLCD: what the ground actually is ---------------------------
+  // The pipeline already samples NLCD per place for the cover LABEL;
+  // this fetches the same MRLC raster for the park's bbox so each CELL
+  // knows its class — wetland, sand, meadow, scrub, crops, developed —
+  // and the ground can show it. Needs mrlc.gov to allow cross-origin
+  // reads; if it doesn't, everything degrades to the uniform palette.
+  const NLCD_RGB = [
+    [70, 107, 159, 11], [222, 197, 197, 21], [217, 146, 130, 22],
+    [235, 0, 0, 23], [171, 0, 0, 24], [179, 172, 159, 31],
+    [104, 171, 95, 41], [28, 95, 44, 42], [181, 197, 143, 43],
+    [147, 204, 147, 51], [204, 184, 121, 52], [223, 223, 194, 71],
+    [220, 217, 57, 81], [171, 108, 40, 82], [184, 217, 235, 90],
+    [108, 159, 184, 95]];
+  function nlcdClassOf(r, g, b) {
+    let best = 0, bd = 46 * 46 * 3;
+    for (const [cr, cg, cb, cls] of NLCD_RGB) {
+      const d = (r - cr) * (r - cr) + (g - cg) * (g - cg) + (b - cb) * (b - cb);
+      if (d < bd) { bd = d; best = cls; }
+    }
+    return best;
+  }
+  async function fetchCoverGrid(bbox) {
+    const [w, s, e, n] = bbox;
+    const url = "https://www.mrlc.gov/geoserver/mrlc_display/wms?service=WMS" +
+      "&version=1.1.1&request=GetMap&layers=NLCD_2021_Land_Cover_L48" +
+      "&styles=&srs=EPSG:4326&format=image/png" +
+      `&bbox=${w},${s},${e},${n}&width=128&height=128`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error("nlcd " + r.status);
+    const bmp = await createImageBitmap(await r.blob());
+    const cv = document.createElement("canvas");
+    cv.width = bmp.width; cv.height = bmp.height;
+    const c2 = cv.getContext("2d");
+    c2.drawImage(bmp, 0, 0);
+    const d = c2.getImageData(0, 0, cv.width, cv.height);
+    return { px: d.data, w: cv.width, h: cv.height };
+  }
+  // Rasterise the sample onto the CURRENT grid (row 0 = north in both).
+  function coverGridFrom(cg, bbox) {
+    const M = new Uint8Array(GRID * GRID);
+    for (let gy = 0; gy < GRID; gy++)
+      for (let gx = 0; gx < GRID; gx++) {
+        const sx = Math.min(cg.w - 1, (gx / (GRID - 1) * (cg.w - 1)) | 0);
+        const sy = Math.min(cg.h - 1, (gy / (GRID - 1) * (cg.h - 1)) | 0);
+        const o = (sy * cg.w + sx) * 4;
+        if (cg.px[o + 3] < 60) continue;
+        M[gy * GRID + gx] = nlcdClassOf(cg.px[o], cg.px[o + 1], cg.px[o + 2]);
+      }
+    return M;
+  }
+  // Ground tints per class, blended into the height palette BEFORE the
+  // season and time-of-day transforms so autumn wetlands still turn.
+  // Forest classes carry no tint — the palette already is forest.
+  const COVER_TINT = {
+    21: [168, 166, 158], 22: [162, 160, 154], 23: [156, 154, 150],
+    24: [150, 148, 144], 31: [199, 182, 143], 51: [142, 152, 96],
+    52: [142, 152, 96], 71: [173, 180, 112], 81: [166, 178, 104],
+    82: [187, 168, 104], 90: [70, 102, 88], 95: [112, 130, 86] };
+  // Where trees should NOT be invented by the uniform-cover fallback.
+  // A real canopy mask (from imagery) overrides this — it has seen the
+  // actual trees.
+  const COVER_NO_TREES = new Set([95, 31, 82, 22, 23, 24]);
+
   // ---- GNIS: the names of the land itself --------------------------
   // Summits, ridges, gaps and cliffs from the Landforms layer (5);
   // lakes, reservoirs, swamps and falls from Other Hydrographic (7).
@@ -906,7 +969,7 @@ const EveryParkIso = (() => {
 
   function renderScene(canvas, S, yaw) {
     const { H, inside, trailM, waterM, roadM, buildM, parkM, courtM,
-            dropM, edge, p, spriteAt, tex } = S;
+            dropM, edge, p, spriteAt, tex, coverM } = S;
     const useSat = S.useSat && tex;
     const tod = TOD[S.tod].fn;
     // Satellite is a photo — always drape it on the continuous mesh
@@ -988,6 +1051,7 @@ const EveryParkIso = (() => {
     // roads. Butt caps — round caps on every segment were what made them
     // read as strings of cylinders.
     const deferred = [];        // facility marks, painted above the ways
+    const decor = [];           // sprites, painted after ALL terrain
     const atlas = treeSprites(S.season || 0, S.tod, tod);
     const trailCol = (() => { const c = tod(232, 196, 74); return `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`; })();
     const roadCol  = (() => { const c = tod(146, 148, 150); return `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`; })();
@@ -1064,6 +1128,15 @@ const EveryParkIso = (() => {
         g = pal.lo[1] + (pal.hi[1] - pal.lo[1]) * t;
         b = pal.lo[2] + (pal.hi[2] - pal.lo[2]) * t;
         r += sh; g += sh; b += sh;
+        // NLCD says what this cell actually is — lean the height
+        // palette toward it. 55/45 keeps the relief shading readable
+        // through the class colour.
+        const ct = coverM && COVER_TINT[coverM[i]];
+        if (ct) {
+          r = r * .45 + ct[0] * .55;
+          g = g * .45 + ct[1] * .55;
+          b = b * .45 + ct[2] * .55;
+        }
       }
       if (!useSat && !isWater && !courtM[i] && !parkM[i] && !isBuild)
         [r, g, b] = SEASONS[S.season || 0].ground(r, g, b);
@@ -1190,14 +1263,13 @@ const EveryParkIso = (() => {
         ctx.strokeStyle = topFill; ctx.lineWidth = 1; ctx.stroke();
       }
 
-      // Decorations — facility marks, trees, headstones, boulders — are
-      // seeded per FULL-RES cell whatever stride the geometry walks.
-      // When they followed the coarse lattice instead, the entire
-      // forest reshuffled, resized and flickered every time motion LOD
-      // kicked in or the walk direction flipped quadrant. Each coarse
-      // step scans its own sub-cells and projects every decoration at
-      // that cell's true spot at its true size, so the tree field is
-      // pixel-identical at any LOD.
+      // Decorations — trees, headstones, boulders, reeds, bushes — are
+      // seeded per FULL-RES cell whatever stride the geometry walks
+      // (a coarse-lattice forest reshuffles and flickers), and they are
+      // NOT drawn here: they are collected and painted after every
+      // column, in the sprite pass below. Timothy's spec: decorations
+      // are video-game sprites — their full face is always shown, the
+      // terrain never eats them.
       for (let sy = 0; sy < st; sy++)
       for (let sx = 0; sx < st; sx++) {
         const dgx = gx + sx * dirX, dgy = gy + sy * dirY;
@@ -1212,26 +1284,32 @@ const EveryParkIso = (() => {
         // Stand on the surface that is actually DRAWN. During a coarse
         // pass the ground here is the anchor's block, not this cell's
         // true height — a tree planted at its true height sinks into or
-        // floats over that block on slopes, and nearer blocks smear
-        // over its buried half. At full detail (st=1) they're the same.
+        // floats over that block on slopes. At full detail (st=1)
+        // they're the same.
         const [dX, dY] = project(dgx, dgy, st > 1 ? h : dh);
+        const dd = depth(dgx, dgy);
 
         const sp = spriteAt && spriteAt.get(j);
         // Facility marks are drawn after the ways, so a court's icon is
         // never painted over by the road running past it.
         if (sp) { deferred.push([dX, dY, sp]); continue; }
         if (dWater || dBuild || trailM[j] || roadM[j] || parkM[j]) continue;
+        const cvr = coverM ? coverM[j] : 0;
 
         // Trees stay in satellite mode too — the drape is the ground,
-        // the sprites are the forest standing on it.
+        // the sprites are the forest standing on it. Without a canopy
+        // mask, don't invent trees on ground NLCD calls treeless
+        // (marsh, sand, crops, pavement).
         if (!courtM[j] && hash(dgx, dgy) < density
-            && (!S.treeMask || S.treeMask[j])) {
+            && (!S.treeMask || S.treeMask[j])
+            && (S.treeMask || !COVER_NO_TREES.has(cvr))) {
           const jx = (hash(dgx + 7, dgy) - .5) * s * .97;
           const th = s * (1.5 + hash(dgx, dgy + 3)) * 1.35;
           const tw = th * (TREE_W / TREE_H);
           const v = (hash(dgx + 1, dgy + 1) * TREE_N) | 0;
-          ctx.drawImage(atlas, v * TREE_W, 0, TREE_W, TREE_H,
-                        dX + jx - tw / 2, dY - th, tw, th);
+          decor.push({ d: dd, f: () =>
+            ctx.drawImage(atlas, v * TREE_W, 0, TREE_W, TREE_H,
+                          dX + jx - tw / 2, dY - th, tw, th) });
         }
 
         // Headstones instead of pines: little pale slabs in rows, with
@@ -1240,27 +1318,60 @@ const EveryParkIso = (() => {
         else if (p.type === "cemetery" && hash(dgx * 2, dgy) < 0.20) {
           const stoneH = s * (.7 + .35 * hash(dgx, dgy + 5));
           const stoneW = s * .42;
-          let [gr2, gg2, gb2] = tod(198, 200, 196);
-          ctx.fillStyle = `rgb(${gr2 | 0},${gg2 | 0},${gb2 | 0})`;
-          ctx.beginPath();
-          ctx.moveTo(dX - stoneW / 2, dY);
-          ctx.lineTo(dX - stoneW / 2, dY - stoneH * .68);
-          ctx.quadraticCurveTo(dX, dY - stoneH * 1.12, dX + stoneW / 2, dY - stoneH * .68);
-          ctx.lineTo(dX + stoneW / 2, dY);
-          ctx.closePath(); ctx.fill();
-          if (hash(dgx + 9, dgy + 9) < 0.14) {       // a bare crooked tree
-            let [br, bg2, bb] = tod(58, 52, 48);
-            ctx.strokeStyle = `rgb(${br | 0},${bg2 | 0},${bb | 0})`;
-            ctx.lineWidth = Math.max(1, s * .16);
+          const crooked = hash(dgx + 9, dgy + 9) < 0.14;
+          decor.push({ d: dd, f: () => {
+            let [gr2, gg2, gb2] = tod(198, 200, 196);
+            ctx.fillStyle = `rgb(${gr2 | 0},${gg2 | 0},${gb2 | 0})`;
             ctx.beginPath();
-            ctx.moveTo(dX, dY);
-            ctx.lineTo(dX + s * .2, dY - s * 1.5);
-            ctx.moveTo(dX + s * .12, dY - s * .9);
-            ctx.lineTo(dX - s * .5, dY - s * 1.35);
-            ctx.moveTo(dX + s * .17, dY - s * 1.15);
-            ctx.lineTo(dX + s * .8, dY - s * 1.6);
-            ctx.stroke();
-          }
+            ctx.moveTo(dX - stoneW / 2, dY);
+            ctx.lineTo(dX - stoneW / 2, dY - stoneH * .68);
+            ctx.quadraticCurveTo(dX, dY - stoneH * 1.12, dX + stoneW / 2, dY - stoneH * .68);
+            ctx.lineTo(dX + stoneW / 2, dY);
+            ctx.closePath(); ctx.fill();
+            if (crooked) {
+              let [br, bg2, bb] = tod(58, 52, 48);
+              ctx.strokeStyle = `rgb(${br | 0},${bg2 | 0},${bb | 0})`;
+              ctx.lineWidth = Math.max(1, s * .16);
+              ctx.beginPath();
+              ctx.moveTo(dX, dY);
+              ctx.lineTo(dX + s * .2, dY - s * 1.5);
+              ctx.moveTo(dX + s * .12, dY - s * .9);
+              ctx.lineTo(dX - s * .5, dY - s * 1.35);
+              ctx.moveTo(dX + s * .17, dY - s * 1.15);
+              ctx.lineTo(dX + s * .8, dY - s * 1.6);
+              ctx.stroke();
+            }
+          } });
+        }
+
+        // Marsh reeds where NLCD says herbaceous wetland.
+        else if (cvr === 95 && hash(dgx + 3, dgy + 7) < 0.28) {
+          decor.push({ d: dd, f: () => {
+            const [rr, rg2, rb] = tod(104, 116, 62);
+            ctx.strokeStyle = `rgb(${rr | 0},${rg2 | 0},${rb | 0})`;
+            ctx.lineWidth = Math.max(1, s * .09);
+            for (let k = -1; k <= 1; k++) {
+              ctx.beginPath();
+              ctx.moveTo(dX + k * s * .16, dY);
+              ctx.quadraticCurveTo(dX + k * s * .22, dY - s * .45,
+                dX + k * s * .3, dY - s * (.7 + .25 * hash(dgx + k, dgy)));
+              ctx.stroke();
+            }
+          } });
+        }
+
+        // Low bushes on shrub/scrub ground.
+        else if ((cvr === 51 || cvr === 52) && hash(dgx + 11, dgy + 5) < 0.18) {
+          decor.push({ d: dd, f: () => {
+            const [br2, bg3, bb2] = tod(86, 118, 70);
+            ctx.fillStyle = `rgb(${br2 | 0},${bg3 | 0},${bb2 | 0})`;
+            ctx.beginPath();
+            ctx.ellipse(dX, dY - s * .22, s * .4, s * .27, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(dX + s * .28, dY - s * .14, s * .26, s * .18, 0, 0, Math.PI * 2);
+            ctx.fill();
+          } });
         }
 
         // Boulders: same scatter as trees, but only where the ground is
@@ -1275,25 +1386,38 @@ const EveryParkIso = (() => {
             const rx2 = (hash(dgx + 5, dgy + 11) - .5) * s * .81;
             const rs = s * (.5 + .5 * hash(dgx + 3, dgy + 9));
             const v = 26 * hash(dgx + 13, dgy + 2);
-            let [kr, kg, kb] = tod(126 + v, 122 + v, 114 + v);
-            ctx.fillStyle = `rgb(${kr | 0},${kg | 0},${kb | 0})`;
-            ctx.beginPath();
-            ctx.moveTo(dX + rx2 - rs, dY);
-            ctx.lineTo(dX + rx2 - rs * .55, dY - rs * .95);
-            ctx.lineTo(dX + rx2 + rs * .35, dY - rs * 1.05);
-            ctx.lineTo(dX + rx2 + rs, dY - rs * .2);
-            ctx.closePath(); ctx.fill();
-            let [sr, sg, sb] = tod(92, 89, 84);
-            ctx.fillStyle = `rgb(${sr | 0},${sg | 0},${sb | 0})`;
-            ctx.beginPath();
-            ctx.moveTo(dX + rx2 + rs * .35, dY - rs * 1.05);
-            ctx.lineTo(dX + rx2 + rs, dY - rs * .2);
-            ctx.lineTo(dX + rx2 + rs * .2, dY);
-            ctx.closePath(); ctx.fill();
+            decor.push({ d: dd, f: () => {
+              let [kr, kg, kb] = tod(126 + v, 122 + v, 114 + v);
+              ctx.fillStyle = `rgb(${kr | 0},${kg | 0},${kb | 0})`;
+              ctx.beginPath();
+              ctx.moveTo(dX + rx2 - rs, dY);
+              ctx.lineTo(dX + rx2 - rs * .55, dY - rs * .95);
+              ctx.lineTo(dX + rx2 + rs * .35, dY - rs * 1.05);
+              ctx.lineTo(dX + rx2 + rs, dY - rs * .2);
+              ctx.closePath(); ctx.fill();
+              let [sr, sg, sb] = tod(92, 89, 84);
+              ctx.fillStyle = `rgb(${sr | 0},${sg | 0},${sb | 0})`;
+              ctx.beginPath();
+              ctx.moveTo(dX + rx2 + rs * .35, dY - rs * 1.05);
+              ctx.lineTo(dX + rx2 + rs, dY - rs * .2);
+              ctx.lineTo(dX + rx2 + rs * .2, dY);
+              ctx.closePath(); ctx.fill();
+            } });
           }
         }
       }
     }
+
+    // SPRITE PASS. All decorations paint after every terrain column,
+    // far-to-near so they overlap each other correctly. This is what
+    // makes them read as video-game sprites: a tree's full face is
+    // always shown — the ground never eats it while the view turns.
+    // The trade: a sprite whose ground is genuinely hidden behind a
+    // ridge stands on the silhouette instead of vanishing; with
+    // Connecticut relief that is rare, and it reads far better than
+    // trees sinking into the hillside mid-rotation.
+    decor.sort((a, b) => a.d - b.d);
+    for (const D of decor) D.f();
 
     // A low mist over graveyards.
     if (p.type === "cemetery") {
@@ -1375,7 +1499,8 @@ const EveryParkIso = (() => {
                  Math.round((S.zoom || 1) * 200), cw, ch,
                  S.trailPieces ? S.trailPieces.length : 0,
                  S.roadPieces ? S.roadPieces.length : 0,
-                 S.labels ? S.labels.length : 0].join(",");
+                 S.labels ? S.labels.length : 0,
+                 S.coverM ? 1 : 0, S.treeMask ? 1 : 0].join(",");
     if (!S._cache || S._cache.width !== cw || S._cache.height !== ch) {
       S._cache = document.createElement("canvas");
       S._cache.width = cw; S._cache.height = ch;
@@ -1593,6 +1718,13 @@ const EveryParkIso = (() => {
       S.treeMask = treeMaskFrom(S.tex, S.inside);
     }).catch(() => { /* uniform cover fallback */ });
 
+    // NLCD ground classes: wetland, sand, meadow, scrub, crops,
+    // pavement — per cell, so the ground can show what it is.
+    fetchCoverGrid(bbox).then(cg => {
+      coverSample = cg;
+      S.coverM = coverGridFrom(cg, bbox);
+    }).catch(() => { /* uniform palette fallback */ });
+
     // Toolbar: time of day, satellite drape, export.
     const todBtn = ov.querySelector("#isoTod");
     const paintTod = () => {
@@ -1654,7 +1786,7 @@ const EveryParkIso = (() => {
     };
     labelBlocks();
 
-    let satSample = null;
+    let satSample = null, coverSample = null;
     const rebuild = () => {
       GRID = gridFor(S.cellM);
       const t2 = buildTerrain();
@@ -1668,6 +1800,7 @@ const EveryParkIso = (() => {
       S.tex = satSample ? satTexFrom(satSample, bbox) : null;
       S.treeMask = S.tex ? treeMaskFrom(S.tex, S.inside) : null;
       if (!S.tex) S.useSat = false;
+      S.coverM = coverSample ? coverGridFrom(coverSample, bbox) : null;
       buildLabels();          // re-pin names to the new grid
       labelBlocks();
     };
