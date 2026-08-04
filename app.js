@@ -33,9 +33,17 @@
 
   const map = L.map("map", { zoomControl: true }).setView(CONFIG.mapCenter, CONFIG.mapZoom);
   const baseLayers = {};
+  const baseByName = {};
   CONFIG.basemaps.forEach((b, i) => {
-    const parts = [L.tileLayer(b.url, { attribution: b.attribution, maxZoom: 19,
-                                        maxNativeZoom: b.maxNativeZoom || 19 })];
+    baseByName[b.label] = b;
+    // A basemap with `ground` instead of `url` is DRAWN, not fetched:
+    // an empty layer group, with the colour and the mown texture supplied
+    // by CSS underneath. Leaflet still treats it as a base layer, so it
+    // takes part in the radio switch like any other.
+    const parts = b.url
+      ? [L.tileLayer(b.url, { attribution: b.attribution, maxZoom: 19,
+                              maxNativeZoom: b.maxNativeZoom || 19 })]
+      : [];
     // Roads drawn over imagery: how you'd actually get there, at a glance.
     if (b.roadsUrl) parts.push(L.tileLayer(b.roadsUrl, { maxZoom: 19 }));
     if (b.labelsUrl) parts.push(L.tileLayer(b.labelsUrl, { maxZoom: 19 }));
@@ -43,6 +51,29 @@
     if (i === 0) baseLayers[b.label].addTo(map);
   });
   L.control.layers(baseLayers, null, { position: "bottomright" }).addTo(map);
+
+  // The mown checkerboard. One screen-space overlay above the polygons
+  // textures the ground AND the park fills in a single pass — the
+  // alternative, pattern-filling each polygon, has to be split into one
+  // paint rule per status colour, and splitting a dataLayer across rules
+  // has already stopped tile loading in this codebase once.
+  // Attached to the map container rather than a Leaflet pane: panes are
+  // transformed while you drag, and mown ground should stay put in
+  // screen space instead of sliding under the cursor.
+  const turf = document.createElement("div");
+  turf.className = "map-turf";
+  map.getContainer().appendChild(turf);
+
+  const applyBase = b => {
+    if (!b) return;
+    // Texture belongs on the drawn ground only. Over an aerial photo a
+    // checkerboard reads as a rendering fault, not as grass.
+    map.getContainer().style.background = b.ground || "";
+    turf.style.display = b.turf ? "" : "none";
+    document.body.classList.toggle("base-drawn", !!b.ground);
+  };
+  applyBase(CONFIG.basemaps[0]);
+  map.on("baselayerchange", e => applyBase(baseByName[e.name]));
 
   // ------------------------------------------------------------------
   // Icons are generated, not files: the ring takes the owner's colour and
@@ -2381,6 +2412,160 @@
     e.currentTarget.classList.toggle("active", !layersPanel.hidden);
   });
 
+  // ------------------------------------------------------------------
+  // Nearest parks you could actually drive to.
+  // Ranked by real driving time, not by straight-line distance: in
+  // Connecticut those disagree badly — a reservoir or a ridge puts a
+  // park two miles away twenty-five minutes down the road.
+  //
+  // OSRM's public server answers a one-to-many matrix in a single
+  // request, which is why the shortlist is cut to 25 by crow-flies
+  // first: 26 coordinates is one small URL, and asking for driving
+  // times to 1,063 parks is not a thing anyone should do to a free
+  // service. It is a demo server with no uptime promise, so a failure
+  // falls back to straight-line order and says so on the card.
+  // ------------------------------------------------------------------
+  const SHORTLIST = 25, NEAR_SHOW = 6;
+  const nearBtn = document.getElementById("nearBtn");
+
+  const haversineKm = (aLat, aLng, bLat, bLng) => {
+    const R = 6371, rad = Math.PI / 180;
+    const dLat = (bLat - aLat) * rad, dLng = (bLng - aLng) * rad;
+    const s = Math.sin(dLat / 2) ** 2
+            + Math.cos(aLat * rad) * Math.cos(bLat * rad) * Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(s));
+  };
+
+  function nearPanel() {
+    let el = document.getElementById("nearPanel");
+    if (el) return el;
+    el = document.createElement("div");
+    el.id = "nearPanel";
+    el.hidden = true;
+    el.innerHTML = `<div class="near-head"><span class="near-title">Near me</span>
+      <button type="button" aria-label="Close">×</button></div>
+      <div class="near-list"></div><div class="near-note"></div>`;
+    el.querySelector("button").addEventListener("click", () => { el.hidden = true; });
+    document.querySelector("main").appendChild(el);
+    return el;
+  }
+
+  const setNear = (title, listHtml, note) => {
+    const el = nearPanel();
+    el.querySelector(".near-title").textContent = title;
+    el.querySelector(".near-list").innerHTML = listHtml;
+    const n = el.querySelector(".near-note");
+    n.textContent = note || "";
+    n.style.display = note ? "" : "none";
+    el.hidden = false;
+    return el;
+  };
+
+  const mins = sec => sec < 60 ? "under a minute"
+    : sec < 3600 ? `${Math.round(sec / 60)} min`
+    : `${Math.floor(sec / 3600)} h ${Math.round((sec % 3600) / 60)} min`;
+  const miles = m => `${(m / 1609.34).toFixed(m < 16093 ? 1 : 0)} mi`;
+
+  function renderNear(rows, note) {
+    const el = setNear("Near me", "", note);
+    const list = el.querySelector(".near-list");
+    list.innerHTML = "";
+    for (const r of rows) {
+      const b = document.createElement("button");
+      b.className = "near-item";
+      b.type = "button";
+      b.innerHTML = `<span><span class="near-name"></span><br>
+        <span class="sr-sub"></span></span>
+        <span class="near-when"></span>`;
+      b.querySelector(".near-name").textContent = r.p.name;
+      b.querySelector(".sr-sub").textContent =
+        [r.p.town, r.p.subtype].filter(Boolean).join(" · ");
+      b.querySelector(".near-when").innerHTML = r.sec != null
+        ? `${mins(r.sec)}<br><span class="near-far">${miles(r.metres)}</span>`
+        : `<span class="near-far">${r.km.toFixed(1)} mi away</span>`;
+      b.addEventListener("click", () => {
+        map.flyTo([r.p.lat, r.p.lng], Math.max(map.getZoom(), 14), { duration: .9 });
+        setTimeout(() => openPlace(r.p), 950);
+      });
+      list.appendChild(b);
+    }
+  }
+
+  async function findNear(lat, lng) {
+    // Only places you can definitely go, that have something to walk.
+    // Cemeteries are deliberately in the dataset as walkable green space,
+    // but "where can I go for a walk right now" is not what they are for,
+    // and two of them led the Sherman test list. Land trust preserves DO
+    // belong here — often the best walking in a town.
+    const WALKABLE = ["town", "state", "national", "preserve"];
+    const pool = allParks.filter(p =>
+      visible(p) && p.status === "park" && (p.attrs || {}).trails
+      && WALKABLE.includes(p.type));
+    if (!pool.length) {
+      setNear("Near me", "", "No parks with mapped trails match your current filters.");
+      return;
+    }
+    const short = pool
+      .map(p => ({ p, km: haversineKm(lat, lng, p.lat, p.lng) }))
+      .sort((a, b) => a.km - b.km)
+      .slice(0, SHORTLIST);
+
+    const straight = () => short.slice(0, NEAR_SHOW)
+      .map(r => ({ ...r, km: r.km * 0.621371, sec: null }));
+
+    try {
+      const coords = [[lng, lat], ...short.map(r => [r.p.lng, r.p.lat])]
+        .map(c => `${c[0].toFixed(5)},${c[1].toFixed(5)}`).join(";");
+      const url = `https://router.project-osrm.org/table/v1/driving/${coords}`
+                + `?sources=0&annotations=duration,distance`;
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), 8000);
+      const r = await fetch(url, { signal: ctl.signal });
+      clearTimeout(timer);
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const j = await r.json();
+      if (j.code !== "Ok" || !j.durations || !j.durations[0]) throw new Error("no matrix");
+      const dur = j.durations[0], dist = (j.distances || [])[0] || [];
+      const rows = short
+        // Index 0 of the matrix row is the origin itself, so destinations
+        // start at 1. Unroutable destinations come back null.
+        .map((r2, i) => ({ ...r2, sec: dur[i + 1], metres: dist[i + 1] }))
+        .filter(r2 => r2.sec != null)
+        .sort((a, b) => a.sec - b.sec)
+        .slice(0, NEAR_SHOW);
+      if (!rows.length) throw new Error("nothing routable");
+      renderNear(rows, "Driving times from OpenStreetMap routing (OSRM).");
+    } catch (e) {
+      renderNear(straight(), "Routing unavailable — these are straight-line "
+                           + "distances, so the drive will be longer.");
+    }
+  }
+
+  if (nearBtn) nearBtn.addEventListener("click", () => {
+    if (!navigator.geolocation) {
+      setNear("Near me", "", "This browser can't share your location.");
+      return;
+    }
+    const was = nearBtn.textContent;
+    nearBtn.textContent = "Locating…";
+    nearBtn.disabled = true;
+    const done = () => { nearBtn.textContent = was; nearBtn.disabled = false; };
+    navigator.geolocation.getCurrentPosition(async pos => {
+      const { latitude: lat, longitude: lng } = pos.coords;
+      setNear("Near me", "", "Working out driving times…");
+      L.circleMarker([lat, lng], { radius: 6, color: "#d9a441", weight: 2,
+                                   fillColor: "#d9a441", fillOpacity: .8 })
+       .addTo(map).bindTooltip("You are here");
+      map.setView([lat, lng], Math.max(map.getZoom(), 11));
+      try { await findNear(lat, lng); } finally { done(); }
+    }, err => {
+      done();
+      setNear("Near me", "", err.code === 1
+        ? "Location permission denied — allow it in your browser to use this."
+        : "Couldn't get your location. Try again in a moment.");
+    }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 });
+  });
+
   // Random park: fly somewhere that passes the current filters.
   (document.getElementById("randomBtn") || {addEventListener(){}}).addEventListener("click", () => {
     // Somewhere you can definitely go, run by a public body, with
@@ -2441,11 +2626,85 @@
     });
   });
 
+  // ------------------------------------------------------------------
+  // Search results.
+  // Filtering alone stopped being a usable search when the list view was
+  // removed: matches simply stopped being painted, and below the mark
+  // zoom nothing visibly happened at all — indistinguishable from a
+  // search that doesn't work. The list is back, but only while you type.
+  // ------------------------------------------------------------------
+  const searchBox = document.getElementById("search");
+  const srBox = document.getElementById("searchResults");
+  const SR_MAX = 12;
+  const STATUS_COLOR = p => {
+    const V = CONFIG.visual;
+    if (p.type === "cemetery") return V.cemeteryFill;
+    if (p.access === "unknown") return V.unverifiedFill;
+    if (p.status === "park") return V.publicFill;
+    return V.probablyFill;
+  };
+
+  function closeResults() { if (srBox) { srBox.hidden = true; srBox.innerHTML = ""; } }
+
+  function showResults() {
+    if (!srBox) return;
+    if (!searchTerm) return closeResults();
+    const hits = [];
+    for (const p of allParks) {
+      if (!visible(p)) continue;
+      hits.push(p);
+      if (hits.length > SR_MAX) break;      // one over, so "more" is honest
+    }
+    srBox.innerHTML = "";
+    if (!hits.length) {
+      srBox.innerHTML = `<div class="sr-none">Nothing matches “${
+        searchTerm.replace(/[<>&]/g, "")}”. Try a town, or the steward's name.</div>`;
+      srBox.hidden = false;
+      return;
+    }
+    for (const p of hits.slice(0, SR_MAX)) {
+      const b = document.createElement("button");
+      b.className = "sr-item";
+      b.type = "button";
+      const sub = [p.town, p.subtype || p.steward || p.agency].filter(Boolean).join(" · ");
+      b.innerHTML = `<span class="sr-dot" style="background:${STATUS_COLOR(p)}"></span>
+        <span><span class="sr-name"></span><br><span class="sr-sub"></span></span>`;
+      b.querySelector(".sr-name").textContent = p.name;
+      b.querySelector(".sr-sub").textContent = sub;
+      b.addEventListener("click", () => {
+        map.flyTo([p.lat, p.lng], Math.max(map.getZoom(), 14), { duration: .8 });
+        setTimeout(() => openPlace(p), 850);
+        closeResults();
+      });
+      srBox.appendChild(b);
+    }
+    if (hits.length > SR_MAX) {
+      const m = document.createElement("div");
+      m.className = "sr-more";
+      m.textContent = `Showing ${SR_MAX} — keep typing to narrow it down`;
+      srBox.appendChild(m);
+    }
+    srBox.hidden = false;
+  }
+
   let searchTimer;
-  (document.getElementById("search") || {addEventListener(){}}).addEventListener("input", (e) => {
+  (searchBox || {addEventListener(){}}).addEventListener("input", (e) => {
     clearTimeout(searchTimer);
-    searchTimer = setTimeout(() => { searchTerm = e.target.value.trim().toLowerCase(); refresh(); }, 180);
+    searchTimer = setTimeout(() => {
+      searchTerm = e.target.value.trim().toLowerCase();
+      refresh();
+      showResults();
+    }, 180);
   });
+  if (searchBox) {
+    searchBox.addEventListener("focus", showResults);
+    searchBox.addEventListener("keydown", e => { if (e.key === "Escape") closeResults(); });
+  }
+  // Capture phase: the map swallows pointer events in the bubble phase,
+  // which is the same trap that kept the Filters dropdown open.
+  document.addEventListener("pointerdown", e => {
+    if (srBox && !srBox.hidden && !e.target.closest(".search-wrap")) closeResults();
+  }, true);
 
   (document.getElementById("padusToggle") || {addEventListener(){}}).addEventListener("click", async (e) => {
     const btn = e.currentTarget;

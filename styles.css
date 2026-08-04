@@ -642,14 +642,15 @@ header { border-bottom: 2px solid var(--ep-brass); }
 }
 #search:focus { outline: 2px solid var(--ep-brass); outline-offset: 0; }
 
-#filtersBtn, #randomBtn, #guideBtn {
+#filtersBtn, #randomBtn, #guideBtn, #nearBtn {
   background: var(--ep-ink-2); color: var(--ep-paper);
   border: 1px solid rgba(245,242,230,.18); border-radius: var(--ep-radius);
   font-family: var(--ep-mono); font-size: .74rem; letter-spacing: .04em;
   text-transform: uppercase; padding: 7px 12px;
 }
-#filtersBtn:hover, #randomBtn:hover, #guideBtn:hover,
+#filtersBtn:hover, #randomBtn:hover, #guideBtn:hover, #nearBtn:hover,
 #filtersBtn.active { background: var(--ep-ink-3); border-color: var(--ep-brass); }
+#nearBtn:disabled { opacity: .6; cursor: default; }
 
 #filtersPanel { background: var(--ep-ink); border: 1px solid var(--ep-brass); }
 .glabel { font-family: var(--ep-mono); letter-spacing: .12em; opacity: .7; }
@@ -749,7 +750,7 @@ header { border-bottom: 2px solid var(--ep-brass); }
   header h1 { font-size: .9rem; }
   header > #search { flex: 1 1 100%; order: 3; width: auto; min-width: 0; }
   .controls { margin-left: auto; gap: 6px; flex-wrap: wrap; }
-  #filtersBtn, #randomBtn, #guideBtn { padding: 6px 9px; font-size: .66rem; }
+  #filtersBtn, #randomBtn, #guideBtn, #nearBtn { padding: 6px 9px; font-size: .66rem; }
   #buildBadge { display: none; }
   #filtersPanel { left: auto; right: 0; min-width: min(88vw, 320px); }
   #legend { max-width: 62vw; font-size: .74rem; }
@@ -784,4 +785,149 @@ header { border-bottom: 2px solid var(--ep-brass); }
   #isoOverlay.iso-full #isoPanel canvas {
     width: 100%; height: auto; aspect-ratio: auto; flex: 1 1 auto; min-height: 0;
   }
+}
+
+
+/* ============================================================
+   THE MOWN GROUND — v0.29.0
+   One motif: a fine checkerboard, the pattern a mower leaves on a
+   fairway. It carries the site's character without any new colour,
+   which matters because the map's colours are already spoken for —
+   green means "you can go here", so the ground itself can never be
+   green without the code collapsing.
+   ============================================================ */
+:root {
+  --ep-turf-a:    rgba(120,140,94,.10);
+  --ep-turf-b:    rgba(120,140,94,.03);
+  --ep-turf-size: 18px;
+  /* A conic gradient makes a TRUE checkerboard. The usual
+     two-linear-gradient trick makes diagonal argyle diamonds. */
+  --ep-turf: conic-gradient(var(--ep-turf-a) 0 25%, var(--ep-turf-b) 0 50%,
+                            var(--ep-turf-a) 0 75%, var(--ep-turf-b) 0);
+  /* On ink, the same check has to be paler to register at all. */
+  --ep-turf-ink: conic-gradient(rgba(255,255,255,.045) 0 25%, transparent 0 50%,
+                                rgba(255,255,255,.045) 0 75%, transparent 0);
+}
+
+/* The map's turf: above the polygons, so it textures the park fills and
+   the parchment alike. Blend mode rather than opacity, so every colour
+   underneath stays itself. */
+.map-turf {
+  position: absolute; inset: 0; z-index: 450;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+  background-image: var(--ep-turf);
+  background-size: var(--ep-turf-size) var(--ep-turf-size);
+}
+
+/* Chrome wears the same weave. */
+header, #filtersPanel {
+  background-image: var(--ep-turf-ink);
+  background-size: var(--ep-turf-size) var(--ep-turf-size);
+}
+.leaflet-popup-content-wrapper, #legend, #guide {
+  background-image: var(--ep-turf);
+  background-size: var(--ep-turf-size) var(--ep-turf-size);
+}
+
+/* ---------- header order --------------------------------------
+   Title, search, then the two controls you reach for while searching.
+   Guide and the build badge are pushed to the far right, in that
+   order — the badge is proof-of-deploy, not navigation, so it reads
+   last and small. */
+header { flex-wrap: nowrap; }
+.search-wrap { position: relative; flex: 0 1 auto; min-width: 0; }
+.search-wrap > #search { width: 230px; max-width: 100%; }
+.controls { margin-left: auto; }
+
+#buildBadge {
+  font-size: .56rem; letter-spacing: .02em; padding: 3px 6px;
+  border-radius: var(--ep-radius); opacity: .75; order: 99;
+  white-space: nowrap;
+}
+#buildBadge:hover { opacity: 1; }
+
+/* ---------- search results ------------------------------------
+   Removing the list view took the map's only way of answering "did my
+   search find anything?" — matches simply stopped being painted, which
+   is indistinguishable from a broken search. This brings the answer
+   back, scoped to while you are actually typing. */
+#searchResults {
+  position: absolute; top: calc(100% + 6px); left: 0;
+  width: max(260px, 100%); max-height: min(58vh, 420px); overflow-y: auto;
+  background: var(--ep-paper); border: 1px solid var(--ep-brass);
+  border-radius: var(--ep-radius-lg); box-shadow: var(--ep-shadow);
+  z-index: 1400; padding: 4px;
+}
+#searchResults[hidden] { display: none !important; }
+.sr-item {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  background: none; border: 0; text-align: left; cursor: pointer;
+  padding: 7px 8px; border-radius: var(--ep-radius); color: var(--ep-text);
+  font-size: .82rem; line-height: 1.25;
+}
+.sr-item:hover, .sr-item:focus-visible { background: var(--ep-paper-2); outline: none; }
+.sr-dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto;
+          border: 1px solid rgba(0,0,0,.25); }
+.sr-name { font-weight: 700; }
+.sr-sub  { font-family: var(--ep-mono); font-size: .62rem; letter-spacing: .06em;
+           text-transform: uppercase; color: var(--ep-muted); }
+.sr-none { padding: 10px; color: var(--ep-muted); font-size: .8rem; }
+.sr-more { padding: 6px 9px; color: var(--ep-muted);
+           font-family: var(--ep-mono); font-size: .6rem;
+           letter-spacing: .07em; text-transform: uppercase; }
+
+/* ---------- nearest parks -------------------------------------- */
+#nearPanel {
+  position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+  width: min(420px, calc(100vw - 28px)); z-index: 1300;
+  background: var(--ep-paper); border: 1px solid var(--ep-brass);
+  border-radius: var(--ep-radius-lg); box-shadow: var(--ep-shadow);
+  background-image: var(--ep-turf);
+  background-size: var(--ep-turf-size) var(--ep-turf-size);
+}
+#nearPanel[hidden] { display: none !important; }
+.near-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 10px; border-bottom: var(--ep-hair);
+  font-family: var(--ep-mono); text-transform: uppercase;
+  letter-spacing: .09em; font-size: .64rem; color: var(--ep-muted);
+}
+.near-head button {
+  margin-left: auto; background: none; border: 0; cursor: pointer;
+  font-size: 1.05rem; line-height: 1; color: var(--ep-muted); padding: 0 2px;
+}
+.near-list { max-height: min(48vh, 340px); overflow-y: auto; padding: 4px; }
+.near-item {
+  display: flex; align-items: baseline; gap: 8px; width: 100%;
+  background: none; border: 0; text-align: left; cursor: pointer;
+  padding: 8px; border-radius: var(--ep-radius); color: var(--ep-text);
+  font-size: .84rem;
+}
+.near-item:hover { background: var(--ep-paper-2); }
+.near-when {
+  margin-left: auto; font-family: var(--ep-mono); font-size: .72rem;
+  font-weight: 700; color: var(--ep-ink); white-space: nowrap;
+}
+.near-far { color: var(--ep-muted); font-weight: 400; }
+.near-note {
+  padding: 8px 10px; border-top: var(--ep-hair); color: var(--ep-muted);
+  font-size: .68rem;
+}
+
+@media (max-width: 760px) {
+  /* Three rows, in reading order: identity and Guide, then the search
+     box, then the controls. Without explicit orders the auto-margin on
+     .controls stranded Guide alone on a row of its own. */
+  header { flex-wrap: wrap; }
+  header h1 { order: 1; }
+  /* width:100% survives from an earlier mobile rule, written when
+     .controls still held every button. It now holds only Guide, so left
+     at full width it takes a whole row to itself. */
+  .controls { order: 2; margin-left: auto; width: auto; }
+  .search-wrap { order: 3; flex: 1 1 100%; }
+  .search-wrap > #search { width: 100%; }
+  .filters-wrap, #nearBtn, #randomBtn { order: 4; }
+  #buildBadge { display: none; }
+  #nearPanel { top: 8px; width: calc(100vw - 16px); }
 }

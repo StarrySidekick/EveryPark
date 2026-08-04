@@ -17,33 +17,34 @@ const CONFIG = {
   //   BORDER colour = who owns and maintains it
   //   ICON   glyph  = what kind of place it is
   visual: {
-    publicFill: "#43a047",        // green: verified — you can go. Includes
+    publicFill: "#5f9c52",        // green: verified — you can go. Includes
                                   // by-permission land; that nuance lives
                                   // on the card, not in the colour.
     // Amber: probably — public or land-trust ground with a legal basis
     // for access, but our research can't 100% confirm a way in yet.
-    probablyFill: "#e8a33d",
+    probablyFill: "#e0a03f",
     // Cemeteries fill purple — the colour of their category — instead of
     // park green; the border still says who owns/runs the ground.
     cemeteryFill: "#8464c9",
     // Grey: unverified — we have no data either way. Deliberately not
     // amber: amber now means "probably yes, by permission", and claiming
     // that for a place with no evidence would be a confident lie.
-    unverifiedFill: "#8e9a93",
+    unverifiedFill: "#9aa398",
     unverifiedBorder: "#66716b",
-    fillOpen: 0.32,
+    fillOpen: 0.55,
     // Open and open-by-permission look identical: for a walker the
     // practical answer is the same, and the popup explains the nuance.
-    fillPermission: 0.32,
-    borderWeight: 3.1,            // thick enough to actually read on imagery
+    fillPermission: 0.55,
+    borderWeight: 2.4,            // an ink line on parchment, not a highlighter
+                                  // over a photograph — imagery needed 3.1
     // Border colour by owner — brightened so the outline carries at a
     // glance. These are also the marker ring colours.
     owner: {
-      state:    "#2b8a3e",        // vivid forest green
-      national: "#a9662f",        // warm saddle brown
-      town:     "#1971c2",        // vivid blue
-      preserve: "#0c8599",        // vivid teal
-      cemetery: "#7048b6"         // vivid purple
+      state:    "#24603a",        // vivid forest green
+      national: "#8a5426",        // warm saddle brown
+      town:     "#1f5c96",        // vivid blue
+      preserve: "#0f6f7d",        // vivid teal
+      cemetery: "#5f3f9e"         // vivid purple
     }
   },
 
@@ -53,7 +54,7 @@ const CONFIG = {
   // heavier effect, down for a subtler one.
   hover: {
     fill: "#c8f5cf",       // the shape brightens to this while hovered
-    fillOpacity: 0.62,     // vs 0.32 normally — a clear, obvious change
+    fillOpacity: 0.88,     // vs 0.55 normally — a clear, obvious change
     stroke: "#ffffff",     // white outline reads against any imagery
     width: 6               // vs ~1.9 normally
   },
@@ -86,6 +87,21 @@ const CONFIG = {
   // First entry is the default. A switcher control lets visitors flip.
   // labelsUrl (optional) draws place names on top of imagery.
   basemaps: [
+    {
+      // THE DEFAULT: no photo at all. A flat parchment ground, the mown
+      // checkerboard over it, and the park polygons carrying the colour.
+      // The 3D viewer's palette, seen from above. `ground` instead of
+      // `url` is what marks a basemap as drawn rather than fetched.
+      //
+      // Why the ground is NOT green, though the site is about grass:
+      // green means "verified — you can go here" in this map's colour
+      // code. On a green field the verified parks stop reading as parks.
+      // The turf character comes from texture, not hue.
+      label: "Field guide",
+      ground: "#e6e2cf",
+      turf: true,
+      attribution: "Boundaries: CT DEEP, OpenStreetMap, USGS PAD-US"
+    },
     {
       // USGS's national imagery basemap is built on NAIP: one leaf-on
       // survey, consistent across all of Connecticut at every zoom —
@@ -183,7 +199,7 @@ const CONFIG = {
   // Shown in the top-right corner. Bumped by hand on every code change,
   // so there's visible proof of which build is actually loaded rather
   // than guessing whether a cached copy is being served.
-  siteVersion: "v0.28.0",
+  siteVersion: "v0.29.0",
 
   // ---- VECTOR TILES --------------------------------------------------
   // Every boundary and trail, pre-cut into map tiles and packed into one
