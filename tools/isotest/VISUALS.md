@@ -36,6 +36,19 @@ change that looked correct.
   (`WALL`), never terrain green — at rest and mid-spin, in blocky and
   smooth and satellite modes alike. (Broken in v0.26.1: rim edge tests
   keyed on the full-res `edge[]` mask, which coarse anchors miss.)
+- **Trees and the hiker are INDEXED PIXEL ART (v0.32.0).** Authored in
+  `tools/sprites/author.py`, which renders them magnified so the pixels
+  can be looked at; the shapes live in `iso.js` as strings where each
+  character names a palette slot, NES-style. One conifer covers all four
+  seasons via `PIX_SEASON` palette swap — do not add per-season copies.
+  Four tree variants (conifer, broadleaf, slim, bush) each keep their own
+  proportions and height factor (`PIX_TREE_SCALE`); sharing one atlas
+  cell size drew every bush as tall as a pine. The outline slot stays
+  near-black in every season — a constant dark edge is what makes the art
+  read at 20 px tall. `imageSmoothingEnabled` MUST be false around every
+  blit or the pixels turn to mush. The hiker is a four-frame walk cycle
+  with no vertical bob: a pixel sprite moving by fractions of a pixel
+  just shimmers.
 - **No emojis anywhere.** Every icon is drawn (canvas sprite or inline
   SVG).
 - Sky is a plain gradient. Time-of-day button top-LEFT corner, season

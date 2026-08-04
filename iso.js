@@ -833,65 +833,116 @@ const EveryParkIso = (() => {
   }
 
   // A walker: head, body, two legs mid-stride.
-  function hikerSprite(ctx, X, Y, r, tod, phase) {
-    const t = tod(250, 248, 240);
-    const light = `rgb(${t[0]|0},${t[1]|0},${t[2]|0})`;
-    const t2 = tod(38, 62, 48);
-    const dark = `rgb(${t2[0]|0},${t2[1]|0},${t2[2]|0})`;
-    const sw = Math.max(1.4, r * .34);
-    ctx.save();
-    ctx.lineCap = "round"; ctx.lineJoin = "round";
-    ctx.strokeStyle = dark; ctx.lineWidth = sw * 1.9;
-    ctx.beginPath(); ctx.moveTo(X, Y - r * 1.5); ctx.lineTo(X, Y - r * .1);
-    const sp = Math.sin(phase * 9) * r * .55;
-    ctx.moveTo(X, Y - r * .1); ctx.lineTo(X - sp, Y + r * .9);
-    ctx.moveTo(X, Y - r * .1); ctx.lineTo(X + sp, Y + r * .9);
-    ctx.stroke();
-    ctx.strokeStyle = light; ctx.lineWidth = sw;
-    ctx.beginPath(); ctx.moveTo(X, Y - r * 1.5); ctx.lineTo(X, Y - r * .1);
-    ctx.moveTo(X, Y - r * .1); ctx.lineTo(X - sp, Y + r * .9);
-    ctx.moveTo(X, Y - r * .1); ctx.lineTo(X + sp, Y + r * .9);
-    ctx.stroke();
-    ctx.fillStyle = light;
-    ctx.beginPath(); ctx.arc(X, Y - r * 1.95, r * .48, 0, 7); ctx.fill();
-    ctx.restore();
+  let hikerAtlas = null, hikerAtlasKey = "";
+  function hikerFrames(todIdx, tod) {
+    if (hikerAtlasKey === String(todIdx) && hikerAtlas) return hikerAtlas;
+    const w = PIX_HIKER[0][0].length * PIX_K, h = PIX_HIKER[0].length * PIX_K;
+    const cv = document.createElement("canvas");
+    cv.width = w * PIX_HIKER.length; cv.height = h;
+    const c2 = cv.getContext("2d");
+    PIX_HIKER.forEach((rows, i) =>
+      pixDraw(c2, rows, PIX_HIKER_PAL, i * w, 0, PIX_K, tod));
+    cv.fw = w; cv.fh = h;
+    hikerAtlas = cv; hikerAtlasKey = String(todIdx);
+    return cv;
   }
 
-  // Trees are the densest thing on screen — thousands of them, each
-  // formerly three filled paths per frame. They are baked once into a
-  // little atlas of variants and blitted after that, which is the
-  // difference between redrawing geometry and copying pixels.
+  function hikerSprite(ctx, X, Y, r, tod, phase, todIdx) {
+    const at = hikerFrames(todIdx == null ? 0 : todIdx, tod);
+    // Four frames on a two-beat walk. The phase already advances with
+    // the hiker's progress along the trail, so the feet keep time with
+    // the distance covered rather than with the frame rate.
+    const f = Math.abs(Math.floor(phase * 6)) % PIX_HIKER.length;
+    const hh = r * 3.4, ww = hh * (at.fw / at.fh);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(at, f * at.fw, 0, at.fw, at.fh, X - ww / 2, Y - hh, ww, hh);
+    ctx.imageSmoothingEnabled = true;
+  }
+
+  // ---- Pixel-art sprites ------------------------------------------
+  // Authored in tools/sprites/author.py, which renders them magnified so
+  // the pixels can actually be looked at. Stored INDEXED, the way an NES
+  // tile was: each pixel names a palette slot, and the palette is swapped
+  // per season. One conifer therefore covers all four seasons instead of
+  // four drawings, and the time-of-day tint applies to six colours rather
+  // than to every pixel.
+  // Slots: o outline · a lit · b mid · c shadow · t trunk · u trunk shadow
+  const PIX_TREES = [
+    [".......oo.......","......oaao......","......oaabo.....",".....oaaabo.....",".....oaaabbo....","....oaaaabbo....","...ooaaabbboo...",".....oaaabbo....","....oaaaabbbo...","...oaaaaabbbbo..","..ooaaaabbbbboo.","....oaaaabbbo...","...oaaaaabbbbo..","..oaaaaaabbbbbo.",".ooaaaaabbbbbboo","....oaaaabbbo...","..oaaaaaabbbbbo.",".oaaaaaaabbbbbbo","ooooaaaabbbboooo",".......tu.......",".......tu.......","......ootuoo...."],
+    [".....oooooo.....","...ooaaaabbboo..","..oaaaaabbbbbbo.",".oaaaaaabbbbbbbo",".oaaaaaabbbbbbbo","oaaaaaaabbbbbbbb","oaaaaaaabbbbbbbb","oaaaaaaabbbbbbbb",".oaaaaaabbbbbbbo",".ooaaaaabbbbbboo","...ooaaabbbboo..",".....oootuoo....","......ottuo.....","......ottuo.....",".....oottuuo...."],
+    ["........oo......","......ooaabo....",".....oaaaabbo...",".....oaaaabbo...","....oaaaabbbbo..","....oaaaabbbbo..",".....oaaabbbo...","......oatubo....",".......tu.......",".......tu.......",".......tu.......","......ootuoo...."],
+    ["....oooo....","..ooaabboo..",".oaaaabbbbo.","oaaaaabbbbbo","oaaaaabbbbbo",".oaaabbbbbo.","..ooaaabboo.","....oooo...."],
+  ];
+  const PIX_HIKER = [
+    ["....oooo....","...ohhhho...","..ohhhhhho..","...osssso...","....osso....","..ooccccoo..",".opccccccpo.",".opccccccpo.",".oopccccpoo.","...occcco...","...ollllo...","..oll..llo..","..oll..llo..",".oll....llo.",".oo......oo."],
+    ["....oooo....","...ohhhho...","..ohhhhhho..","...osssso...","....osso....","..ooccccoo..",".opccccccpo.",".opccccccpo.",".oopccccpoo.","...occcco...","...ollllo...","...ollllo...","...ollllo...","...oll.lo...","...oo..oo..."],
+    ["....oooo....","...ohhhho...","..ohhhhhho..","...osssso...","....osso....","..ooccccoo..",".opccccccpo.",".opccccccpo.",".oopccccpoo.","...occcco...","...ollllo...","...oll.llo..","..oll..llo..","..oll...llo.","..oo.....oo."],
+    ["....oooo....","...ohhhho...","..ohhhhhho..","...osssso...","....osso....","..ooccccoo..",".opccccccpo.",".opccccccpo.",".oopccccpoo.","...occcco...","...ollllo...","...ollllo...","...ollllo...","...ol.llo...","...oo..oo..."],
+  ];
+  // The outline stays near-black in every season: a constant dark edge is
+  // what makes limited-palette art read at 20 pixels tall.
+  const PIX_SEASON = [
+    { o: [27, 51, 32],  a: [99, 165, 82],  b: [61, 122, 60],  c: [45, 92, 48],
+      t: [107, 74, 47], u: [67, 48, 31] },   // summer
+    { o: [51, 34, 15],  a: [216, 151, 58], b: [165, 90, 36],  c: [125, 63, 28],
+      t: [107, 74, 47], u: [67, 48, 31] },   // autumn
+    { o: [42, 51, 64],  a: [232, 238, 242], b: [169, 188, 203], c: [125, 148, 166],
+      t: [79, 58, 40],  u: [51, 37, 26] },   // winter
+    { o: [30, 53, 36],  a: [143, 201, 95], b: [92, 156, 70],  c: [63, 119, 53],
+      t: [107, 74, 47], u: [67, 48, 31] }    // spring
+  ];
+  const PIX_HIKER_PAL = { o: [32, 33, 31], h: [194, 69, 47], s: [224, 176, 136],
+                          c: [217, 164, 65], p: [77, 107, 60], l: [55, 80, 107] };
+
+  // Relative trunk-to-crown heights, so a bush is not drawn as tall as a
+  // conifer just because they share an atlas.
+  const PIX_TREE_SCALE = [1, .78, .62, .34];
+  const PIX_K = 4;                       // atlas magnification
+
+  // Paint one indexed shape into a context at integer scale. Nearest
+  // neighbour by construction — every pixel is a filled rect, so the art
+  // never picks up the smoothing that would make it mush.
+  function pixDraw(c2, rows, pal, ox, oy, k, tod) {
+    const cache = {};
+    for (let y = 0; y < rows.length; y++) {
+      const row = rows[y];
+      for (let x = 0; x < row.length; x++) {
+        const ch = row[x];
+        if (ch === "." || !pal[ch]) continue;
+        let col = cache[ch];
+        if (!col) {
+          const v = tod ? tod(pal[ch][0], pal[ch][1], pal[ch][2]) : pal[ch];
+          col = cache[ch] = `rgb(${v[0] | 0},${v[1] | 0},${v[2] | 0})`;
+        }
+        c2.fillStyle = col;
+        c2.fillRect(ox + x * k, oy + y * k, k, k);
+      }
+    }
+  }
+
+  // Trees are the densest thing on screen — thousands of them. They are
+  // baked once into an atlas of variants and blitted after that, which is
+  // the difference between redrawing geometry and copying pixels.
   let treeAtlas = null, treeAtlasKey = "";
-  const TREE_W = 44, TREE_H = 74, TREE_N = 4;
+  const TREE_N = PIX_TREES.length;
   function treeSprites(season, todIdx, tod) {
     const key = season + "|" + todIdx;
     if (treeAtlasKey === key && treeAtlas) return treeAtlas;
+    const pal = PIX_SEASON[season % PIX_SEASON.length];
+    const cells = PIX_TREES.map(rows => ({
+      w: rows[0].length * PIX_K, h: rows.length * PIX_K, rows
+    }));
     const cv = document.createElement("canvas");
-    cv.width = TREE_W * TREE_N; cv.height = TREE_H;
+    cv.width = cells.reduce((a, c) => a + c.w, 0);
+    cv.height = Math.max(...cells.map(c => c.h));
     const c2 = cv.getContext("2d");
-    for (let v = 0; v < TREE_N; v++) {
-      const h2 = (v + .5) / TREE_N;
-      const ox = v * TREE_W + TREE_W / 2;
-      const base = TREE_H - 2;
-      const th = TREE_H * (.72 + .2 * h2);
-      const half = TREE_W * .42;
-      const shade = 24 * h2;
-      let [tr, tg2, tb] = tod(58 + shade, 44 + shade * .6, 30);
-      let [cr, cg, cb] = tod(...SEASONS[season].canopy(h2));
-      c2.fillStyle = `rgb(${tr | 0},${tg2 | 0},${tb | 0})`;
-      c2.fillRect(ox - TREE_W * .06, base - th * .32, TREE_W * .12, th * .34);
-      c2.fillStyle = `rgb(${cr | 0},${cg | 0},${cb | 0})`;
-      c2.beginPath();
-      c2.moveTo(ox, base - th * .74);
-      c2.lineTo(ox - half, base - th * .22);
-      c2.lineTo(ox + half, base - th * .22);
-      c2.closePath(); c2.fill();
-      c2.beginPath();
-      c2.moveTo(ox, base - th);
-      c2.lineTo(ox - half * .72, base - th * .53);
-      c2.lineTo(ox + half * .72, base - th * .53);
-      c2.closePath(); c2.fill();
+    let x = 0;
+    for (const c of cells) {
+      c.x = x;
+      pixDraw(c2, c.rows, pal, x, 0, PIX_K, tod);
+      x += c.w;
     }
+    cv.cells = cells;
     treeAtlas = cv; treeAtlasKey = key;
     return cv;
   }
@@ -1304,12 +1355,18 @@ const EveryParkIso = (() => {
             && (!S.treeMask || S.treeMask[j])
             && (S.treeMask || !COVER_NO_TREES.has(cvr))) {
           const jx = (hash(dgx + 7, dgy) - .5) * s * .97;
-          const th = s * (1.5 + hash(dgx, dgy + 3)) * 1.35;
-          const tw = th * (TREE_W / TREE_H);
           const v = (hash(dgx + 1, dgy + 1) * TREE_N) | 0;
-          decor.push({ d: dd, f: () =>
-            ctx.drawImage(atlas, v * TREE_W, 0, TREE_W, TREE_H,
-                          dX + jx - tw / 2, dY - th, tw, th) });
+          const cell = atlas.cells[v];
+          // Each variant keeps its own proportions and its own height:
+          // sharing one atlas cell size drew every bush as tall as a pine.
+          const th = s * (1.5 + hash(dgx, dgy + 3)) * 1.35 * PIX_TREE_SCALE[v];
+          const tw = th * (cell.w / cell.h);
+          decor.push({ d: dd, f: () => {
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(atlas, cell.x, 0, cell.w, cell.h,
+                          dX + jx - tw / 2, dY - th, tw, th);
+            ctx.imageSmoothingEnabled = true;
+          } });
         }
 
         // Headstones instead of pines: little pale slabs in rows, with
@@ -1527,9 +1584,11 @@ const EveryParkIso = (() => {
       const gx2 = Math.min(GRID - 1, Math.max(0, Math.round(fgx)));
       const gy2 = Math.min(GRID - 1, Math.max(0, Math.round(fgy)));
       const [hx0, hy0] = P.project(fgx, fgy, S.H[gy2 * GRID + gx2]);
-      const bob = Math.sin(S.hikeT * 240) * 1.5;
-      hikerSprite(ctx, hx0 * inv, (hy0 - P.s * 1.1 + bob) * inv,
-                  Math.min(9, Math.max(3.6, P.s * 1.2)) * inv, P.tod, S.hikeT * 100);
+      // No bob: a pixel sprite that slides up and down by fractions of a
+      // pixel just shimmers. The walk cycle carries the motion instead.
+      hikerSprite(ctx, hx0 * inv, (hy0 - P.s * .5) * inv,
+                  Math.min(9, Math.max(3.6, P.s * 1.2)) * inv, P.tod,
+                  S.hikeT * 100, S.tod);
     }
   }
 

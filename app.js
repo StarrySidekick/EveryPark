@@ -2725,6 +2725,40 @@
   // ------------------------------------------------------------------
   let districtLayer = null, districtsLoaded = false, districtsOn = true;
 
+  // A district boundary is a legal line that follows back gardens and lot
+  // lines. Drawn literally it reads as a parcel — exactly the thing these
+  // are not. Generalising it into a soft outline says "this general area
+  // is worth walking", which is the honest claim.
+  function generalise(ring) {
+    if (!ring || ring.length < 8) return ring;
+    // Drop points closer together than about 25 m, so the corner-cutting
+    // below has real corners to cut rather than surveyor noise.
+    const MIN = 0.0003;
+    const thin = [ring[0]];
+    for (const pt of ring.slice(1)) {
+      const last = thin[thin.length - 1];
+      if (Math.abs(pt[0] - last[0]) + Math.abs(pt[1] - last[1]) > MIN) thin.push(pt);
+    }
+    if (thin.length < 6) return ring;
+    if (thin[thin.length - 1] !== thin[0]) thin.push(thin[0]);
+    // Chaikin corner cutting, twice: every corner becomes two points a
+    // quarter of the way along each edge, which rounds the outline
+    // without letting it drift off the real extent.
+    let pts = thin;
+    for (let pass = 0; pass < 2; pass++) {
+      const out = [];
+      for (let i = 0; i < pts.length - 1; i++) {
+        const [ax, ay] = pts[i], [bx, by] = pts[i + 1];
+        out.push([ax + (bx - ax) * .25, ay + (by - ay) * .25]);
+        out.push([ax + (bx - ax) * .75, ay + (by - ay) * .75]);
+      }
+      out.push(out[0]);
+      pts = out;
+    }
+    return pts;
+  }
+
+
   async function loadDistricts() {
     if (districtsLoaded) return districtLayer;
     districtsLoaded = true;                    // never retry a 404 in a loop
@@ -2736,7 +2770,7 @@
         type: "Feature",
         properties: { name: d.name, town: d.town, ref: d.ref, landmark: d.landmark,
                       source: doc.source, checked: doc.checked },
-        geometry: { type: "Polygon", coordinates: d.rings }
+        geometry: { type: "Polygon", coordinates: d.rings.map(generalise) }
       }));
       districtLayer = L.geoJSON({ type: "FeatureCollection", features: feats }, {
         pane: "epRoads",                       // above the parks, like roads
