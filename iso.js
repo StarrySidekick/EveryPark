@@ -1,7 +1,7 @@
 /* ============================================================
    EVERYPARK — ISOMETRIC TERRAIN VIEW, v3
 
-   Opens from the ⛰ button on a place card. Renders the park's real
+   Opens from the 3D terrain button on a place card. Renders the real
    boundary as a Minecraft-style floating island and dresses it with
    everything we can fetch about the place:
 
@@ -9,10 +9,11 @@
    - Elevation: AWS Terrain Tiles (terrarium); procedural fallback.
    - Trails (OSM + Blue-Blazed) as worn tan paths; water flattened blue.
    - Roads, buildings and parking lots from one Overpass query: roads
-     asphalt grey, buildings extruded blocks, parking pads with 🅿.
-   - Sport courts from the OSM leisure layer, sport-coloured with an
-     emoji sprite each (⚾🏀🎾🏓⚽…).
-   - A little hiker 🚶 walking the longest trail, because it's cute.
+     asphalt grey, buildings extruded blocks, parking pads marked.
+   - Sport courts from the OSM leisure layer, sport-coloured with a
+     drawn sprite each.
+   - A little pixel-art hiker walking the longest trail, because it's
+     cute.
    - Time-of-day toggle (day / sunset / night), satellite drape toggle,
      and PNG export of the canvas.
 
@@ -2256,7 +2257,12 @@ const EveryParkIso = (() => {
           S.zoom = Math.min(9, Math.max(.5, S.zoom * (d / pinchDist)));
         pinchDist = d;
       } else if (dragging) {
-        target += (e.clientX - lastX) * .008; lastX = e.clientX;
+        // Touch drags the ISLAND; a mouse drags the CAMERA. With a finger
+        // on the thing itself, pushing right should carry the near edge
+        // right, which is the opposite sign — the mouse convention felt
+        // backwards on a phone.
+        const dir = e.pointerType === "touch" ? -1 : 1;
+        target += (e.clientX - lastX) * .008 * dir; lastX = e.clientX;
       }
     });
     const release = e => {

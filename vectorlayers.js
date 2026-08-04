@@ -264,7 +264,10 @@ const EveryParkTiles = (() => {
         // that happened to be drawn — including tribal reservation land
         // that is explicitly not open. Unverified is the honest label,
         // and it matches what a place record with no evidence would show.
-        `<div class="pblock acc-unknown"><div class="pb-head">⚠️ Unverified</div>
+        `<div class="pblock acc-unknown"><div class="pb-head"><svg viewBox="0 0 24 24"
+             width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round"><path d="M12 21l-9-4.5v-9L12 3l9
+             4.5v9z"/><path d="M12 10v4M12 17v.01"/></svg> Unverified</div>
            <div class="pb-body">Mapped boundary with no place record. We can't
              confirm this is open to the public.</div></div>
          <div class="popup-name">${nameOf(hit.f)}</div>

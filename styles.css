@@ -930,6 +930,16 @@ header { flex-wrap: nowrap; }
   .filters-wrap, #nearBtn, #randomBtn, #satBtn { order: 4; }
   #buildBadge { display: none; }
   #nearPanel { top: 8px; width: calc(100vw - 16px); }
+  /* The filters panel was anchored right:0 to its button, from when
+     Filters sat at the RIGHT end of the header. Once it moved next to
+     the search box that anchoring threw 243 px of a 320 px panel off the
+     left edge of the screen. On a phone it belongs to the viewport, not
+     to the button. */
+  #filtersPanel {
+    position: fixed; left: 8px; right: 8px; top: auto;
+    width: auto; min-width: 0; max-width: none;
+    max-height: 62vh; overflow-y: auto;
+  }
 }
 
 

@@ -291,7 +291,7 @@
     // iPhone the Google link opens a browser rather than the map app.
     let links =
       `<a class="primary" href="https://www.google.com/maps/dir/?api=1&destination=${dest}"
-          target="_blank" rel="noopener">➜ Directions</a>` +
+          target="_blank" rel="noopener">${FEAT_SVG.arrow} Directions</a>` +
       `<a href="https://maps.apple.com/?daddr=${dest}&q=${label}"
           target="_blank" rel="noopener">Apple Maps</a>`;
     if (p.url) {
@@ -315,20 +315,20 @@
     if (!p.attrs) return "";
     const t = [];
     const A = p.attrs;
-    if (A.water) t.push(`🌊 ${A.waterName || "Waterfront"}`);
-    if (A.beach) t.push("🏖️ Beach");
-    if (A.trails) t.push("🥾 Trails");
-    if (A.sportList && A.sportList.length) t.push("🏀 " + A.sportList.slice(0, 5).join(", "));
-    if (A.playground) t.push("🛝 Playground");
-    if (A.dogpark) t.push("🐕 Dog park");
-    if (A.pool) t.push("🏊 Pool");
-    if (A.historic) t.push("🏛️ Historic");
-    if (A.parking) t.push("🅿️ Parking");
-    if (A.cover) t.push(`${A.cover === "mostly wooded" ? "🌲" :
-                          A.cover === "mostly open" ? "🌾" : "🌗"} ${A.cover}` +
+    if (A.water) t.push(`${FEAT_SVG.water} ${A.waterName || "Waterfront"}`);
+    if (A.beach) t.push(FEAT_SVG.beach + " Beach");
+    if (A.trails) t.push(FEAT_SVG.trail + " Trails");
+    if (A.sportList && A.sportList.length) t.push(FEAT_SVG.sports + " " + A.sportList.slice(0, 5).join(", "));
+    if (A.playground) t.push(FEAT_SVG.playground + " Playground");
+    if (A.dogpark) t.push(FEAT_SVG.dog + " Dog park");
+    if (A.pool) t.push(FEAT_SVG.pool + " Pool");
+    if (A.historic) t.push(FEAT_SVG.historic + " Historic");
+    if (A.parking) t.push(FEAT_SVG.parking + " Parking");
+    if (A.cover) t.push(`${A.cover === "mostly wooded" ? FEAT_SVG.wooded :
+                          A.cover === "mostly open" ? FEAT_SVG.field : FEAT_SVG.mixed} ${A.cover}` +
                         (A.coverTop ? ` (${A.coverTop.toLowerCase()})` : ""));
-    if (A.terrain) t.push(`⛰️ ${A.terrain}`);
-    else if (A.elev != null) t.push(`⛰️ ${A.elev} m` +
+    if (A.terrain) t.push(`${FEAT_SVG.relief} ${A.terrain}`);
+    else if (A.elev != null) t.push(`${FEAT_SVG.relief} ${A.elev} m` +
       (A.relief != null ? ` · ${terrainLabel(A.relief)}` : ""));
     if (!t.length) return "";
     return `<div class="popup-tags">${t.map(x => `<span class="tag">${x}</span>`).join("")}</div>`;
@@ -340,7 +340,8 @@
     const ok = A.visitable;
     let cls = ok ? "ok" : "warn";
     if (A.officialAccess === "Closed") cls = "warn";
-    let html = `<div class="popup-access ${cls}">${ok ? "✅" : "⚠️"} ${A.accessNote}</div>`;
+    let html = `<div class="popup-access ${cls}">${
+      ok ? VERDICT_SVG.open : VERDICT_SVG.unknown} ${A.accessNote}</div>`;
     if (A.officialOwner)
       html += `<div class="popup-fee">Owner of record: ${A.officialOwner}</div>`;
     return html;
@@ -352,15 +353,28 @@
       out += `<div class="popup-fee">Also known locally as <strong>${p.aka[0]}</strong>${p.akaNote ? " — " + p.akaNote : ""}</div>`;
     if (p.note) out += `<div class="popup-fee">${p.note}</div>`;
     if (p.type === "state")
-      out += `<div class="popup-fee">🅿️ CT-registered vehicles park free (Passport to the Parks); out-of-state $7–22. Camping/special facilities extra.</div>`;
+      out += `<div class="popup-fee">${FEAT_SVG.parking} CT-registered vehicles park free (Passport to the Parks); out-of-state $7–22. Camping/special facilities extra.</div>`;
     else if (p.fee)
-      out += `<div class="popup-fee">🎟️ ${p.fee}${p.agency ? " &middot; " + p.agency : ""}</div>`;
+      out += `<div class="popup-fee">${FEAT_SVG.ticket} ${p.fee}${p.agency ? " &middot; " + p.agency : ""}</div>`;
     else if (p.agency)
       out += `<div class="popup-fee">${p.agency}</div>`;
     return out;
   }
 
-  const ACCESS_ICON = { open: "✅", permission: "🤝", closed: "⛔", unknown: "❓" };
+  const svg1 = d => `<svg viewBox="0 0 24 24" width="13" height="13" fill="none"
+      stroke="currentColor" stroke-width="2" stroke-linecap="round"
+      stroke-linejoin="round">${d}</svg>`;
+
+  // Verdict glyphs. These were emoji, which render differently on every
+  // platform, carry their own colour, and break the one rule this
+  // project has about icons: everything is drawn.
+  const VERDICT_SVG = {
+    open:       svg1('<path d="M4 12.5l5.5 5.5L20 6.5"/>'),
+    permission: svg1('<path d="M3 12h6l2-3 3 6 2-3h5"/>'),
+    closed:     svg1('<circle cx="12" cy="12" r="8.5"/><path d="M6 18L18 6"/>'),
+    unknown:    svg1('<path d="M12 21l-9-4.5v-9L12 3l9 4.5v9z"/><path d="M12 10v4M12 17v.01"/>')
+  };
+  const ACCESS_ICON = VERDICT_SVG;
 
   // One short row per fact, in a fixed order so every card reads the same
   // way: can I go, who runs it, does it cost, then what's actually there.
@@ -368,9 +382,6 @@
   // reading paragraphs.
   // Drawn marks for the card's feature chips — one flat stroke style,
   // no emoji, so the card reads as one designed object.
-  const svg1 = d => `<svg viewBox="0 0 24 24" width="13" height="13" fill="none"
-      stroke="currentColor" stroke-width="2" stroke-linecap="round"
-      stroke-linejoin="round">${d}</svg>`;
   const FEAT_SVG = {
     trail:      svg1('<path d="M4 20c5-3 3-8 6-11s7-2 8-6"/><circle cx="18" cy="3.5" r="1.4" fill="currentColor" stroke="none"/>'),
     water:      svg1('<path d="M3 8c3-2 5 2 8 0s5-2 8 0M3 13c3-2 5 2 8 0s5-2 8 0M3 18c3-2 5 2 8 0s5-2 8 0"/>'),
@@ -384,6 +395,8 @@
     relief:     svg1('<path d="M2 19l7-12 4.5 7.5L16 11l6 8z"/>'),
     wooded:     svg1('<path d="M12 3l5 8h-3l4 6H6l4-6H7z M12 17v4"/>'),
     field:      svg1('<path d="M3 17c4-3 6 1 9-2s6 1 9-2M3 21h18"/>'),
+    ticket:     svg1('<path d="M3 9V6h18v3a3 3 0 0 0 0 6v3H3v-3a3 3 0 0 0 0-6z"/><path d="M12 7v2M12 15v2"/>'),
+    arrow:      svg1('<path d="M4 12h15M13 6l6 6-6 6"/>'),
     mixed:      svg1('<path d="M9 3l4 7h-2.5l3 5H4.5l3-5H5z M9 15v6M17 9l3 5h-6z M17 14v7"/>')
   };
 
@@ -394,12 +407,12 @@
 
     // 1. Can I go?
     const st = p.status === "unverified"
-      ? { cls: "unknown", icon: "⚠️", label: "Unverified" }
+      ? { cls: "unknown", icon: VERDICT_SVG.unknown, label: "Unverified" }
       : p.access === "open"
-        ? { cls: "open", icon: "✅", label: "Open to all" }
+        ? { cls: "open", icon: VERDICT_SVG.open, label: "Open to all" }
         : p.access === "permission"
-          ? { cls: "permission", icon: "🤝", label: "Open by permission" }
-          : { cls: "unknown", icon: "⚠️", label: "Access unverified" };
+          ? { cls: "permission", icon: VERDICT_SVG.permission, label: "Open by permission" }
+          : { cls: "unknown", icon: VERDICT_SVG.unknown, label: "Access unverified" };
 
     // 2. Who runs it
     rows.push(["Maintained by", p.steward]);
@@ -442,7 +455,7 @@
     const dir = `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}`;
     const iso = (A.relief != null && window.EveryParkIso)
       ? `<a class="iso-btn" href="#" data-iso="${p.id || ""}"
-           title="Prototype: isometric terrain of this place">⛰ 3D terrain</a>`
+           title="Isometric terrain of this place">${FEAT_SVG.relief} 3D terrain</a>`
       : "";
 
     return `
@@ -463,11 +476,11 @@
       ${p.status === "unverified"
         ? `<div class="pnote">${statusReason(p)}</div>` : ""}
       ${(p.attrs && p.attrs.researched)
-        ? `<div class="pchecked">✔︎ Checked by hand${p.attrs.checked
+        ? `<div class="pchecked">${VERDICT_SVG.open} Checked by hand${p.attrs.checked
              ? ` · ${p.attrs.checked}` : ""}</div>` : ""}
 
       <div class="popup-links">
-        <a class="primary" href="${dir}" target="_blank" rel="noopener">➜ Directions</a>
+        <a class="primary" href="${dir}" target="_blank" rel="noopener">${FEAT_SVG.arrow} Directions</a>
         ${iso}
       </div>`;
   }
@@ -2127,7 +2140,8 @@
          <div class="popup-name">${nm}</div>
          <div class="popup-sub">${OWNER_WORD[pr.Own_Name] || "Private / non-profit"}</div>
          <div class="pblock ${open ? "acc-open" : "acc-permission"}">
-           <div class="pb-head">${open ? "✅ Open to all" : "🤝 Open by permission"}</div>
+           <div class="pb-head">${open ? VERDICT_SVG.open + " Open to all"
+                                       : VERDICT_SVG.permission + " Open by permission"}</div>
            <div class="pb-body">${open
              ? "Officially open (USGS PAD-US)."
              : "Privately held but customarily open. You're here by the owner's permission rather than by legal right. Respect posted signs."}</div>
@@ -2265,7 +2279,7 @@
           `<span class="badge state">${LEGEND_LABELS[legend] || legend}</span>
            <div class="popup-name">${nm}</div>
            <div class="popup-sub">Connecticut${ac ? " &middot; " + ac.toLocaleString() + " acres" : ""}</div>
-           <div class="popup-access ok">✅ Public land — owned by the State of Connecticut</div>`
+           <div class="popup-access ok">${VERDICT_SVG.open} Public land — owned by the State of Connecticut</div>`
         ).addTo(publicLandLayer);
       }
     } catch (e) { console.warn("Public land layer failed:", e); }
@@ -2841,7 +2855,8 @@
            <p class="pchecked">${esc(d.source)} · checked ${esc(d.checked)}</p>
            <div class="popup-links">
              ${window.EveryParkIso
-               ? `<a href="#" class="iso-btn" data-district="${esc(d.ref)}">See it in 3D</a>` : ""}
+               ? `<a class="iso-btn" href="#" data-district="${esc(d.ref)}"
+                     title="Isometric terrain of this place">${FEAT_SVG.relief} 3D terrain</a>` : ""}
              <a href="https://www.google.com/maps/search/?api=1&query=${latlng.lat},${latlng.lng}"
                 target="_blank" rel="noopener">Look at it</a>
              <a href="https://www.google.com/search?q=${q}" target="_blank"

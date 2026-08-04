@@ -243,7 +243,9 @@ an edit that looked correct.
 
 - Comments explain **why**, not what — especially the non-obvious constraint
   that forced a decision. Several comments here record bugs that took hours.
-- No emoji in code or data.
+- No emoji in code, data, comments or UI. Card glyphs come from `FEAT_SVG` /
+  `VERDICT_SVG` in `app.js`; the viewer draws its own. Emoji render
+  differently per platform and carry their own colour.
 - Prefer editing `config.js` over code for anything visual.
 - British-ish spelling in prose is fine; identifiers stay US.
 
