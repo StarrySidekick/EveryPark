@@ -189,6 +189,7 @@ Every one of these produced output that looked fine.
 | Run #5 died at 12 min | one OSM endpoint returned "Invalid query parameters" | per-section guard degrades to last refresh's `data/baked.json`; `::warning::` annotation; fatal only when no fallback exists |
 | Preserves named "Non-profit / land trust" | read `officialOwner` (category) before `agency` (name) | precedence fixed |
 | Reservation shown as "You can go here" | tile-fallback popup asserted access unconditionally | now "Unverified" |
+| Map panning dropped to ~30 fps with 250 ms stalls | 260 divIcon marks destroyed and rebuilt on every `moveend`, over a full 7,727-record scan | marks draw on ONE canvas in `overlayPane` + a 0.02° grid index; **do not put marks back into the DOM** |
 
 **The pattern: silent success.** Nothing crashed, files stayed valid, the map
 rendered. That is why the research guard *fails the workflow* rather than

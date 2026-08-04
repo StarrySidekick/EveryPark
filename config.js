@@ -100,7 +100,17 @@ const CONFIG = {
       label: "Field guide",
       ground: "#e6e2cf",
       turf: true,
-      attribution: "Boundaries: CT DEEP, OpenStreetMap, USGS PAD-US"
+      // Layers that make the drawn ground legible without a photograph.
+      // All three are ordinary cached raster tiles, so they need no CORS
+      // co-operation — the browser loads them as images.
+      shadeUrl: "https://basemap.nationalmap.gov/arcgis/rest/services/USGSShadedReliefOnly/MapServer/tile/{z}/{y}/{x}",
+      shadeOpacity: 0.42,
+      // Without this every lake in Connecticut simply vanished: the
+      // vector tiles carry no water layer, so on parchment nobody was
+      // doing the job the photograph used to do.
+      waterUrl: "https://basemap.nationalmap.gov/arcgis/rest/services/USGSHydroCached/MapServer/tile/{z}/{y}/{x}",
+      roadsUrl: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}",
+      attribution: "Relief and hydrography: USGS · Boundaries: CT DEEP, OpenStreetMap, USGS PAD-US"
     },
     {
       // USGS's national imagery basemap is built on NAIP: one leaf-on
@@ -199,7 +209,7 @@ const CONFIG = {
   // Shown in the top-right corner. Bumped by hand on every code change,
   // so there's visible proof of which build is actually loaded rather
   // than guessing whether a cached copy is being served.
-  siteVersion: "v0.29.0",
+  siteVersion: "v0.30.0",
 
   // ---- VECTOR TILES --------------------------------------------------
   // Every boundary and trail, pre-cut into map tiles and packed into one

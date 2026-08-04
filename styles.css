@@ -642,14 +642,14 @@ header { border-bottom: 2px solid var(--ep-brass); }
 }
 #search:focus { outline: 2px solid var(--ep-brass); outline-offset: 0; }
 
-#filtersBtn, #randomBtn, #guideBtn, #nearBtn {
+#filtersBtn, #randomBtn, #guideBtn, #nearBtn, #satBtn {
   background: var(--ep-ink-2); color: var(--ep-paper);
   border: 1px solid rgba(245,242,230,.18); border-radius: var(--ep-radius);
   font-family: var(--ep-mono); font-size: .74rem; letter-spacing: .04em;
   text-transform: uppercase; padding: 7px 12px;
 }
 #filtersBtn:hover, #randomBtn:hover, #guideBtn:hover, #nearBtn:hover,
-#filtersBtn.active { background: var(--ep-ink-3); border-color: var(--ep-brass); }
+#satBtn:hover, #filtersBtn.active, #satBtn.active { background: var(--ep-ink-3); border-color: var(--ep-brass); }
 #nearBtn:disabled { opacity: .6; cursor: default; }
 
 #filtersPanel { background: var(--ep-ink); border: 1px solid var(--ep-brass); }
@@ -750,7 +750,7 @@ header { border-bottom: 2px solid var(--ep-brass); }
   header h1 { font-size: .9rem; }
   header > #search { flex: 1 1 100%; order: 3; width: auto; min-width: 0; }
   .controls { margin-left: auto; gap: 6px; flex-wrap: wrap; }
-  #filtersBtn, #randomBtn, #guideBtn, #nearBtn { padding: 6px 9px; font-size: .66rem; }
+  #filtersBtn, #randomBtn, #guideBtn, #nearBtn, #satBtn { padding: 6px 9px; font-size: .66rem; }
   #buildBadge { display: none; }
   #filtersPanel { left: auto; right: 0; min-width: min(88vw, 320px); }
   #legend { max-width: 62vw; font-size: .74rem; }
@@ -927,7 +927,24 @@ header { flex-wrap: nowrap; }
   .controls { order: 2; margin-left: auto; width: auto; }
   .search-wrap { order: 3; flex: 1 1 100%; }
   .search-wrap > #search { width: 100%; }
-  .filters-wrap, #nearBtn, #randomBtn { order: 4; }
+  .filters-wrap, #nearBtn, #randomBtn, #satBtn { order: 4; }
   #buildBadge { display: none; }
   #nearPanel { top: 8px; width: calc(100vw - 16px); }
 }
+
+
+/* Hillshade reads as dirt unless it multiplies into the parchment. */
+.ep-shade { mix-blend-mode: multiply; }
+/* The origin marker for "Near me". */
+.near-origin-row { display: flex; gap: 6px; padding: 8px; border-bottom: var(--ep-hair); }
+.near-origin-row input {
+  flex: 1 1 auto; min-width: 0; padding: 6px 8px; font-size: .8rem;
+  border: var(--ep-hair); border-radius: var(--ep-radius);
+  background: var(--ep-paper); color: var(--ep-text);
+}
+.near-origin-row button {
+  background: var(--ep-ink); color: var(--ep-paper); border: 0; cursor: pointer;
+  border-radius: var(--ep-radius); font-family: var(--ep-mono);
+  text-transform: uppercase; letter-spacing: .05em; font-size: .6rem; padding: 6px 8px;
+}
+.near-origin-row button:hover { background: var(--ep-ink-3); }

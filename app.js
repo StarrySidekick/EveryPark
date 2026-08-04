@@ -32,21 +32,34 @@
   rootStyle.setProperty("--accent", CONFIG.colors.accent);
 
   const map = L.map("map", { zoomControl: true }).setView(CONFIG.mapCenter, CONFIG.mapZoom);
+  // Panes so the drawn basemap stacks in the right order. Water is
+  // ground and belongs under the parks; roads are wayfinding and belong
+  // over them, or every road vanishes the moment it crosses a forest.
+  map.createPane("epWater").style.zIndex = 210;
+  map.createPane("epRoads").style.zIndex = 440;
+  map.getPane("epWater").style.pointerEvents = "none";
+  map.getPane("epRoads").style.pointerEvents = "none";
+
   const baseLayers = {};
   const baseByName = {};
   CONFIG.basemaps.forEach((b, i) => {
     baseByName[b.label] = b;
     // A basemap with `ground` instead of `url` is DRAWN, not fetched:
-    // an empty layer group, with the colour and the mown texture supplied
-    // by CSS underneath. Leaflet still treats it as a base layer, so it
-    // takes part in the radio switch like any other.
+    // the colour and the mown texture come from CSS, and relief, water
+    // and roads are layered over it. Leaflet still treats the group as a
+    // base layer, so it takes part in the radio switch like any other.
     const parts = b.url
       ? [L.tileLayer(b.url, { attribution: b.attribution, maxZoom: 19,
                               maxNativeZoom: b.maxNativeZoom || 19 })]
       : [];
-    // Roads drawn over imagery: how you'd actually get there, at a glance.
-    if (b.roadsUrl) parts.push(L.tileLayer(b.roadsUrl, { maxZoom: 19 }));
-    if (b.labelsUrl) parts.push(L.tileLayer(b.labelsUrl, { maxZoom: 19 }));
+    if (b.shadeUrl) parts.push(L.tileLayer(b.shadeUrl, {
+      maxZoom: 19, maxNativeZoom: 16, opacity: b.shadeOpacity || 0.4,
+      className: "ep-shade", attribution: b.attribution }));
+    if (b.waterUrl) parts.push(L.tileLayer(b.waterUrl, {
+      maxZoom: 19, maxNativeZoom: 16, pane: "epWater" }));
+    // Roads drawn over the ground: how you'd actually get there.
+    if (b.roadsUrl) parts.push(L.tileLayer(b.roadsUrl, { maxZoom: 19, pane: "epRoads" }));
+    if (b.labelsUrl) parts.push(L.tileLayer(b.labelsUrl, { maxZoom: 19, pane: "epRoads" }));
     baseLayers[b.label] = L.layerGroup(parts);
     if (i === 0) baseLayers[b.label].addTo(map);
   });
@@ -64,6 +77,10 @@
   turf.className = "map-turf";
   map.getContainer().appendChild(turf);
 
+  // A handle for debugging and for the performance harness in
+  // tools/isotest. Read-only in practice; nothing in the app uses it.
+  window.__map = map;
+
   const applyBase = b => {
     if (!b) return;
     // Texture belongs on the drawn ground only. Over an aerial photo a
@@ -71,9 +88,27 @@
     map.getContainer().style.background = b.ground || "";
     turf.style.display = b.turf ? "" : "none";
     document.body.classList.toggle("base-drawn", !!b.ground);
+    const sb = document.getElementById("satBtn");
+    if (sb) sb.classList.toggle("active", !b.ground);
   };
   applyBase(CONFIG.basemaps[0]);
   map.on("baselayerchange", e => applyBase(baseByName[e.name]));
+
+  // Satellite as a plain on/off, rather than a radio buried in the
+  // layers control at the bottom corner.
+  const drawnBase = CONFIG.basemaps.find(b => b.ground) || CONFIG.basemaps[0];
+  const photoBase = CONFIG.basemaps.find(b => b.url) || CONFIG.basemaps[1];
+  const setBase = b => {
+    if (!b) return;
+    for (const name in baseLayers)
+      if (name !== b.label && map.hasLayer(baseLayers[name])) map.removeLayer(baseLayers[name]);
+    if (!map.hasLayer(baseLayers[b.label])) baseLayers[b.label].addTo(map);
+    applyBase(b);
+  };
+  (document.getElementById("satBtn") || {addEventListener(){}}).addEventListener("click", () => {
+    const onPhoto = photoBase && map.hasLayer(baseLayers[photoBase.label]);
+    setBase(onPhoto ? drawnBase : photoBase);
+  });
 
   // ------------------------------------------------------------------
   // Icons are generated, not files: the ring takes the owner's colour and
@@ -139,32 +174,54 @@
     return "wooded";
   }
 
-  const iconCache = new Map();
-  function iconFor(p) {
-    const m = markFor(p);
-    if (iconCache.has(m)) return iconCache.get(m);
-    const stroke = OUTLINE[m];
-    const svg =
-      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="26" height="26">
-         <path d="${MARK[m]}" fill="${stroke ? "none" : "currentColor"}"
-               stroke="currentColor" stroke-width="${stroke ? 6 : 0}"
-               stroke-linecap="round" stroke-linejoin="round"/>
-       </svg>`;
-    const icon = L.divIcon({
-      className: "ep-mark ep-mark-" + m,
-      html: svg,
-      iconSize: [26, 26], iconAnchor: [13, 13]
-    });
-    iconCache.set(m, icon);
-    return icon;
-  }
+  // Marks are drawn on ONE canvas, not as 260 DOM icons.
+  // Measured: rebuilding divIcon markers on every moveend put panning at
+  // zoom 13 over a dense town at ~30 fps with quarter-second stalls;
+  // emptying the layer alone restored 60 fps. Marks are decoration —
+  // they take no clicks — so they have no business being DOM at all.
+  const markPath = new Map();
+  const pathFor = m => {
+    let d = markPath.get(m);
+    if (!d) { d = new Path2D(MARK[m]); markPath.set(m, d); }
+    return d;
+  };
 
   // Marks are drawn only where they can mean something: from the zoom
   // where boundaries are visible, and only for what's on screen. No
   // clustering, no 7,700 markers built at load — that was most of the
   // startup cost, and the polygons are what you click now anyway.
-  const MARK_ZOOM = 12, MARK_CAP = 260;
-  const markLayer = L.layerGroup().addTo(map);
+  const MARK_ZOOM = 12, MARK_CAP = 260, MARK_PX = 26, MARK_PAD = 120;
+
+  // Coarse spatial index, built once. Without it every repaint scanned
+  // all 7,727 records to find the ~200 on screen.
+  const CELL = 0.02;                       // degrees, about 2 km
+  const gridKey = (lat, lng) => `${Math.floor(lat / CELL)},${Math.floor(lng / CELL)}`;
+  const placeGrid = new Map();
+  function indexPlaces() {
+    placeGrid.clear();
+    for (const p of allParks) {
+      const k = gridKey(p.lat, p.lng);
+      let bucket = placeGrid.get(k);
+      if (!bucket) placeGrid.set(k, bucket = []);
+      bucket.push(p);
+    }
+  }
+  function placesIn(bounds) {
+    const out = [];
+    const y0 = Math.floor(bounds.getSouth() / CELL), y1 = Math.floor(bounds.getNorth() / CELL);
+    const x0 = Math.floor(bounds.getWest() / CELL),  x1 = Math.floor(bounds.getEast() / CELL);
+    for (let y = y0; y <= y1; y++)
+      for (let x = x0; x <= x1; x++) {
+        const bucket = placeGrid.get(`${y},${x}`);
+        if (bucket) out.push(...bucket);
+      }
+    return out;
+  }
+
+  const markCanvas = L.DomUtil.create("canvas", "ep-mark-canvas");
+  markCanvas.style.pointerEvents = "none";
+  markCanvas.style.position = "absolute";
+  map.getPanes().overlayPane.appendChild(markCanvas);
 
   // ------------------------------------------------------------------
   // State
@@ -515,23 +572,57 @@
   }
 
   function paintMarks() {
-    markLayer.clearLayers();
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const size = map.getSize();
+    const w = size.x + MARK_PAD * 2, h = size.y + MARK_PAD * 2;
+    // The canvas is a child of overlayPane, so Leaflet's own pane
+    // transform pans it for free; it is only redrawn when the view
+    // settles. The padding is what stops a blank edge appearing while
+    // the drag is still in flight.
+    const topLeft = map.containerPointToLayerPoint([-MARK_PAD, -MARK_PAD]);
+    L.DomUtil.setPosition(markCanvas, topLeft);
+    if (markCanvas.width !== w * dpr || markCanvas.height !== h * dpr) {
+      markCanvas.width = w * dpr; markCanvas.height = h * dpr;
+      markCanvas.style.width = w + "px"; markCanvas.style.height = h + "px";
+    }
+    const ctx = markCanvas.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
     if (map.getZoom() < MARK_ZOOM) return;
-    const b = map.getBounds();
+
+    const b = map.getBounds().pad(MARK_PAD / Math.max(size.x, size.y));
+    const scale = MARK_PX / 64;
     let n = 0;
-    for (const p of allParks) {
+    for (const p of placesIn(b)) {
       if (n >= MARK_CAP) break;
-      if (p.lat < b.getSouth() || p.lat > b.getNorth()
-          || p.lng < b.getWest() || p.lng > b.getEast()) continue;
       if (!visible(p)) continue;
-      // Marks are decoration: the polygon underneath takes the click.
-      markLayer.addLayer(L.marker([p.lat, p.lng],
-        { icon: iconFor(p), interactive: false, keyboard: false }));
+      const q = map.latLngToLayerPoint([p.lat, p.lng]);
+      const x = q.x - topLeft.x, y = q.y - topLeft.y;
+      if (x < -MARK_PX || y < -MARK_PX || x > w + MARK_PX || y > h + MARK_PX) continue;
+      const m = markFor(p);
+      const d = pathFor(m);
+      const outline = OUTLINE[m];
+      ctx.save();
+      ctx.translate(x - MARK_PX / 2, y - MARK_PX / 2);
+      ctx.scale(scale, scale);
+      ctx.lineCap = "round"; ctx.lineJoin = "round";
+      // Two passes instead of a canvas shadow: shadowBlur is measured in
+      // whole milliseconds per shape, and this reads the same.
+      ctx.translate(0, 2.5);
+      ctx.fillStyle = "rgba(0,0,0,.55)"; ctx.strokeStyle = "rgba(0,0,0,.55)";
+      ctx.lineWidth = outline ? 6 : 0;
+      if (outline) ctx.stroke(d); else ctx.fill(d);
+      ctx.translate(0, -2.5);
+      const col = m === "grave" ? "rgba(226,214,240,.94)" : "rgba(245,242,230,.92)";
+      ctx.fillStyle = col; ctx.strokeStyle = col;
+      if (outline) ctx.stroke(d); else ctx.fill(d);
+      ctx.restore();
       n++;
     }
   }
 
   function refresh() {
+    if (!placeGrid.size && allParks.length) indexPlaces();
     if (tilesActive) EveryParkTiles.refresh(activeTypes);
     let shown = 0;
     for (const p of allParks) if (visible(p)) shown++;
@@ -2443,9 +2534,21 @@
     el.id = "nearPanel";
     el.hidden = true;
     el.innerHTML = `<div class="near-head"><span class="near-title">Near me</span>
-      <button type="button" aria-label="Close">×</button></div>
+      <button type="button" class="near-close" aria-label="Close">×</button></div>
+      <div class="near-origin-row">
+        <input id="nearWhere" type="search" placeholder="Town, address or landmark…"
+               autocomplete="off">
+        <button type="button" id="nearGo">Go</button>
+        <button type="button" id="nearHere" title="Use my current location">Here</button>
+      </div>
       <div class="near-list"></div><div class="near-note"></div>`;
-    el.querySelector("button").addEventListener("click", () => { el.hidden = true; });
+    el.querySelector(".near-close").addEventListener("click", () => { el.hidden = true; });
+    const where = el.querySelector("#nearWhere");
+    el.querySelector("#nearGo").addEventListener("click", () => geocodeThen(where.value));
+    where.addEventListener("keydown", e => {
+      if (e.key === "Enter") { e.preventDefault(); geocodeThen(where.value); }
+    });
+    el.querySelector("#nearHere").addEventListener("click", useMyLocation);
     document.querySelector("main").appendChild(el);
     return el;
   }
@@ -2541,29 +2644,73 @@
     }
   }
 
-  if (nearBtn) nearBtn.addEventListener("click", () => {
+  // Fly to wherever the search starts from, so the answer and the map
+  // agree about where "here" is.
+  function originHere(lat, lng, label) {
+    if (originMark) map.removeLayer(originMark);
+    originMark = L.circleMarker([lat, lng], { radius: 6, color: "#d9a441", weight: 2,
+                                              fillColor: "#d9a441", fillOpacity: .85 })
+      .addTo(map).bindTooltip(label || "You are here");
+    map.setView([lat, lng], Math.max(map.getZoom(), 12));
+  }
+  let originMark = null;
+
+  // Nominatim, biased to Connecticut and capped at one result. Free, no
+  // key, and their policy asks for low volume — one lookup per click is
+  // exactly that.
+  async function geocodeThen(q) {
+    q = (q || "").trim();
+    if (!q) return;
+    const panel = nearPanel();
+    panel.querySelector(".near-note").textContent = `Looking up “${q}”…`;
+    panel.querySelector(".near-note").style.display = "";
+    try {
+      const url = "https://nominatim.openstreetmap.org/search?format=json&limit=1"
+                + "&countrycodes=us&viewbox=-73.75,42.10,-71.75,40.95&bounded=1"
+                + "&q=" + encodeURIComponent(q);
+      const r = await fetch(url, { headers: { "Accept": "application/json" } });
+      const j = await r.json();
+      if (!j || !j.length) {
+        setNear("Near me", "", `Couldn't find “${q}” in Connecticut. Try a town name.`);
+        return;
+      }
+      const lat = +j[0].lat, lng = +j[0].lon;
+      originHere(lat, lng, j[0].display_name.split(",")[0]);
+      setNear("Near me", "", "Working out driving times…");
+      await findNear(lat, lng);
+    } catch (e) {
+      setNear("Near me", "", "Place lookup is unavailable right now. "
+                           + "Try Here, or search the map directly.");
+    }
+  }
+
+  function useMyLocation() {
     if (!navigator.geolocation) {
       setNear("Near me", "", "This browser can't share your location.");
       return;
     }
-    const was = nearBtn.textContent;
-    nearBtn.textContent = "Locating…";
-    nearBtn.disabled = true;
-    const done = () => { nearBtn.textContent = was; nearBtn.disabled = false; };
+    const panel = nearPanel();
+    panel.hidden = false;
+    panel.querySelector(".near-note").textContent = "Finding you…";
+    panel.querySelector(".near-note").style.display = "";
     navigator.geolocation.getCurrentPosition(async pos => {
       const { latitude: lat, longitude: lng } = pos.coords;
+      originHere(lat, lng, "You are here");
       setNear("Near me", "", "Working out driving times…");
-      L.circleMarker([lat, lng], { radius: 6, color: "#d9a441", weight: 2,
-                                   fillColor: "#d9a441", fillOpacity: .8 })
-       .addTo(map).bindTooltip("You are here");
-      map.setView([lat, lng], Math.max(map.getZoom(), 11));
-      try { await findNear(lat, lng); } finally { done(); }
+      await findNear(lat, lng);
     }, err => {
-      done();
       setNear("Near me", "", err.code === 1
-        ? "Location permission denied — allow it in your browser to use this."
-        : "Couldn't get your location. Try again in a moment.");
+        ? "Location permission denied — type a town above instead."
+        : "Couldn't get your location. Type a town above instead.");
     }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 });
+  }
+
+  if (nearBtn) nearBtn.addEventListener("click", () => {
+    const panel = nearPanel();
+    panel.hidden = false;
+    setNear("Near me", "", "Type a place above, or use Here for your own location.");
+    const w = panel.querySelector("#nearWhere");
+    if (w) w.focus();
   });
 
   // Random park: fly somewhere that passes the current filters.
