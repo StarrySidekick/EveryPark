@@ -1,0 +1,127 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="leaflet.css">
+<style>
+  html, body { margin: 0; height: 100%; background: #0d2a1e; }
+  #map { position: absolute; inset: 0; background: var(--ground, #e8e4d2); }
+  /* The turf pane: one screen-space checkerboard over EVERYTHING —
+     basemap and polygons alike — so the whole map reads as mown ground
+     without touching a single paint rule. */
+  .turf-pane {
+    position: absolute; inset: 0; z-index: 650;
+    pointer-events: none;
+    mix-blend-mode: var(--turf-blend, multiply);
+    opacity: var(--turf-op, .5);
+    background-image: var(--turf-img);
+    background-size: var(--turf-size, 32px 32px);
+  }
+  .leaflet-container { background: var(--ground, #e8e4d2); }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<script src="leaflet.js"></script>
+<script src="protomaps-leaflet.js"></script>
+<script>
+// Style variants under evaluation. Each is only colours + turf texture:
+// the geometry and paint structure are identical to the live site.
+const VARIANTS = {
+  // A — FIELD GUIDE: aged paper ground, restrained mow, ink borders.
+  a: {
+    ground: "#e6e2cf",
+    turfA: "rgba(120,140,94,.10)", turfB: "rgba(120,140,94,.03)",
+    size: 18, blend: "multiply", op: 1,
+    fills: { park: "#5f9c52", cem: "#8464c9", maybe: "#e0a03f", unk: "#9aa398" },
+    fillOp: .55,
+    borders: { state: "#24603a", national: "#8a5426", town: "#1f5c96",
+               preserve: "#0f6f7d", cemetery: "#5f3f9e" },
+    weight: 2.2, trail: "#c8a63c"
+  },
+  // B — 90s GOLF: saturated turf, bold alternating mow squares.
+  b: {
+    ground: "#9dbf78",
+    turfA: "rgba(255,255,255,.10)", turfB: "rgba(38,84,40,.07)",
+    size: 20, blend: "overlay", op: 1,
+    fills: { park: "#4e9a3e", cem: "#8f6fd4", maybe: "#e8a83a", unk: "#9fa89c" },
+    fillOp: .62,
+    borders: { state: "#1d5c2c", national: "#8a5426", town: "#17538c",
+               preserve: "#0d6b78", cemetery: "#573a96" },
+    weight: 2.6, trail: "#f2d75a"
+  },
+  // C — MOWED STRIPES: fairway bands instead of a checkerboard.
+  c: {
+    ground: "#9dbf78",
+    stripes: true,
+    turfA: "rgba(255,255,255,.09)", turfB: "rgba(30,76,36,.07)",
+    size: 16, blend: "overlay", op: 1,
+    fills: { park: "#4e9a3e", cem: "#8f6fd4", maybe: "#e8a83a", unk: "#9fa89c" },
+    fillOp: .60,
+    borders: { state: "#1d5c2c", national: "#8a5426", town: "#17538c",
+               preserve: "#0d6b78", cemetery: "#573a96" },
+    weight: 2.6, trail: "#f2d75a"
+  }
+};
+
+const qp = new URLSearchParams(location.search);
+const V = VARIANTS[qp.get("v") || "a"];
+const zoom = +(qp.get("z") || 13);
+const lat = +(qp.get("lat") || 41.5786), lng = +(qp.get("lng") || -73.4954);
+
+// Turf texture. A conic gradient gives a TRUE checkerboard — the
+// two-linear-gradient trick everyone reaches for produces diagonal
+// harlequin diamonds, which read as argyle, not mown grass.
+const checker = `conic-gradient(${V.turfA} 0 25%, ${V.turfB} 0 50%, ${V.turfA} 0 75%, ${V.turfB} 0)`;
+const stripes = `repeating-linear-gradient(45deg, ${V.turfA} 0 ${V.size}px, ${V.turfB} ${V.size}px ${V.size * 2}px)`;
+const root = document.documentElement.style;
+root.setProperty("--ground", V.ground);
+root.setProperty("--turf-img", V.stripes ? stripes : checker);
+root.setProperty("--turf-size", V.stripes ? "auto" : `${V.size}px ${V.size}px`);
+root.setProperty("--turf-blend", V.blend);
+root.setProperty("--turf-op", String(V.op));
+
+const map = L.map("map", { zoomControl: false, attributionControl: false })
+             .setView([lat, lng], zoom);
+
+// Colour by source layer — enough variety to judge the palette without
+// wiring up the full verified-status lookup.
+const FILL = { stateland: "park", townparks: "park", landuse: "maybe",
+               preserves: "park", padus: "maybe", cemeteries: "cem" };
+const BORD = { stateland: "state", townparks: "town", landuse: "town",
+               preserves: "preserve", padus: "preserve", cemeteries: "cemetery" };
+
+const landRule = dl => ({
+  dataLayer: dl,
+  symbolizer: new protomapsL.PolygonSymbolizer({
+    fill: V.fills[FILL[dl]], opacity: V.fillOp,
+    stroke: V.borders[BORD[dl]], width: V.weight
+  })
+});
+
+protomapsL.leafletLayer({
+  url: "../../data/everypark.pmtiles",
+  maxDataZoom: 14,
+  pane: "overlayPane",
+  labelRules: [],
+  paintRules: [
+    landRule("stateland"), landRule("padus"), landRule("preserves"),
+    landRule("landuse"), landRule("townparks"), landRule("cemeteries"),
+    { dataLayer: "trails", symbolizer: new protomapsL.LineSymbolizer({
+        color: V.trail, width: 1.6, dash: [5, 4], opacity: .95 }) },
+    { dataLayer: "blueblazed", symbolizer: new protomapsL.LineSymbolizer({
+        color: V.trail, width: 2.2, opacity: .95 }) }
+  ]
+}).addTo(map);
+
+// The turf layer sits above the polygons so one texture unifies the
+// whole picture. Attached to the map CONTAINER, not a Leaflet pane:
+// panes are transformed as you drag, and mown ground should stay put in
+// screen space rather than slide around under the cursor.
+const tp = document.createElement("div");
+tp.className = "turf-pane";
+map.getContainer().appendChild(tp);
+window.__ready = true;
+</script>
+</body>
+</html>
