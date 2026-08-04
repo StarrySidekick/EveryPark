@@ -1,0 +1,75 @@
+name: Build districts layer
+
+# The "places to wander" layer — historic districts from the National
+# Register. Separate from the parks pipeline on purpose: it writes its
+# own file, so it can be rebuilt in a minute without paying for the
+# 65-minute full refresh.
+on:
+  workflow_dispatch:
+  # Git-based dispatch, same pattern as refresh-data.yml: the sandbox
+  # sessions that maintain this repo can push over git but cannot reach
+  # the GitHub API to press the dispatch button.
+  push:
+    branches: [main]
+    paths:
+      - "data/districts-request"
+      - "fetchdistricts.py"
+
+permissions:
+  contents: write
+
+# Shares the data lock with the other two workflows: all three write to
+# data/, and a publish landing mid-run is exactly the race that has
+# already cost this project a rebuild.
+concurrency:
+  group: everypark-data
+  cancel-in-progress: false
+
+jobs:
+  districts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Fetch historic districts
+        run: python3 fetchdistricts.py -o data/districts.json
+
+      - name: Report
+        run: |
+          python3 - <<'PY'
+          import json, os
+          d = json.load(open("data/districts.json"))
+          n = len(d["districts"])
+          towns = len({x["town"] for x in d["districts"] if x["town"]})
+          print(f"{n:,} districts across {towns} towns, "
+                f"{os.path.getsize('data/districts.json')/1024:.0f} KB")
+          # A claim without a number is not a result: fail loudly if the
+          # source suddenly returns a fraction of what it used to.
+          assert n > 250, f"only {n} districts — source may have changed"
+          PY
+
+      - name: Commit
+        run: |
+          git config user.name  "everypark-bot"
+          git config user.email "actions@github.com"
+          git add data/districts.json
+          if git diff --cached --quiet; then
+            echo "nothing changed"
+          else
+            git commit -m "Rebuild historic districts layer"
+            for attempt in 1 2 3; do
+              if git push; then
+                echo "pushed on attempt $attempt"
+                exit 0
+              fi
+              git pull --rebase --autostash origin main || exit 1
+              sleep 5
+            done
+            echo "could not push after 3 attempts"
+            exit 1
+          fi

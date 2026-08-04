@@ -948,3 +948,27 @@ header { flex-wrap: nowrap; }
   text-transform: uppercase; letter-spacing: .05em; font-size: .6rem; padding: 6px 8px;
 }
 .near-origin-row button:hover { background: var(--ep-ink-3); }
+
+
+/* --- places to wander ---------------------------------------
+   A second class of walkable place: ground you pass through, not ground
+   you enter. Brass dashes, never a fill — fill would imply an access
+   status, and a public street has none. */
+.dot-district {
+  background: transparent;
+  border: 2px dashed var(--ep-brass);
+}
+.district-card .d-body {
+  margin: 6px 0; font-size: .82rem; line-height: 1.4; color: var(--ep-text);
+}
+#districtCount {
+  /* Top-right: bottom-right is taken by the layers control and the
+     attribution, and the badge was landing on both. */
+  position: absolute; right: 10px; top: 10px; z-index: 800;
+  font-family: var(--ep-mono); font-size: .58rem; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--ep-muted);
+  background: rgba(245,242,230,.82); border: var(--ep-hair);
+  border-radius: var(--ep-radius); padding: 3px 7px; pointer-events: none;
+}
+#districtCount:empty { display: none; }
+@media (max-width: 760px) { #districtCount { display: none; } }

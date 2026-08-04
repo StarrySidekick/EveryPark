@@ -2713,6 +2713,98 @@
     if (w) w.focus();
   });
 
+  // ------------------------------------------------------------------
+  // Places to wander — the second class of walkable place.
+  //
+  // Ground you may pass THROUGH (streets, village centres) rather than
+  // ground you may enter. They carry no access colour on purpose: green
+  // means "verified, you can go", and a public street's access was never
+  // in question. Dashed outline, no fill, counted separately, and kept
+  // out of verified.json entirely.
+  // See claude/walkable-places-plan.md in the project for the reasoning.
+  // ------------------------------------------------------------------
+  let districtLayer = null, districtsLoaded = false, districtsOn = true;
+
+  async function loadDistricts() {
+    if (districtsLoaded) return districtLayer;
+    districtsLoaded = true;                    // never retry a 404 in a loop
+    try {
+      const r = await fetch("data/districts.json?v=" + (CONFIG.dataVersion || "1"));
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const doc = await r.json();
+      const feats = (doc.districts || []).map(d => ({
+        type: "Feature",
+        properties: { name: d.name, town: d.town, ref: d.ref, landmark: d.landmark,
+                      source: doc.source, checked: doc.checked },
+        geometry: { type: "Polygon", coordinates: d.rings }
+      }));
+      districtLayer = L.geoJSON({ type: "FeatureCollection", features: feats }, {
+        pane: "epRoads",                       // above the parks, like roads
+        style: f => ({
+          color: f.properties.landmark ? "#b8862f" : "#d9a441",
+          weight: f.properties.landmark ? 2.4 : 1.8,
+          dashArray: "6 4",
+          fill: true, fillOpacity: 0,          // clickable, but never filled
+          interactive: true
+        }),
+        onEachFeature: (f, lyr) => lyr.on("click", e => {
+          L.DomEvent.stop(e);
+          districtCard(f.properties, e.latlng);
+        })
+      });
+      return districtLayer;
+    } catch (e) {
+      // The layer is built by its own workflow and may simply not exist
+      // yet. That is not an error worth showing anyone.
+      districtLayer = null;
+      return null;
+    }
+  }
+
+  function districtCard(d, latlng) {
+    const esc = t => String(t || "").replace(/[<>&]/g, c =>
+      ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]));
+    const q = encodeURIComponent(`${d.name} ${d.town || ""} Connecticut`);
+    L.popup({ maxWidth: 300, autoPan: true })
+      .setLatLng(latlng)
+      .setContent(
+        `<div class="popup-card district-card">
+           <div class="popup-sub">Place to wander</div>
+           <div class="popup-name">${esc(d.name)}</div>
+           <div class="popup-sub">${esc(d.town)}${d.landmark
+             ? " · National Historic Landmark" : ""}</div>
+           <p class="d-body">A designated historic district — public streets you
+             can walk freely. This is somewhere to <em>wander through</em>,
+             not a park you enter, so it carries no access colour.</p>
+           <p class="pchecked">${esc(d.source)} · checked ${esc(d.checked)}</p>
+           <div class="popup-links">
+             <a href="https://www.google.com/maps/search/?api=1&query=${latlng.lat},${latlng.lng}"
+                target="_blank" rel="noopener">Look at it</a>
+             <a href="https://www.google.com/search?q=${q}" target="_blank"
+                rel="noopener">More info</a>
+           </div>
+         </div>`)
+      .openOn(map);
+  }
+
+  async function syncDistricts() {
+    const lyr = await loadDistricts();
+    if (!lyr) return;
+    if (districtsOn && !map.hasLayer(lyr)) lyr.addTo(map);
+    if (!districtsOn && map.hasLayer(lyr)) map.removeLayer(lyr);
+    const c = document.getElementById("districtCount");
+    if (c) c.textContent = districtsOn && lyr
+      ? `${lyr.getLayers().length.toLocaleString()} places to wander` : "";
+  }
+
+  (document.querySelector('[data-layer="districts"]') || {addEventListener(){}})
+    .addEventListener("click", e => {
+      districtsOn = !districtsOn;
+      e.currentTarget.classList.toggle("active", districtsOn);
+      syncDistricts();
+    });
+  syncDistricts();
+
   // Random park: fly somewhere that passes the current filters.
   (document.getElementById("randomBtn") || {addEventListener(){}}).addEventListener("click", () => {
     // Somewhere you can definitely go, run by a public body, with
