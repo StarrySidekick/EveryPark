@@ -334,13 +334,30 @@ const EveryParkIso = (() => {
   }
 
   // ---- Overpass: roads + buildings + parking in one query ---------
+  // Which public buildings are worth naming on the ground. Ordered by
+  // how much a walker cares: the library is the point of a town centre in
+  // a way the fire station is not.
+  const PUBLIC_AMENITY = {
+    library: "library", townhall: "townhall", museum: "museum",
+    community_centre: "community", arts_centre: "museum", theatre: "museum",
+    post_office: "post", school: "school", college: "school",
+    university: "school", place_of_worship: "worship",
+    fire_station: "civic", police: "civic", courthouse: "civic",
+    hospital: "civic", clinic: "civic"
+  };
+  const PUBLIC_RANK = { library: 0, townhall: 1, museum: 2, community: 3,
+                        post: 4, worship: 5, school: 6, civic: 7 };
+
   async function fetchOverpass(bbox) {
     const [w, s, e, n] = bbox;
+    const amen = Object.keys(PUBLIC_AMENITY).join("|");
     const q = `[out:json][timeout:12];(` +
       `way[highway~"^(motorway|trunk|primary|secondary|tertiary|` +
       `unclassified|residential|service|living_street)$"](${s},${w},${n},${e});` +
       `way[building](${s},${w},${n},${e});` +
       `way[amenity=parking](${s},${w},${n},${e});` +
+      `node[amenity~"^(${amen})$"](${s},${w},${n},${e});` +
+      `way[amenity~"^(${amen})$"](${s},${w},${n},${e});` +
       `);out geom 700;`;
     // Mirrors: the main endpoint rate-limits and times out often, which
     // silently cost every road on the island while ArcGIS-sourced trails
@@ -360,16 +377,29 @@ const EveryParkIso = (() => {
       } catch (e) { lastErr = e; j = null; }
     }
     if (!j) throw lastErr || new Error("no overpass endpoint answered");
-    const roads = [], buildings = [], parking = [];
+    const roads = [], buildings = [], parking = [], publics = [];
     for (const el of j.elements || []) {
+      const tags = el.tags || {};
+      const kind = PUBLIC_AMENITY[tags.amenity];
+      if (kind) {
+        // Nodes carry lat/lon directly; ways only have geometry, so take
+        // the middle of the ring as a good-enough doorstep.
+        let lon = el.lon, lat = el.lat;
+        if (lon == null && el.geometry && el.geometry.length) {
+          const g = el.geometry;
+          lon = g.reduce((a, q) => a + q.lon, 0) / g.length;
+          lat = g.reduce((a, q) => a + q.lat, 0) / g.length;
+        }
+        if (lon != null) publics.push({ lon, lat, kind, name: tags.name || "" });
+        if (!tags.building) continue;
+      }
       if (!el.geometry) continue;
       const pts = el.geometry.map(g => [g.lon, g.lat]);
-      const tags = el.tags || {};
       if (tags.building) buildings.push([pts]);
       else if (tags.amenity === "parking") parking.push([pts]);
       else if (tags.highway) roads.push({ geometry: { paths: [pts] } });
     }
-    return { roads, buildings, parking };
+    return { roads, buildings, parking, publics };
   }
 
   // ---- Trails + water + courts (ArcGIS) + Overpass extras ---------
@@ -413,12 +443,13 @@ const EveryParkIso = (() => {
                      emoji: KIND[a.leisure][2] };
           return null;
         }).filter(Boolean),
-      roads: [], buildings: [], parking: []
+      roads: [], buildings: [], parking: [], publics: []
     };
     if (over.status === "fulfilled") {
       raw.roads = over.value.roads;
       raw.buildings = over.value.buildings;
       raw.parking = over.value.parking;
+      raw.publics = over.value.publics || [];
     }
     return raw;
   }
@@ -674,8 +705,25 @@ const EveryParkIso = (() => {
     // empty sky reads as a bug, whatever it says about the neighbourhood.
     const trailLines = linesFrom(raw.trailFeats, bbox, inside, 0);
     const roadLines = linesFrom(raw.roads, bbox, inside, 0);
+    // Public buildings, snapped onto the island and thinned so a dense
+    // downtown does not become a wall of labels. Ranked, so if only a few
+    // fit, the library survives and the clinic does not.
+    const publics = [];
+    const seenCell = new Set();
+    for (const q of (raw.publics || []).slice().sort(
+           (a, b) => (PUBLIC_RANK[a.kind] || 9) - (PUBLIC_RANK[b.kind] || 9))) {
+      const [gx, gy] = cellOf(bbox, q.lon, q.lat);
+      const snap = snapInside(inside, gx, gy);
+      if (!snap) continue;
+      const key = `${Math.round(snap[0] / 3)},${Math.round(snap[1] / 3)}`;
+      if (seenCell.has(key)) continue;
+      seenCell.add(key);
+      publics.push({ gx: snap[0], gy: snap[1], kind: q.kind, name: q.name });
+      if (publics.length >= 14) break;
+    }
+
     return { trailM, waterM, roadM, buildM, parkM, courtM, sprites, hikePath,
-             trailLines, roadLines,
+             trailLines, roadLines, publics,
              trailPieces: pathPieces(trailLines, [1.5, 1.1]),
              roadPieces: pathPieces(roadLines, null) };
   }
@@ -727,6 +775,58 @@ const EveryParkIso = (() => {
   ];
 
   // ---- Drawn sprites (no emoji font anywhere in the scene) --------
+  // Civic glyphs: a disc with a simple mark. Drawn rather than emoji, and
+  // legible at eight pixels, which rules out anything with fine detail.
+  function civicSprite(ctx, kind, X, Y, r, tod) {
+    const ink = c => { const t = tod(c[0], c[1], c[2]);
+                       return `rgb(${t[0]|0},${t[1]|0},${t[2]|0})`; };
+    const FACE = { library: [216, 164, 65], townhall: [206, 210, 214],
+                   museum: [206, 210, 214], community: [143, 176, 120],
+                   post: [176, 196, 216], worship: [214, 206, 226],
+                   school: [226, 196, 150], civic: [206, 206, 206] };
+    ctx.save();
+    ctx.fillStyle = ink(FACE[kind] || FACE.civic);
+    ctx.beginPath(); ctx.arc(X, Y, r, 0, 7); ctx.fill();
+    ctx.strokeStyle = ink([32, 48, 38]);
+    ctx.lineWidth = Math.max(1, r * .17);
+    ctx.stroke();
+    ctx.strokeStyle = ctx.fillStyle = ink([28, 44, 34]);
+    ctx.lineWidth = Math.max(1, r * .15);
+    const u = r * .5;
+    ctx.beginPath();
+    if (kind === "library") {                       // an open book
+      ctx.moveTo(X - u, Y - u * .7); ctx.lineTo(X - u, Y + u * .7);
+      ctx.lineTo(X, Y + u * .45); ctx.lineTo(X, Y - u * .9);
+      ctx.moveTo(X + u, Y - u * .7); ctx.lineTo(X + u, Y + u * .7);
+      ctx.lineTo(X, Y + u * .45); ctx.lineTo(X, Y - u * .9);
+    } else if (kind === "worship") {                // a steeple
+      ctx.moveTo(X, Y - u); ctx.lineTo(X, Y + u);
+      ctx.moveTo(X - u * .6, Y - u * .2); ctx.lineTo(X + u * .6, Y - u * .2);
+    } else if (kind === "post") {                   // an envelope
+      ctx.rect(X - u, Y - u * .65, u * 2, u * 1.3);
+      ctx.moveTo(X - u, Y - u * .65); ctx.lineTo(X, Y + u * .15);
+      ctx.lineTo(X + u, Y - u * .65);
+    } else if (kind === "school") {                 // a mortarboard
+      ctx.moveTo(X - u, Y - u * .2); ctx.lineTo(X, Y - u * .8);
+      ctx.lineTo(X + u, Y - u * .2); ctx.lineTo(X, Y + u * .4);
+      ctx.closePath();
+      ctx.moveTo(X + u * .7, Y - u * .05); ctx.lineTo(X + u * .7, Y + u * .6);
+    } else if (kind === "community") {              // a roof over a door
+      ctx.moveTo(X - u, Y + u * .6); ctx.lineTo(X - u, Y - u * .1);
+      ctx.lineTo(X, Y - u * .8); ctx.lineTo(X + u, Y - u * .1);
+      ctx.lineTo(X + u, Y + u * .6);
+    } else {                                        // columns: civic, town hall, museum
+      ctx.moveTo(X - u, Y - u * .35); ctx.lineTo(X, Y - u * .95);
+      ctx.lineTo(X + u, Y - u * .35);
+      ctx.moveTo(X - u * .65, Y - u * .2); ctx.lineTo(X - u * .65, Y + u * .5);
+      ctx.moveTo(X, Y - u * .2); ctx.lineTo(X, Y + u * .5);
+      ctx.moveTo(X + u * .65, Y - u * .2); ctx.lineTo(X + u * .65, Y + u * .5);
+      ctx.moveTo(X - u, Y + u * .62); ctx.lineTo(X + u, Y + u * .62);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
   function facilitySprite(ctx, kind, X, Y, r, tod) {
     const ink = (c) => { const t = tod(c[0], c[1], c[2]);
                          return `rgb(${t[0]|0},${t[1]|0},${t[2]|0})`; };
@@ -1504,6 +1604,40 @@ const EveryParkIso = (() => {
     // paper-coloured halo, lake names in water ink, each pinned to its
     // spot by a short tick. Greedy spacing: a name that would land on
     // one already drawn is skipped this frame rather than overlapped.
+    // Public buildings — where the library actually is. Drawn in the
+    // always-visible pass with the landscape names, because the whole
+    // point is that a roof or a ridge must never hide one.
+    if (S.publics && S.publics.length) {
+      const fs = Math.max(8, Math.min(13, s * 1.7));
+      const r = Math.max(5, Math.min(11, s * 1.5));
+      const placedP = [];
+      for (const q of S.publics) {
+        const [px, pyG] = project(q.gx, q.gy, heightAtCell(q.gx, q.gy));
+        const py = pyG - r * 2.1;
+        if (placedP.some(o => Math.abs(o[0] - px) < r * 2.4
+                           && Math.abs(o[1] - py) < r * 2.4)) continue;
+        placedP.push([px, py]);
+        // A stem to the ground, so the icon reads as marking a spot
+        // rather than floating over one.
+        const st2 = tod(28, 44, 34);
+        ctx.strokeStyle = `rgb(${st2[0] | 0},${st2[1] | 0},${st2[2] | 0})`;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.moveTo(px, py + r); ctx.lineTo(px, pyG); ctx.stroke();
+        civicSprite(ctx, q.kind, px, py, r, tod);
+        if (q.name && s > 2.2) {
+          ctx.font = `600 ${fs}px ui-monospace, Menlo, Consolas, monospace`;
+          ctx.textAlign = "center";
+          const halo = tod(245, 242, 230), ink2 = tod(13, 42, 30);
+          ctx.lineJoin = "round";
+          ctx.lineWidth = Math.max(2.4, fs * .26);
+          ctx.strokeStyle = `rgba(${halo[0] | 0},${halo[1] | 0},${halo[2] | 0},.88)`;
+          ctx.strokeText(q.name, px, py - r - 3);
+          ctx.fillStyle = `rgb(${ink2[0] | 0},${ink2[1] | 0},${ink2[2] | 0})`;
+          ctx.fillText(q.name, px, py - r - 3);
+        }
+      }
+    }
+
     if (S.labels && S.labels.length) {
       const fs = Math.max(10, Math.min(17, s * 2.2));
       ctx.font = `600 ${fs}px ui-monospace, Menlo, Consolas, monospace`;
@@ -1557,7 +1691,8 @@ const EveryParkIso = (() => {
                  S.trailPieces ? S.trailPieces.length : 0,
                  S.roadPieces ? S.roadPieces.length : 0,
                  S.labels ? S.labels.length : 0,
-                 S.coverM ? 1 : 0, S.treeMask ? 1 : 0].join(",");
+                 S.coverM ? 1 : 0, S.treeMask ? 1 : 0,
+                 S.publics ? S.publics.length : 0].join(",");
     if (!S._cache || S._cache.width !== cw || S._cache.height !== ch) {
       S._cache = document.createElement("canvas");
       S._cache.width = cw; S._cache.height = ch;
@@ -1640,7 +1775,11 @@ const EveryParkIso = (() => {
     ov.addEventListener("click", e => { if (e.target === ov) close(); });
 
     let boundary = null;
-    try { boundary = await fetchBoundary(p); } catch (e) { /* fall through */ }
+    // Districts arrive WITH their boundary — it is the National Register
+    // outline the map already drew. Re-deriving it from DEEP/OSM/PAD-US
+    // would find nothing, because a town centre is not anybody's parcel.
+    if (p.rings && p.rings.length) boundary = { rings: p.rings, label: p.boundaryLabel || "supplied" };
+    else { try { boundary = await fetchBoundary(p); } catch (e) { /* fall through */ } }
     let bbox;
     if (boundary) {
       let w = 180, s2 = 90, e2 = -180, n2 = -90;

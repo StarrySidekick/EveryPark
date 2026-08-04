@@ -2766,6 +2766,15 @@
       const r = await fetch("data/districts.json?v=" + (CONFIG.dataVersion || "1"));
       if (!r.ok) throw new Error("HTTP " + r.status);
       const doc = await r.json();
+      districtById = new Map();
+      for (const d of doc.districts || []) {
+        const ring = d.rings[0] || [];
+        let x = 0, y = 0;
+        for (const pt of ring) { x += pt[0]; y += pt[1]; }
+        districtById.set(d.ref, { name: d.name, town: d.town, rings: d.rings,
+                                  lng: x / (ring.length || 1),
+                                  lat: y / (ring.length || 1) });
+      }
       const feats = (doc.districts || []).map(d => ({
         type: "Feature",
         properties: { name: d.name, town: d.town, ref: d.ref, landmark: d.landmark,
@@ -2774,11 +2783,17 @@
       }));
       districtLayer = L.geoJSON({ type: "FeatureCollection", features: feats }, {
         pane: "epRoads",                       // above the parks, like roads
+        // Clay, solid, lightly washed. The first cut was dashed brass,
+        // which read as a trail — dashes plus that yellow ARE the trail
+        // idiom on this map. Solid line and a fill say "area", and clay
+        // is a hue no access tier uses, so the wash cannot be mistaken
+        // for a verdict about who may enter.
         style: f => ({
-          color: f.properties.landmark ? "#b8862f" : "#d9a441",
-          weight: f.properties.landmark ? 2.4 : 1.8,
-          dashArray: "6 4",
-          fill: true, fillOpacity: 0,          // clickable, but never filled
+          color: f.properties.landmark ? "#8c4a34" : "#a35c46",
+          weight: f.properties.landmark ? 2.6 : 2,
+          dashArray: null,
+          fill: true, fillColor: "#b9704f",
+          fillOpacity: f.properties.landmark ? 0.18 : 0.13,
           interactive: true
         }),
         onEachFeature: (f, lyr) => lyr.on("click", e => {
@@ -2794,6 +2809,8 @@
       return null;
     }
   }
+
+  let districtById = new Map();
 
   function districtCard(d, latlng) {
     const esc = t => String(t || "").replace(/[<>&]/g, c =>
@@ -2812,6 +2829,8 @@
              not a park you enter, so it carries no access colour.</p>
            <p class="pchecked">${esc(d.source)} · checked ${esc(d.checked)}</p>
            <div class="popup-links">
+             ${window.EveryParkIso
+               ? `<a href="#" class="iso-btn" data-district="${esc(d.ref)}">See it in 3D</a>` : ""}
              <a href="https://www.google.com/maps/search/?api=1&query=${latlng.lat},${latlng.lng}"
                 target="_blank" rel="noopener">Look at it</a>
              <a href="https://www.google.com/search?q=${q}" target="_blank"
@@ -2820,6 +2839,24 @@
          </div>`)
       .openOn(map);
   }
+
+  // Delegated: the popup is rebuilt on every open, so binding the button
+  // directly would go stale.
+  document.addEventListener("click", e => {
+    const btn = e.target.closest("[data-district]");
+    if (!btn) return;
+    e.preventDefault();
+    const rec = districtById.get(btn.dataset.district);
+    if (!rec || !window.EveryParkIso) return;
+    EveryParkIso.open({
+      name: rec.name, town: rec.town,
+      lat: rec.lat, lng: rec.lng,
+      type: "district",
+      rings: rec.rings,
+      boundaryLabel: "National Register district",
+      attrs: {}
+    });
+  });
 
   async function syncDistricts() {
     const lyr = await loadDistricts();
