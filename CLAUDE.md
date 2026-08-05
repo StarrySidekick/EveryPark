@@ -284,6 +284,41 @@ have not checked is the exact bug that once rendered a reservation as
 simultaneous Overpass calls is how you get rate-limited, and a throttled
 Overpass once silently cost every road on the island.
 
+### Motion detail (v0.37.1)
+
+A block is **20 m by default**, rotating or not. It was 10 m, and the
+renderer dropped to a doubled grid step plus 0.7 resolution the instant
+the view moved — visible as the blocks growing while you drag and
+snapping back on release.
+
+The coarse step could not simply be deleted: full detail costs ~1.7-2.6x
+the coarse step (measured both in the harness and live), and cost scales
+with column count — a 48-cell grid renders in a few ms where a 176-cell
+grid is tens. So instead, **every motion burst starts at full detail,
+that frame is timed, and the viewer only coarsens for the rest of the
+burst if it blew `LOD_BUDGET_MS` (22 ms).** Resolution follows the same
+decision, so there is never a frame that is sharp but chunky. On hardware
+that keeps up, motion is byte-identical to rest.
+
+**Do not try to pin absolute frame times from this sandbox** — its
+browser has no GPU. And the live measurement that first looked
+authoritative was taken in a **backgrounded tab**, where rAF is throttled
+and raster deprioritised; it reported 200-320 ms frames for a scene that
+is fluid in the foreground. `document.hidden` is worth asserting in any
+in-browser benchmark. Measuring inside the running viewer avoids the
+whole question.
+
+`tools/isotest/lodbench.mjs` asserts BOTH branches via the
+`window.__lodBudgetMs` test seam: unlimited budget → the moving frame
+must hash identical to the settled one; zero budget → it must differ.
+A one-frame version of that test passed vacuously, because the first
+moving frame is the probe and renders at full detail by design.
+
+Two limits the 20 m default cannot beat, both reported honestly by the
+slider label rather than hidden: the grid floors at 48 a side, so a very
+small park lands near 10 m; and it clamps at 176, so a big forest lands
+coarser than 20.
+
 ### Viewer chrome layout
 
 Four corners, all 38px icons: time of day (TL), season (TR), terrain menu

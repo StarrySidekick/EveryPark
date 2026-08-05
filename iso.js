@@ -2140,12 +2140,57 @@ const EveryParkIso = (() => {
   function draw(canvas, S, yaw) {
     const ctx = canvas.getContext("2d");
     const W = canvas.width, Hh = canvas.height;
-    // While the view is turning, render the scene at a fraction of the
-    // resolution and scale it up: motion hides the softness, and it is
-    // the cheapest way to keep a turntable of 25,000 columns fluid. The
-    // moment it settles, one full-resolution pass replaces it.
-    S.lod = window.__forceLod != null ? window.__forceLod : (S.moving ? 2 : 1);
-    const q = S.moving ? 0.7 : 1;
+    // MOTION DETAIL, decided by measurement rather than always-on.
+    //
+    // This used to drop unconditionally to a doubled grid step and 0.7
+    // resolution the instant the view moved, which is visible as the
+    // blocks growing while you drag and snapping back when you let go —
+    // Timothy reported exactly that, and he was right about the cause.
+    //
+    // The saving is real: full detail costs about 1.7-2.6x the coarse
+    // step, measured both in the offline harness and on the live site,
+    // and the cost scales with the column count — a 48-cell grid renders
+    // in a few ms where a 176-cell grid is tens. So the coarse step
+    // cannot simply be deleted; a big forest on a slow device needs it.
+    //
+    // It just should not be paid by devices that do not need it. So:
+    // start every motion burst at FULL detail, time that first frame,
+    // and only coarsen for the rest of the burst if it actually blew the
+    // budget. On hardware that keeps up, motion now looks identical to
+    // rest — no size change, no softening — because both degradations
+    // are tied to the same measured decision instead of to a flag.
+    //
+    // Absolute frame times could not be pinned down from this sandbox:
+    // its browser has no GPU, and the live measurement ran in a
+    // BACKGROUNDED tab, where rAF is throttled and raster is
+    // deprioritised — numbers from either are not what a real viewer
+    // experiences. Measuring in the running viewer sidesteps the
+    // question entirely: whatever the truth is on this device, the
+    // viewer finds it out for itself.
+    // ~45 fps; a full-detail frame under this keeps full detail. The
+    // override is a test seam: this sandbox's browser has no GPU, so it
+    // coarsens on everything and the fast-device branch could otherwise
+    // only be asserted by argument rather than by running it.
+    const LOD_BUDGET_MS = window.__lodBudgetMs != null ? window.__lodBudgetMs : 22;
+    // Re-probe when the scene's cost could have changed under us —
+    // a different grid, the satellite drape, smooth mode, sprite style.
+    // Dressing counts are in here too: trails, roads and buildings stream
+    // in after the terrain, so a probe taken before they land would be
+    // measuring a cheaper scene than the one that ends up on screen.
+    const shape = [GRID, S.smooth ? 1 : 0, S.useSat ? 1 : 0,
+                   S.pixel === false ? 0 : 1,
+                   S.trailPieces ? S.trailPieces.length : 0,
+                   S.roadPieces ? S.roadPieces.length : 0,
+                   S.publics ? S.publics.length : 0].join(",");
+    if (!S.moving || S._lodShape !== shape) {
+      S._lodShape = shape;
+      S._lodCoarse = false;        // every burst starts optimistic
+    }
+    S.lod = window.__forceLod != null ? window.__forceLod
+          : (S.moving && S._lodCoarse ? 2 : 1);
+    // Resolution follows the same decision, so there is never a frame
+    // that is sharp but chunky or vice versa.
+    const q = (S.moving && S._lodCoarse) ? 0.7 : 1;
     const cw = Math.max(2, Math.round(W * q)), ch = Math.max(2, Math.round(Hh * q));
     const sig = [Math.round(yaw * 500), S.lod, S.tod, S.season, S.sides,
                  S.smooth ? 1 : 0, S.useSat ? 1 : 0, GRID,
@@ -2163,7 +2208,13 @@ const EveryParkIso = (() => {
       S._sig = null;
     }
     if (S._sig !== sig) {
+      const t0 = performance.now();
       renderScene(S._cache, S, yaw);
+      // Only a full-detail frame tells us whether full detail is
+      // affordable. Timing a coarse one would just confirm that the
+      // cheap path is cheap, and the viewer would never come back.
+      if (S.lod === 1 && S.moving && window.__forceLod == null)
+        S._lodCoarse = (performance.now() - t0) > LOD_BUDGET_MS;
       S._sig = sig;
     }
     ctx.clearRect(0, 0, W, Hh);
@@ -2332,7 +2383,12 @@ const EveryParkIso = (() => {
       return { inside, H, dropM, edge };
     };
 
-    GRID = gridFor(Math.max(10, Math.ceil(spanM / 176 / 2) * 2));  // default ≈ 10 m
+    // The default block size, defined once. The slider below re-derives
+    // the same value; if these two ever disagree the first terrain is
+    // built at one scale while the slider claims another.
+    const minCell = Math.max(4, Math.ceil(spanM / 176 / 2) * 2);
+    const defCell = Math.min(Math.max(20, minCell), minCell + 16);
+    GRID = gridFor(defCell);
     const { inside, H, dropM, edge } = buildTerrain();
 
     // TERRAIN FIRST. Trails/roads/buildings/courts stream in after —
@@ -2593,8 +2649,15 @@ const EveryParkIso = (() => {
     // Big parks clamp at 240 cells per side, so a fixed 4-20 m range
     // left the slider dead there (every value clamped to the same grid).
     // The range now starts at the smallest ACHIEVABLE block size.
-    const minCell = Math.max(4, Math.ceil(spanM / 176 / 2) * 2);
-    const defCell = Math.max(10, minCell);
+    // minCell / defCell come from the terrain build above — a block is
+    // 20 m by default, everywhere, rotating or not (Timothy, 2026-08-05).
+    // It was 10 m, which made a small park's blocks half the size of a
+    // big one's and gave the whole thing an inconsistent scale. Fixing it
+    // also makes the default view four times cheaper to draw — halving
+    // the cell size doubles the grid on each axis — which is why full
+    // detail during motion is affordable almost everywhere now. Big parks
+    // cannot reach 20 m (the grid clamps at 176 a side), so this is the
+    // closest achievable value rather than a promise.
     const sliderWrap = document.createElement("label");
     sliderWrap.className = "iso-slider";
     sliderWrap.innerHTML = `<span class="iso-slider-lab"></span>
