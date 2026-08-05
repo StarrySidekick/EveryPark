@@ -44,14 +44,15 @@ const setCell = cell => page.evaluate(cell => new Promise(res => {
 const frameHash = moving => page.evaluate(moving => {
   const S = window.__isoS;
   S.moving = moving;
-  // TWO frames when moving. The first is the probe: it renders at full
-  // detail by design and only then decides. Hashing that one would
-  // always report "full detail" and the check would pass no matter what
-  // the viewer went on to do — which is exactly what it did on the first
-  // run of this test.
+  // THREE frames when moving, and the count is load-bearing. The viewer
+  // needs two consecutive over-budget full-detail frames before it
+  // coarsens, so frames 1 and 2 are both probes rendered at full detail
+  // by design; only frame 3 shows the decision. An earlier version of
+  // this test shot once and passed vacuously — it was hashing a probe
+  // and calling it the verdict.
   const shoot = () => { S._sig = null; window.__isoSetYaw(0.7); };
   shoot();
-  if (moving) shoot();
+  if (moving) { shoot(); shoot(); }
   const c = document.querySelector("#isoPanel canvas");
   const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
   let h = 2166136261;
