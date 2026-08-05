@@ -249,7 +249,54 @@ tree field stable across motion LOD, continuous brown rim, no wall
 strokes, gap-free smooth mesh mid-spin. **Run `tools/isotest/check.mjs`
 (offline Playwright harness, no network) before pushing any `iso.js`
 change**: every invariant in that file has been broken at least once by
-an edit that looked correct.
+an edit that looked correct. `tools/isotest/shotui.mjs` is the companion
+for the *chrome* — it drives the lore ribbon through its pages and opens
+the terrain menu, so layout collisions show up in a screenshot.
+
+### The lore ribbon (v0.37.0)
+
+Game-dialogue text across the top of the stage, revealed letter by
+letter. Three sources, merged in this order:
+
+1. **OpenStreetMap tags** on the park's own polygon — the only live
+   source for RULES (hours, dogs, fee), and the only *reliable* way to
+   find the right Wikipedia article, since its `wikipedia`/`wikidata`
+   tag is an editor's assertion rather than our guess.
+2. **Wikipedia** REST summary — history, trimmed to three sentences.
+3. **The record we already hold** — always available, so the panel is
+   never empty. Most of the 7,727 places will only ever get this one.
+
+Nothing is baked; baking 7,727 summaries by hand does not finish.
+
+**The gates exist because a wrong article is worse than none.** "Memorial
+Park" matches a hundred articles nationwide. A match that did NOT come
+from an OSM tag must clear both a name gate (token overlap ≥ 0.5, after
+dropping the words every park name contains) and a distance gate (≤ 4 km,
+and it must be geotagged at all). Do not relax these to raise coverage —
+coverage is what the composed fallback is for.
+
+**Rules are stated, never inferred.** No recorded hours prints "No posted
+hours recorded", not silence and not an assumption. Asserting access we
+have not checked is the exact bug that once rendered a reservation as
+"You can go here."
+
+**Lore queries queue behind the dressing fetch** (`dressingReady`). Two
+simultaneous Overpass calls is how you get rate-limited, and a throttled
+Overpass once silently cost every road on the island.
+
+### Viewer chrome layout
+
+Four corners, all 38px icons: time of day (TL), season (TR), terrain menu
++ turntable (BL), read-again + save (BR). The footer keeps only Random
+and Close. The elevation readout on the canvas is bottom-**centre**: it
+was bottom-left until the BL icons covered it, and centring is dpr-proof
+where a fixed offset is not (icons are laid out in CSS pixels, that text
+in device pixels).
+
+`check.mjs` clicks `.iso-spin-btn` with a real Playwright click, so that
+button must stay **visible**, and it finds the smooth toggle by
+`.iso-tool` with textContent exactly `Smooth` — which still works from
+inside the closed menu only because it clicks via `evaluate`.
 
 ## Conventions
 

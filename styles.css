@@ -730,14 +730,87 @@ header { border-bottom: 2px solid var(--ep-brass); }
 .iso-corner { position: absolute; z-index: 5; }
 .iso-corner-tl { top: 10px; left: 10px; }
 .iso-corner-tr { top: 10px; right: 10px; }
-.iso-corner button {
+/* Only the corner ICONS get the square treatment. Scoped to direct
+   children and the icon row, because the terrain menu lives inside a
+   corner too and its labelled buttons must keep their natural width —
+   unscoped, this squashed "Satellite" into a 38px box. */
+.iso-corner > button, .iso-corner-row > button {
   width: 38px; height: 38px; display: grid; place-items: center;
   background: rgba(13,42,30,.72); color: var(--ep-paper);
   border: 1px solid rgba(217,164,65,.55); border-radius: var(--ep-radius);
   cursor: pointer; backdrop-filter: blur(3px);
 }
-.iso-corner button:hover { background: var(--ep-brass); color: var(--ep-ink); }
+.iso-corner > button:hover, .iso-corner-row > button:hover {
+  background: var(--ep-brass); color: var(--ep-ink);
+}
 #isoPanel { position: relative; }
+
+/* Bottom corners (2026-08-05): the look controls behind one icon, the
+   turntable beside it, export opposite. Same 38px format as the top two. */
+.iso-corner-bl { bottom: 10px; left: 10px; }
+.iso-corner-br { bottom: 10px; right: 10px; }
+.iso-corner-row { display: flex; gap: 6px; }
+.iso-corner-row > button.active { background: var(--ep-brass); color: var(--ep-ink); }
+.iso-corner-row > button.iso-bad { background: #7d2f2a; color: var(--ep-paper); }
+
+.iso-menu {
+  position: absolute; bottom: 46px; left: 0; z-index: 6;
+  min-width: 208px; padding: 10px;
+  background: rgba(13,42,30,.94); backdrop-filter: blur(4px);
+  border: 1px solid var(--ep-brass); border-radius: var(--ep-radius);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.iso-menu[hidden] { display: none; }
+.iso-menu-row { display: flex; align-items: center; gap: 8px; }
+.iso-menu-lab {
+  font-family: var(--ep-mono); font-size: .62rem; letter-spacing: .12em;
+  text-transform: uppercase; opacity: .68; flex: 1 0 auto; min-width: 58px;
+}
+.iso-menu .iso-tool { padding: 5px 9px; }
+.iso-menu .iso-slider { flex-direction: column; align-items: stretch; gap: 4px; }
+.iso-menu .iso-slider input { width: 100%; }
+
+/* The lore ribbon: game dialogue over the terrain. Inset past the top
+   corner buttons so it never sits on Season or Time of day. */
+.iso-lore {
+  position: absolute; top: 10px; left: 58px; right: 58px; z-index: 4;
+  padding: 9px 12px 10px; cursor: pointer;
+  background: rgba(9,26,19,.82); backdrop-filter: blur(4px);
+  border: 1px solid rgba(217,164,65,.6); border-radius: var(--ep-radius);
+  box-shadow: 0 6px 18px rgba(0,0,0,.35);
+}
+.iso-lore[hidden] { display: none; }
+.iso-lore-head { display: flex; align-items: baseline; gap: 10px; }
+.iso-lore-title {
+  font-family: var(--ep-mono); font-size: .64rem; letter-spacing: .16em;
+  color: var(--ep-brass); text-transform: uppercase;
+}
+.iso-lore-src {
+  font-family: var(--ep-mono); font-size: .58rem; letter-spacing: .06em;
+  opacity: .5; margin-left: auto; text-align: right;
+}
+.iso-lore-x {
+  background: none; border: 0; color: var(--ep-paper); opacity: .55;
+  font-size: 1rem; line-height: 1; cursor: pointer; padding: 0 2px;
+}
+.iso-lore-x:hover { opacity: 1; }
+.iso-lore-body {
+  margin: 5px 0 0; font-size: .86rem; line-height: 1.5;
+  color: var(--ep-paper); min-height: 2.6em;
+}
+/* The "press on" caret, as a drawn triangle rather than a character
+   that renders differently on every platform. */
+.iso-lore-next {
+  display: block; width: 0; height: 0; margin: 2px 0 0 auto;
+  border-left: 7px solid var(--ep-brass);
+  border-top: 5px solid transparent; border-bottom: 5px solid transparent;
+  animation: iso-blink 1s steps(2, start) infinite;
+}
+.iso-lore-next[hidden] { display: none; }
+@keyframes iso-blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .iso-lore-next { animation: none; }
+}
 
 /* the footer row must never run off the side */
 #isoPanel .iso-foot { flex-wrap: wrap; row-gap: 8px; }
@@ -774,6 +847,17 @@ header { border-bottom: 2px solid var(--ep-brass); }
   #isoOverlay.iso-full .iso-stage { width: 100%; flex: 1 1 auto; min-height: 0; }
   #isoOverlay.iso-full #isoPanel .iso-stage canvas { height: 100%; }
   .iso-slider input { width: 90px; }
+
+  /* Phones: the ribbon gets the full width minus the corner buttons,
+     and stays short enough that it is a caption, not a wall. */
+  .iso-lore { left: 52px; right: 52px; top: 8px; padding: 7px 10px 8px; }
+  .iso-lore-body { font-size: .78rem; line-height: 1.45; min-height: 3.2em; }
+  .iso-lore-src { display: none; }
+  .iso-corner > button, .iso-corner-row > button { width: 34px; height: 34px; }
+  .iso-corner-bl { bottom: 8px; left: 8px; }
+  .iso-corner-br { bottom: 8px; right: 8px; }
+  .iso-menu { bottom: 42px; min-width: min(72vw, 230px); }
+  .iso-menu .iso-slider input { width: 100%; }
 }
 
 

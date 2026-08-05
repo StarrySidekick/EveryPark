@@ -555,6 +555,296 @@ const EveryParkIso = (() => {
     return out;
   }
 
+  // ---- Park lore ---------------------------------------------------
+  // What this place actually IS, in the viewer, as game dialogue.
+  //
+  // Three sources, tried in order and merged, because no single one
+  // covers 7,727 places:
+  //
+  //   1. OpenStreetMap tags on the park's own polygon. The only live
+  //      source for RULES — hours, dogs, fee — and the only reliable
+  //      way to find the right Wikipedia article, because its
+  //      `wikipedia`/`wikidata` tag is an editor's assertion rather
+  //      than our guess.
+  //   2. Wikipedia's REST summary: history and general facts.
+  //   3. The record we already hold. This one cannot fail, so the
+  //      panel is never empty — which is the whole reason it exists,
+  //      since most town parks will never have an article.
+  //
+  // Nothing here is baked. Baking 7,727 summaries by hand was the
+  // alternative and it does not finish.
+  //
+  // A WRONG article is worse than none. "Memorial Park" matches a
+  // hundred articles nationwide, and this project's whole history of
+  // bugs is output that looked completely reasonable. So a match that
+  // did not come from an OSM tag must clear BOTH a distance gate and a
+  // name gate before it is allowed to say anything.
+
+  const LORE_KM = 4;          // an unlinked article this far off is not this park
+  const LORE_TIMEOUT = 9000;
+
+  function kmApart(aLat, aLng, bLat, bLng) {
+    const R = 6371, rad = Math.PI / 180;
+    const dLat = (bLat - aLat) * rad, dLng = (bLng - aLng) * rad;
+    const la = aLat * rad, lb = bLat * rad;
+    const h = Math.sin(dLat / 2) ** 2
+            + Math.cos(la) * Math.cos(lb) * Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+  }
+
+  // Token overlap, ignoring the words that every park name contains.
+  // "Park" matching "Park" is not evidence of anything.
+  const LORE_STOP = new Set(["park", "parks", "the", "of", "and", "at", "area",
+                             "open", "space", "preserve", "reserve", "land",
+                             "state", "town", "city", "memorial", "public",
+                             "recreation", "field", "fields", "green"]);
+  function nameTokens(s) {
+    return new Set(String(s || "").toLowerCase()
+      .replace(/[^a-z0-9 ]+/g, " ").split(/\s+/)
+      .filter(t => t.length > 2 && !LORE_STOP.has(t)));
+  }
+  function nameScore(a, b) {
+    const A = nameTokens(a), B = nameTokens(b);
+    if (!A.size || !B.size) return 0;
+    let hit = 0;
+    for (const t of A) if (B.has(t)) hit++;
+    return hit / Math.min(A.size, B.size);
+  }
+
+  function withTimeout(promise, ms) {
+    return Promise.race([promise,
+      new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), ms))]);
+  }
+  const getJSON = async url => {
+    const r = await withTimeout(fetch(url), LORE_TIMEOUT);
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return r.json();
+  };
+
+  // The park's own OSM polygon, with its tags. `out tags center` skips
+  // the geometry — we already have a boundary, all we want is what the
+  // mappers wrote down about the place.
+  async function fetchOsmTags(p, bbox) {
+    const [w, s, e, n] = bbox;
+    const kinds =
+      `way["leisure"~"^(park|nature_reserve|garden|recreation_ground|common|pitch)$"](${s},${w},${n},${e});` +
+      `relation["leisure"~"^(park|nature_reserve|garden|recreation_ground|common)$"](${s},${w},${n},${e});` +
+      `way["boundary"="protected_area"](${s},${w},${n},${e});` +
+      `relation["boundary"="protected_area"](${s},${w},${n},${e});` +
+      `way["landuse"~"^(cemetery|forest|recreation_ground)$"](${s},${w},${n},${e});` +
+      `way["amenity"="grave_yard"](${s},${w},${n},${e});`;
+    const q = `[out:json][timeout:12];(${kinds});out tags center 60;`;
+    const ENDPOINTS = ["https://overpass-api.de/api/interpreter",
+                       "https://overpass.kumi.systems/api/interpreter",
+                       "https://overpass.osm.jp/api/interpreter"];
+    let j = null;
+    for (const url of ENDPOINTS) {
+      try {
+        const r = await withTimeout(fetch(url, { method: "POST",
+          body: "data=" + encodeURIComponent(q),
+          headers: { "Content-Type": "application/x-www-form-urlencoded" } }),
+          LORE_TIMEOUT);
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        j = await r.json();
+        if (j && j.elements) break;
+      } catch (err) { j = null; }
+    }
+    if (!j || !j.elements || !j.elements.length) return null;
+    // Best candidate: name agreement first, nearness second. An unnamed
+    // polygon can still win, but only if it is nearly under the pin.
+    let best = null, bestScore = -1;
+    for (const el of j.elements) {
+      const t = el.tags || {};
+      const c = el.center || (el.lat != null ? { lat: el.lat, lon: el.lon } : null);
+      if (!c) continue;
+      const km = kmApart(p.lat, p.lng, c.lat, c.lon);
+      const ns = nameScore(p.name, t.name);
+      const score = ns * 2 + Math.max(0, 1 - km / 2);
+      if (ns < 0.34 && km > 0.35) continue;        // neither name nor place agrees
+      if (score > bestScore) { bestScore = score; best = t; }
+    }
+    return best;
+  }
+
+  // en:Some Article -> "Some Article". Other-language tags are ignored
+  // rather than machine-translated.
+  function titleFromWikiTag(tag) {
+    if (!tag) return null;
+    const m = String(tag).match(/^([a-z-]+):(.+)$/);
+    if (m) return m[1] === "en" ? m[2] : null;
+    return String(tag);
+  }
+
+  async function titleFromWikidata(qid) {
+    if (!/^Q\d+$/.test(String(qid || ""))) return null;
+    const j = await getJSON("https://www.wikidata.org/w/api.php?action=wbgetentities"
+      + "&ids=" + qid + "&props=sitelinks&sitefilter=enwiki&format=json&origin=*");
+    const ent = j && j.entities && j.entities[qid];
+    const sl = ent && ent.sitelinks && ent.sitelinks.enwiki;
+    return sl ? sl.title : null;
+  }
+
+  async function wikiSummary(title) {
+    const j = await getJSON("https://en.wikipedia.org/api/rest_v1/page/summary/"
+      + encodeURIComponent(String(title).replace(/ /g, "_")));
+    if (!j || j.type === "disambiguation" || !j.extract) return null;
+    return { title: j.title, extract: j.extract,
+             desc: j.description || "",
+             lat: j.coordinates ? j.coordinates.lat : null,
+             lng: j.coordinates ? j.coordinates.lon : null,
+             url: (j.content_urls && j.content_urls.desktop
+                   && j.content_urls.desktop.page) || "" };
+  }
+
+  // No OSM link: search, then refuse anything that fails the gates.
+  async function wikiGuess(p) {
+    const terms = [p.name, p.town, "Connecticut"].filter(Boolean).join(" ");
+    const j = await getJSON("https://en.wikipedia.org/w/api.php?action=query"
+      + "&format=json&origin=*&generator=search&gsrlimit=5&gsrsearch="
+      + encodeURIComponent(terms) + "&prop=coordinates");
+    const pages = (j && j.query && j.query.pages) ? Object.values(j.query.pages) : [];
+    // Sort by the search engine's own ranking, then apply our gates.
+    pages.sort((a, b) => (a.index || 99) - (b.index || 99));
+    for (const pg of pages) {
+      if (nameScore(p.name, pg.title) < 0.5) continue;
+      const co = pg.coordinates && pg.coordinates[0];
+      if (!co) continue;                     // ungeotagged: cannot be checked
+      if (kmApart(p.lat, p.lng, co.lat, co.lon) > LORE_KM) continue;
+      try {
+        const s = await wikiSummary(pg.title);
+        if (s) return s;
+      } catch (err) { /* try the next candidate */ }
+    }
+    return null;
+  }
+
+  async function fetchWiki(p, tags) {
+    const linked = tags
+      ? (titleFromWikiTag(tags.wikipedia)
+         || (tags.wikidata ? await titleFromWikidata(tags.wikidata).catch(() => null)
+                           : null))
+      : null;
+    if (linked) {
+      // An OSM editor asserted this link, so it skips the name gate.
+      // The distance gate still applies: mis-tagged links exist.
+      try {
+        const s = await wikiSummary(linked);
+        if (s && (s.lat == null || kmApart(p.lat, p.lng, s.lat, s.lng) <= 12))
+          return Object.assign(s, { linked: true });
+      } catch (err) { /* fall through to the search */ }
+    }
+    return wikiGuess(p).catch(() => null);
+  }
+
+  // ---- Composing the pages ------------------------------------------
+  // Every sentence below is either a fact from the record, a fact an OSM
+  // editor recorded, or Wikipedia's own words. Nothing is inferred to
+  // fill a gap: a park with no known rules SAYS the rules are unknown.
+
+  const OWNER_WORD = {
+    state: "the State of Connecticut", federal: "the federal government",
+    town: "the town", trust: "a land trust", cemetery: "a burial ground"
+  };
+  const DOG_WORD = {
+    yes: "Dogs are allowed.", leashed: "Dogs on a lead.",
+    no: "No dogs.", unleashed: "Dogs may run off the lead.",
+    leashed_only: "Dogs on a lead."
+  };
+
+  function tidy(v) { return String(v || "").replace(/_/g, " ").trim(); }
+
+  function lorePages(p, tags, wiki, extra) {
+    const a = p.attrs || {};
+    const pages = [];
+    const t = tags || {};
+
+    // 1. Who and where.
+    const bits = [];
+    const acres = Number(p.acres);
+    if (acres > 0) bits.push(`${acres >= 1000 ? Math.round(acres / 100) * 100
+                                              : Math.round(acres)} acres`);
+    if (p.subtype) bits.push(String(p.subtype).toLowerCase());
+    const steward = p.agency || t.operator || OWNER_WORD[p.type] || "";
+    let open = p.town ? `${p.name}, in ${p.town}.` : `${p.name}.`;
+    if (bits.length) open += ` ${bits.join(", ").replace(/^./, c => c.toUpperCase())}`
+                             + (steward ? `, looked after by ${steward}.` : ".");
+    else if (steward) open += ` Looked after by ${steward}.`;
+    pages.push({ head: "THE PLACE", body: open });
+
+    // 2. The ground itself — this is what the viewer is drawing, so it
+    //    is worth saying out loud.
+    const land = [];
+    if (a.relief > 0)
+      land.push(a.relief >= 120 ? `The ground climbs hard here — about ${Math.round(a.relief)} metres between the low ground and the high.`
+              : a.relief >= 40  ? `About ${Math.round(a.relief)} metres of rise and fall across the site.`
+                                : `Gentle ground, barely ${Math.round(a.relief)} metres of relief.`);
+    if (a.elev > 0) land.push(`It sits around ${Math.round(a.elev)} m above the sea.`);
+    if (a.cover) land.push(`${tidy(a.cover).replace(/^./, c => c.toUpperCase())}.`);
+    if (a.water) land.push(a.waterType ? `There is ${/^[aeiou]/i.test(a.waterType) ? "an" : "a"} ${tidy(a.waterType)}.`
+                                       : "There is water on it.");
+    if (extra && extra.spanM)
+      land.push(`Roughly ${(extra.spanM / 1000).toFixed(1)} km across the view you are looking at.`);
+    if (land.length) pages.push({ head: "THE LAND", body: land.join(" ") });
+
+    // 3. What you would actually find on arrival.
+    const here = [];
+    if (a.trails) here.push("There are mapped trails.");
+    if (extra && extra.trailKm > 0.15)
+      here.push(`About ${extra.trailKm.toFixed(1)} km of path is drawn in this view.`);
+    const sport = tidy(t.sport);
+    if (sport) here.push(`Marked for ${sport.split(";").join(", ")}.`);
+    if (t.playground === "yes" || t.leisure === "playground") here.push("A playground.");
+    if (extra && extra.parking) here.push("A parking area sits inside the frame.");
+    if (t.toilets === "yes") here.push("Toilets.");
+    if (t.wheelchair === "yes") here.push("Mapped as wheelchair accessible.");
+    if (extra && extra.publics && extra.publics.length) {
+      const named = extra.publics.filter(q => q.name).slice(0, 2).map(q => q.name);
+      if (named.length) here.push(`Nearby: ${named.join(", ")}.`);
+    }
+    if (here.length) pages.push({ head: "WHAT'S HERE", body: here.join(" ") });
+
+    // 4. Rules. The honest page. Everything here is attributed, and an
+    //    absence is stated as an absence rather than dressed up as
+    //    permission — asserting access we have not checked is exactly
+    //    the bug that once rendered a reservation as "you can go here".
+    const rules = [];
+    let ruleSrc = "";
+    if (p.feeState === "free") rules.push("Free to enter.");
+    else if (p.feeState === "parking") rules.push("Free to enter; parking may be charged.");
+    else if (t.fee === "no") rules.push("Mapped as free.");
+    else if (t.fee === "yes" || p.feeState === "fee") rules.push("There is a fee.");
+    if (t.opening_hours) {
+      rules.push(/dawn|dusk|sunrise|sunset/i.test(t.opening_hours)
+        ? `Open ${tidy(t.opening_hours).toLowerCase()}.`
+        : `Hours: ${t.opening_hours}.`);
+      ruleSrc = "OpenStreetMap";
+    }
+    if (t.dog && DOG_WORD[t.dog]) { rules.push(DOG_WORD[t.dog]); ruleSrc = "OpenStreetMap"; }
+    if (t.access === "permit") { rules.push("A permit is wanted."); ruleSrc = "OpenStreetMap"; }
+    if (t.access === "private") { rules.push("Mapped as private."); ruleSrc = "OpenStreetMap"; }
+    if (a.researched && a.checked)
+      rules.push(`Access confirmed ${a.checked} against ${
+        (a.sources && a.sources.length) ? "a published source" : "our own research"}.`);
+    else if (p.status !== "park")
+      rules.push("We have not confirmed public access here — treat it as unknown.");
+    if (!t.opening_hours) rules.push("No posted hours recorded.");
+    if (!t.dog) rules.push("Nothing recorded about dogs.");
+    pages.push({ head: "RULES", body: rules.join(" "),
+                 src: ruleSrc ? "rules from " + ruleSrc : "" });
+
+    // 5. History, in Wikipedia's own words. Trimmed to three sentences:
+    //    the reveal is letter by letter and a full article never ends.
+    if (wiki && wiki.extract) {
+      const sentences = wiki.extract.match(/[^.!?]+[.!?]+(\s|$)/g) || [wiki.extract];
+      let text = sentences.slice(0, 3).join("").trim();
+      if (text.length > 420) text = text.slice(0, 417).replace(/\s\S*$/, "") + "…";
+      pages.push({ head: "HISTORY", body: text,
+                   src: "Wikipedia" + (wiki.linked ? "" : " (matched by name and location)"),
+                   url: wiki.url });
+    }
+    return pages;
+  }
+
   // Paths as VECTOR polylines in grid coords, split where they leave
   // the island. Drawn as strokes instead of rasterised cells, so a
   // trail reads as a line rather than a staircase of blocks.
@@ -737,7 +1027,13 @@ const EveryParkIso = (() => {
     summer: '<circle cx="12" cy="9" r="6.5"/><circle cx="7" cy="12" r="4"/><circle cx="17" cy="12" r="4"/><path d="M10.8 14h2.4v7h-2.4z"/>',
     fall:   '<path d="M12 21c0-5 1-8 5-11 1.6-1.2 2.4-3.4 2.4-6-3.6 0-6.4.9-8.4 2.6C8.4 8.6 7.4 11.6 7.4 15c0 .5 0 1 .1 1.5"/><path d="M12 21c-1.5-2.5-3-4-5.5-5" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/>',
     winter: '<g stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"><path d="M12 2v20M3.3 7l17.4 10M20.7 7L3.3 17"/><path d="M9 4.4L12 6l3-1.6M9 19.6L12 18l3 1.6M4.6 9.8l.6 3.3-2.4 2.3M19.4 14.2l-.6-3.3 2.4-2.3M4.6 14.2l.6-3.3-2.4-2.3M19.4 9.8l-.6 3.3 2.4 2.3"/></g>',
-    spring: '<circle cx="12" cy="12" r="2.6"/><ellipse cx="12" cy="6.4" rx="2.6" ry="3.6"/><ellipse cx="12" cy="17.6" rx="2.6" ry="3.6"/><ellipse cx="6.4" cy="12" rx="3.6" ry="2.6"/><ellipse cx="17.6" cy="12" rx="3.6" ry="2.6"/>'
+    spring: '<circle cx="12" cy="12" r="2.6"/><ellipse cx="12" cy="6.4" rx="2.6" ry="3.6"/><ellipse cx="12" cy="17.6" rx="2.6" ry="3.6"/><ellipse cx="6.4" cy="12" rx="3.6" ry="2.6"/><ellipse cx="17.6" cy="12" rx="3.6" ry="2.6"/>',
+    // Bottom corners: the terrain menu, the turntable, the export, and
+    // the way back to the text once it has been dismissed.
+    terrain: '<path d="M2 19h20L14.6 7.2 11 12.6 8.6 9.4z"/><path d="M6.2 14.6l2.4-3.2 1.9 2.6" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>',
+    rotate:  '<path d="M12 5V2.5L7.8 5.8 12 9.2V6.6a5.4 5.4 0 1 1-5.4 5.4H5a7 7 0 1 0 7-7z"/><ellipse cx="12" cy="12" rx="9.2" ry="3.4" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".55"/>',
+    save:    '<path d="M12 3v10.2l3.4-3.4 1.5 1.5L11 17.2 5.1 11.3l1.5-1.5L10 13.2V3z"/><path d="M4 18.5h16V21H4z"/>',
+    scroll:  '<path d="M5 3h11a2.5 2.5 0 0 1 2.5 2.5V19a2 2 0 0 0 2 2H7a2 2 0 0 1-2-2z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M8 7.5h7M8 11h7M8 14.5h4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/>'
   };
   const icon = name =>
     `<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"
@@ -1826,10 +2122,15 @@ const EveryParkIso = (() => {
       }
     }
 
+    // The elevation range sits bottom-CENTRE. It was bottom-left until
+    // the terrain menu and turntable icons moved into that corner and
+    // covered it. Centring is also dpr-proof: the icons are laid out in
+    // CSS pixels and this text in device pixels, so any fixed offset
+    // that cleared them on a 1x screen would still collide at 2x.
     ctx.fillStyle = "rgba(255,255,255,.75)";
     ctx.font = "11px system-ui";
-    ctx.textAlign = "left";
-    ctx.fillText(`${Math.round(min)}\u2013${Math.round(max)} m`, 10, Hh - 10);
+    ctx.textAlign = "center";
+    ctx.fillText(`${Math.round(min)}\u2013${Math.round(max)} m`, W / 2, Hh - 10);
   }
 
   // The scene only changes when the view or the settings change, but the
@@ -1901,8 +2202,30 @@ const EveryParkIso = (() => {
         <div class="iso-sub">Loading boundary and terrain…</div>
         <div class="iso-stage">
           <canvas width="840" height="540"></canvas>
+          <div class="iso-lore" hidden>
+            <div class="iso-lore-head">
+              <span class="iso-lore-title"></span>
+              <span class="iso-lore-src"></span>
+              <button class="iso-lore-x" title="Hide">&#215;</button>
+            </div>
+            <p class="iso-lore-body"></p>
+            <span class="iso-lore-next" hidden></span>
+          </div>
           <div class="iso-corner iso-corner-tl"><button id="isoTod" title="Time of day"></button></div>
           <div class="iso-corner iso-corner-tr"><button id="isoSeason" title="Season"></button></div>
+          <div class="iso-corner iso-corner-bl">
+            <div class="iso-menu" id="isoMenu" hidden></div>
+            <div class="iso-corner-row">
+              <button id="isoTerrainBtn" title="Terrain and look"></button>
+              <button id="isoSpinBtn" class="iso-spin-btn active" title="Pause / resume the turntable"></button>
+            </div>
+          </div>
+          <div class="iso-corner iso-corner-br">
+            <div class="iso-corner-row">
+              <button id="isoLoreBtn" title="Read about this place" hidden></button>
+              <button id="isoSaveBtn" title="Save a picture"></button>
+            </div>
+          </div>
         </div>
         <div class="iso-foot">
           <span class="iso-tools"></span>
@@ -1933,7 +2256,14 @@ const EveryParkIso = (() => {
     spin.className = "iso-spin";
     canvas.parentElement.insertBefore(spin, canvas);
     canvas.style.display = "none";
-    const close = () => { cancelAnimationFrame(raf); ov.remove(); };
+    // The lore ribbon runs its own animation frame, so closing the
+    // viewer has to stop that too or it keeps typing into a dead node.
+    let loreCancel = null;
+    const close = () => {
+      cancelAnimationFrame(raf);
+      if (loreCancel) loreCancel();
+      ov.remove();
+    };
     ov.querySelector("#isoClose").addEventListener("click", close);
     ov.addEventListener("click", e => { if (e.target === ov) close(); });
 
@@ -2051,6 +2381,129 @@ const EveryParkIso = (() => {
     fetchNames(bbox).then(ns => { rawNames = ns; buildLabels(); })
                     .catch(() => { /* nameless land is fine */ });
 
+    // Resolved when the dressing fetch settles either way, so the lore
+    // queries can queue behind it rather than race it.
+    let dressingDone = () => {};
+    const dressingReady = new Promise(r => { dressingDone = r; });
+
+    // ---- The lore ribbon --------------------------------------------
+    // Game dialogue: the text arrives a letter at a time, a click
+    // finishes the line, another click turns the page. The reveal is
+    // driven off the animation clock rather than setInterval, so the
+    // pace is the same on a 60 Hz laptop and a 120 Hz phone — a
+    // per-character timer runs twice as fast on the phone.
+    const lore = ov.querySelector(".iso-lore");
+    const loreTitle = lore.querySelector(".iso-lore-title");
+    const loreSrc = lore.querySelector(".iso-lore-src");
+    const loreBody = lore.querySelector(".iso-lore-body");
+    const loreNext = lore.querySelector(".iso-lore-next");
+    const loreBtn = ov.querySelector("#isoLoreBtn");
+    loreBtn.innerHTML = icon("scroll");
+
+    const CPS = 42;                       // characters per second
+    const PAUSE = { ".": 260, "!": 260, "?": 260, ",": 110, ";": 110, "—": 150 };
+    const still = window.matchMedia
+      && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    let pages = [], page = 0, shown = 0, typing = false;
+    let lastT = 0, hold = 0, typeRaf = null;
+
+    const paintPage = () => {
+      const pg = pages[page];
+      if (!pg) return;
+      loreTitle.textContent = pg.head;
+      loreSrc.textContent = pg.src || "";
+      loreBody.textContent = pg.body.slice(0, shown);
+      const done = shown >= pg.body.length;
+      loreNext.hidden = !(done && page < pages.length - 1);
+    };
+
+    const step = t => {
+      const pg = pages[page];
+      if (!pg) { typing = false; return; }
+      if (!lastT) lastT = t;
+      let dt = t - lastT;
+      lastT = t;
+      if (hold > 0) { hold -= dt; typeRaf = requestAnimationFrame(step); return; }
+      const want = Math.min(pg.body.length, shown + Math.max(1, Math.round(dt * CPS / 1000)));
+      if (want > shown) {
+        const justTyped = pg.body[want - 1];
+        shown = want;
+        paintPage();
+        if (PAUSE[justTyped]) hold = PAUSE[justTyped];
+      }
+      if (shown < pg.body.length) typeRaf = requestAnimationFrame(step);
+      else { typing = false; paintPage(); }
+    };
+
+    const startPage = () => {
+      cancelAnimationFrame(typeRaf);
+      shown = still ? (pages[page] ? pages[page].body.length : 0) : 0;
+      lastT = 0; hold = 0;
+      paintPage();
+      if (still || shown >= (pages[page] ? pages[page].body.length : 0)) { typing = false; return; }
+      typing = true;
+      typeRaf = requestAnimationFrame(step);
+    };
+
+    const showLore = on => {
+      lore.hidden = !on;
+      loreBtn.hidden = on;
+      if (on) startPage(); else cancelAnimationFrame(typeRaf);
+    };
+    loreCancel = () => cancelAnimationFrame(typeRaf);
+
+    lore.addEventListener("click", e => {
+      if (e.target.closest(".iso-lore-x")) { showLore(false); return; }
+      const pg = pages[page];
+      if (!pg) return;
+      if (typing && shown < pg.body.length) {   // impatient: finish the line
+        cancelAnimationFrame(typeRaf);
+        shown = pg.body.length; typing = false; paintPage();
+      } else if (page < pages.length - 1) { page++; startPage(); }
+    });
+    loreBtn.addEventListener("click", () => showLore(true));
+
+    // Facts the record does not hold, gathered from what the viewer has
+    // already drawn. Read at compose time so whatever has streamed in by
+    // then is included and nothing waits on anything else.
+    const loreExtra = () => {
+      let cells = 0;
+      for (const run of (S.trailLines || []))
+        if (run.length) cells += run[run.length - 1][2] || 0;
+      return { spanM,
+               trailKm: cells * (S.mPerBlock || 10) / 1000,
+               parking: !!(S.parkM && S.parkM.some(v => v)),
+               publics: S.publics || [] };
+    };
+
+    // Local first, so there is text within a frame of the terrain
+    // appearing. The network sources then replace it if they land.
+    pages = lorePages(p, null, null, loreExtra());
+    page = 0;
+    showLore(true);
+    (async () => {
+      // Wait for the dressing query before asking Overpass anything
+      // else. Firing both at once is how you get rate-limited, and a
+      // throttled Overpass once silently cost every road on the island
+      // while ArcGIS-sourced trails kept working — roads matter more
+      // than lore, so lore queues behind them.
+      await dressingReady;
+      const tags = await fetchOsmTags(p, bbox).catch(() => null);
+      const wiki = await fetchWiki(p, tags).catch(() => null);
+      if (!document.body.contains(ov)) return;      // viewer closed meanwhile
+      if (!tags && !wiki) return;                   // nothing to add
+      const fresh = lorePages(p, tags, wiki, loreExtra());
+      // Do not yank the page out from under someone mid-read: keep their
+      // place if the new set still has it, and only retype if the text
+      // they are looking at actually changed.
+      const wasBody = pages[page] && pages[page].body;
+      pages = fresh;
+      page = Math.min(page, pages.length - 1);
+      if (!lore.hidden && pages[page] && pages[page].body !== wasBody) startPage();
+      else paintPage();
+    })();
+
     fetchRawDressing(bbox).then(raw => {
       rawDressing = raw;
       const d = buildDressing(raw, bbox, S.inside);
@@ -2069,7 +2522,7 @@ const EveryParkIso = (() => {
       sub.textContent = bits.join(" · ");
     }).catch(() => {
       sub.textContent = baseSub + " · extras unavailable · drag to rotate";
-    });
+    }).finally(() => dressingDone());
 
     // Canopy: fetch the imagery sample in the background so trees can
     // stand where the imagery actually shows trees. Doesn't turn the
@@ -2114,20 +2567,27 @@ const EveryParkIso = (() => {
       }
       S.useSat = true; satBtn.classList.add("active");
     });
-    const shotBtn = document.createElement("button");
-    shotBtn.className = "iso-tool";
-    shotBtn.textContent = "Save";
+    // Save moved out of the footer and into the bottom-right corner, to
+    // match Season and Time of day. An icon has no room for a "Failed"
+    // label, so a failure flashes the button and says so in the tooltip.
+    const shotBtn = ov.querySelector("#isoSaveBtn");
+    shotBtn.innerHTML = icon("save");
+    const shotFailed = () => {
+      shotBtn.classList.add("iso-bad");
+      shotBtn.title = "Could not save this frame";
+      setTimeout(() => shotBtn.classList.remove("iso-bad"), 1200);
+    };
     shotBtn.addEventListener("click", () => {
       try {
         canvas.toBlob(blob => {
-          if (!blob) { shotBtn.textContent = "Failed"; return; }
+          if (!blob) { shotFailed(); return; }
           const a = document.createElement("a");
           a.href = URL.createObjectURL(blob);
           a.download = `${p.name.replace(/[^\w ]+/g, "").trim() || "park"}.png`;
           a.click();
           setTimeout(() => URL.revokeObjectURL(a.href), 5000);
         });
-      } catch (e) { shotBtn.textContent = "Failed"; }
+      } catch (e) { shotFailed(); }
     });
     // Block-size slider: a block is a real distance on the ground.
     // Big parks clamp at 240 cells per side, so a fixed 4-20 m range
@@ -2224,7 +2684,44 @@ const EveryParkIso = (() => {
       smoothBtn.classList.toggle("active", S.smooth);
     });
 
-    tools.append(randBtn, satBtn, pixBtn, smoothBtn, sidesBtn, shotBtn, sliderWrap);
+    // The look controls live behind one bottom-left icon now. They are
+    // things you set once and then stop touching, so a permanent row of
+    // them was spending the footer on nothing. The BUTTONS are the same
+    // objects as before — moved, not rebuilt — so every handler above
+    // and the isotest harness's lookup by label still find them.
+    const menu = ov.querySelector("#isoMenu");
+    const menuRow = (label, ...ctrls) => {
+      const row = document.createElement("div");
+      row.className = "iso-menu-row";
+      const lab = document.createElement("span");
+      lab.className = "iso-menu-lab";
+      lab.textContent = label;
+      row.append(lab, ...ctrls);
+      menu.appendChild(row);
+    };
+    menuRow("Ground", smoothBtn);
+    menuRow("Sides", sidesBtn);
+    menuRow("Drape", satBtn);
+    menuRow("Sprites", pixBtn);
+    menu.appendChild(sliderWrap);
+
+    const terrainBtn = ov.querySelector("#isoTerrainBtn");
+    terrainBtn.innerHTML = icon("terrain");
+    const setMenu = on => {
+      menu.hidden = !on;
+      terrainBtn.classList.toggle("active", on);
+    };
+    terrainBtn.addEventListener("click", e => {
+      e.stopPropagation();
+      setMenu(menu.hidden);
+    });
+    // Clicking the terrain itself should put the menu away, but clicking
+    // inside the menu must not — a slider drag ending outside its track
+    // would otherwise close the thing mid-adjustment.
+    menu.addEventListener("click", e => e.stopPropagation());
+    canvas.addEventListener("pointerdown", () => setMenu(false));
+
+    tools.append(randBtn);
 
     // Scroll to zoom, centred on the island.
     canvas.addEventListener("wheel", e => {
@@ -2232,16 +2729,16 @@ const EveryParkIso = (() => {
       S.zoom = Math.min(9, Math.max(.5, S.zoom * (e.deltaY < 0 ? 1.1 : 0.9)));
     }, { passive: false });
 
-    const spinBtn = document.createElement("button");
-    spinBtn.className = "iso-tool iso-spin-btn active";
-    spinBtn.title = "Pause / resume the turntable";
-    spinBtn.textContent = "Pause";
+    // The turntable toggle sits beside the terrain icon rather than
+    // inside its menu: it is the one look control you reach for WHILE
+    // watching, and burying it would cost two clicks every time.
+    const spinBtn = ov.querySelector("#isoSpinBtn");
+    spinBtn.innerHTML = icon("rotate");
     spinBtn.addEventListener("click", () => {
       S.spin = !S.spin;
-      spinBtn.textContent = S.spin ? "Pause" : "Spin";
+      spinBtn.title = S.spin ? "Pause the turntable" : "Resume the turntable";
       spinBtn.classList.toggle("active", S.spin);
     });
-    tools.appendChild(spinBtn);
     S.spin = true;
 
     let yaw = 0, target = 0, dragging = false, lastX = 0, pinchMid = null;
