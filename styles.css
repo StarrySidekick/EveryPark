@@ -642,15 +642,16 @@ header { border-bottom: 2px solid var(--ep-brass); }
 }
 #search:focus { outline: 2px solid var(--ep-brass); outline-offset: 0; }
 
-#filtersBtn, #randomBtn, #guideBtn, #nearBtn, #satBtn {
+#filtersBtn, #randomBtn, #guideBtn, #nearBtn {
   background: var(--ep-ink-2); color: var(--ep-paper);
   border: 1px solid rgba(245,242,230,.18); border-radius: var(--ep-radius);
   font-family: var(--ep-mono); font-size: .74rem; letter-spacing: .04em;
   text-transform: uppercase; padding: 7px 12px;
 }
 #filtersBtn:hover, #randomBtn:hover, #guideBtn:hover, #nearBtn:hover,
-#satBtn:hover, #filtersBtn.active, #satBtn.active { background: var(--ep-ink-3); border-color: var(--ep-brass); }
+#filtersBtn.active { background: var(--ep-ink-3); border-color: var(--ep-brass); }
 #nearBtn:disabled { opacity: .6; cursor: default; }
+/* Satellite lives in the map's own layers control now, not the header. */
 
 #filtersPanel { background: var(--ep-ink); border: 1px solid var(--ep-brass); }
 .glabel { font-family: var(--ep-mono); letter-spacing: .12em; opacity: .7; }
@@ -750,7 +751,7 @@ header { border-bottom: 2px solid var(--ep-brass); }
   header h1 { font-size: .9rem; }
   header > #search { flex: 1 1 100%; order: 3; width: auto; min-width: 0; }
   .controls { margin-left: auto; gap: 6px; flex-wrap: wrap; }
-  #filtersBtn, #randomBtn, #guideBtn, #nearBtn, #satBtn { padding: 6px 9px; font-size: .66rem; }
+  #filtersBtn, #randomBtn, #guideBtn, #nearBtn { padding: 6px 9px; font-size: .66rem; }
   #buildBadge { display: none; }
   #filtersPanel { left: auto; right: 0; min-width: min(88vw, 320px); }
   #legend { max-width: 62vw; font-size: .74rem; }
@@ -927,7 +928,7 @@ header { flex-wrap: nowrap; }
   .controls { order: 2; margin-left: auto; width: auto; }
   .search-wrap { order: 3; flex: 1 1 100%; }
   .search-wrap > #search { width: 100%; }
-  .filters-wrap, #nearBtn, #randomBtn, #satBtn { order: 4; }
+  .filters-wrap, #nearBtn, #randomBtn, #guideBtn { order: 4; }
   #buildBadge { display: none; }
   #nearPanel { top: 8px; width: calc(100vw - 16px); }
   /* The filters panel was anchored right:0 to its button, from when

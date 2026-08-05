@@ -81,6 +81,26 @@
   // tools/isotest. Read-only in practice; nothing in the app uses it.
   window.__map = map;
 
+  // Start where the visitor is, not in the middle of the state. Medium-
+  // tight: close enough that individual parks are distinguishable, wide
+  // enough to show what is around. Anything that moves the map first
+  // wins — a shared link or an early click should not be yanked away,
+  // and a denied prompt just leaves the statewide view alone.
+  let userMovedMap = false;
+  map.once("movestart", () => { userMovedMap = true; });
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(pos => {
+      if (userMovedMap) return;
+      const { latitude: lat, longitude: lng } = pos.coords;
+      L.circleMarker([lat, lng], { radius: 6, color: "#d9a441", weight: 2,
+                                   fillColor: "#d9a441", fillOpacity: .85,
+                                   interactive: false })
+       .addTo(map).bindTooltip("You are here");
+      map.setView([lat, lng], 13);
+    }, () => { /* denied or unavailable: the statewide view is fine */ },
+       { enableHighAccuracy: false, timeout: 8000, maximumAge: 600000 });
+  }
+
   const applyBase = b => {
     if (!b) return;
     // Texture belongs on the drawn ground only. Over an aerial photo a
@@ -88,27 +108,13 @@
     map.getContainer().style.background = b.ground || "";
     turf.style.display = b.turf ? "" : "none";
     document.body.classList.toggle("base-drawn", !!b.ground);
-    const sb = document.getElementById("satBtn");
-    if (sb) sb.classList.toggle("active", !b.ground);
   };
   applyBase(CONFIG.basemaps[0]);
   map.on("baselayerchange", e => applyBase(baseByName[e.name]));
 
-  // Satellite as a plain on/off, rather than a radio buried in the
-  // layers control at the bottom corner.
-  const drawnBase = CONFIG.basemaps.find(b => b.ground) || CONFIG.basemaps[0];
-  const photoBase = CONFIG.basemaps.find(b => b.url) || CONFIG.basemaps[1];
-  const setBase = b => {
-    if (!b) return;
-    for (const name in baseLayers)
-      if (name !== b.label && map.hasLayer(baseLayers[name])) map.removeLayer(baseLayers[name]);
-    if (!map.hasLayer(baseLayers[b.label])) baseLayers[b.label].addTo(map);
-    applyBase(b);
-  };
-  (document.getElementById("satBtn") || {addEventListener(){}}).addEventListener("click", () => {
-    const onPhoto = photoBase && map.hasLayer(baseLayers[photoBase.label]);
-    setBase(onPhoto ? drawnBase : photoBase);
-  });
+  // Imagery is reachable from the map's own layers control in the
+  // bottom corner. It had a header button briefly; the header is for
+  // things you reach for often, and a basemap swap is not one.
 
   // ------------------------------------------------------------------
   // Icons are generated, not files: the ring takes the owner's colour and
@@ -2903,7 +2909,7 @@
   syncDistricts();
 
   // Random park: fly somewhere that passes the current filters.
-  (document.getElementById("randomBtn") || {addEventListener(){}}).addEventListener("click", () => {
+  function goRandom() {
     // Somewhere you can definitely go, run by a public body, with
     // terrain worth flying around AND a mapped trail to walk when you
     // land (Timothy's spec, 2026-08-03) — the dice should never drop
@@ -2921,7 +2927,12 @@
       // Straight into the terrain — the dice IS the 3D tour button.
       if (window.EveryParkIso) EveryParkIso.open(p);
     }, 1000);
-  });
+  }
+  (document.getElementById("randomBtn") || {addEventListener(){}})
+    .addEventListener("click", goRandom);
+  // The viewer's own Random button calls this, so the pool and the
+  // active filters stay defined in exactly one place.
+  window.EveryParkRandom = goRandom;
 
   // Filters dropdown: the access + owner chip groups live in one panel.
   const filtersPanel = document.getElementById("filtersPanel");

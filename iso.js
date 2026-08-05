@@ -1241,7 +1241,7 @@ const EveryParkIso = (() => {
 
     const s = (W / (GRID * 1.9)) * (S.zoom || 1);
     const zScale = Math.min(60, 9000 / span) * (span / 90) * (S.zoom || 1);
-    const cx = W / 2, cy = Hh * 0.60;
+    const cx = W / 2 + (S.panX || 0), cy = Hh * 0.60 + (S.panY || 0);
     const cos = Math.cos(yaw), sin = Math.sin(yaw);
     const project = (fgx, fgy, h) => {
       const rx = (fgx - GRID / 2) * cos - (fgy - GRID / 2) * sin;
@@ -1854,7 +1854,8 @@ const EveryParkIso = (() => {
                  S.labels ? S.labels.length : 0,
                  S.coverM ? 1 : 0, S.treeMask ? 1 : 0,
                  S.publics ? S.publics.length : 0,
-                 S.pixel === false ? 0 : 1].join(",");
+                 S.pixel === false ? 0 : 1,
+                 Math.round(S.panX || 0), Math.round(S.panY || 0)].join(",");
     if (!S._cache || S._cache.width !== cw || S._cache.height !== ch) {
       S._cache = document.createElement("canvas");
       S._cache.width = cw; S._cache.height = ch;
@@ -2016,6 +2017,7 @@ const EveryParkIso = (() => {
                 spriteAt: new Map(), hikePath: null, hikeT: 0,
                 useSat: false, tex: null, tod: 0, zoom: 1, cellM: 10,
                 smooth: false, mPerBlock: 10, sides: 0, treeMask: null,
+                panX: 0, panY: 0,
                 season: 0 };
     if (p.type === "cemetery") S.tod = 1;      // dusk suits them
     const baseSub = boundary ? `boundary: ${boundary.label}`
@@ -2191,6 +2193,19 @@ const EveryParkIso = (() => {
       sidesBtn.textContent = SIDES_LABELS[S.sides];
     });
 
+    // Hop straight to another park without closing the viewer. app.js
+    // owns the pool and the filters, so it hands the picker over rather
+    // than the viewer duplicating that logic.
+    const randBtn = document.createElement("button");
+    randBtn.className = "iso-tool";
+    randBtn.textContent = "Random";
+    randBtn.title = "Jump to another park";
+    randBtn.addEventListener("click", () => {
+      if (!window.EveryParkRandom) return;
+      close();
+      setTimeout(() => window.EveryParkRandom(), 80);
+    });
+
     const pixBtn = document.createElement("button");
     pixBtn.className = "iso-tool active";
     pixBtn.textContent = "Pixel";
@@ -2209,7 +2224,7 @@ const EveryParkIso = (() => {
       smoothBtn.classList.toggle("active", S.smooth);
     });
 
-    tools.append(satBtn, pixBtn, smoothBtn, sidesBtn, shotBtn, sliderWrap);
+    tools.append(randBtn, satBtn, pixBtn, smoothBtn, sidesBtn, shotBtn, sliderWrap);
 
     // Scroll to zoom, centred on the island.
     canvas.addEventListener("wheel", e => {
@@ -2229,7 +2244,7 @@ const EveryParkIso = (() => {
     tools.appendChild(spinBtn);
     S.spin = true;
 
-    let yaw = 0, target = 0, dragging = false, lastX = 0;
+    let yaw = 0, target = 0, dragging = false, lastX = 0, pinchMid = null;
     // Test hooks for tools/isotest. The rotation-stability check has to
     // drive yaw to exact values either side of a quadrant boundary,
     // which no user gesture can do repeatably.
@@ -2238,24 +2253,41 @@ const EveryParkIso = (() => {
     // One finger rotates, two fingers pinch to zoom.
     const pointers = new Map();
     let pinchDist = 0;
+    const midpoint = () => {
+      const p = [...pointers.values()];
+      if (!p.length) return { x: 0, y: 0 };
+      return { x: p.reduce((a, q) => a + q.x, 0) / p.length,
+               y: p.reduce((a, q) => a + q.y, 0) / p.length };
+    };
     const spread = () => {
       const [a, b2] = [...pointers.values()];
       return Math.hypot(a.x - b2.x, a.y - b2.y);
     };
     canvas.addEventListener("pointerdown", e => {
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      canvas.setPointerCapture(e.pointerId);
+      // Capture can throw if the pointer has already been released
+      // (and always does for synthetic events in the test harness).
+      // Losing capture costs a smooth drag, not correctness.
+      try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* fine */ }
       if (pointers.size === 1) { dragging = true; lastX = e.clientX; }
-      else if (pointers.size === 2) { dragging = false; pinchDist = spread(); }
+      else if (pointers.size === 2) { dragging = false; pinchDist = spread(); pinchMid = midpoint(); }
     });
     canvas.addEventListener("pointermove", e => {
       if (!pointers.has(e.pointerId)) return;
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (pointers.size >= 2) {
-        const d = spread();
+        const d = spread(), m = midpoint();
         if (pinchDist > 0 && d > 0)
           S.zoom = Math.min(9, Math.max(.5, S.zoom * (d / pinchDist)));
-        pinchDist = d;
+        // Two fingers pinch AND pan: the midpoint between them drags the
+        // island, so you can zoom into a corner and then bring it to the
+        // middle without letting go.
+        if (pinchMid) {
+          const q = canvas.width / canvas.getBoundingClientRect().width;
+          S.panX = (S.panX || 0) + (m.x - pinchMid.x) * q;
+          S.panY = (S.panY || 0) + (m.y - pinchMid.y) * q;
+        }
+        pinchDist = d; pinchMid = m;
       } else if (dragging) {
         // Touch drags the ISLAND; a mouse drags the CAMERA. With a finger
         // on the thing itself, pushing right should carry the near edge
@@ -2267,7 +2299,7 @@ const EveryParkIso = (() => {
     });
     const release = e => {
       pointers.delete(e.pointerId);
-      if (pointers.size < 2) pinchDist = 0;
+      if (pointers.size < 2) { pinchDist = 0; pinchMid = null; }
       if (pointers.size === 1) {
         dragging = true; lastX = [...pointers.values()][0].x;
       } else if (pointers.size === 0) dragging = false;

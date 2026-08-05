@@ -223,6 +223,18 @@ Triggering a workflow needs the API, so use the Actions tab in the browser.
 `x-access-token:...@` from any output. Editing a fine-grained token's
 permissions **invalidates it** — it must be regenerated.
 
+**Never pipe `git push` in a success check.** `if git push 2>&1 | sed ...`
+tests *sed's* exit code, which is always 0, so a rejected push reports
+"pushed" and the work silently stays local. Use `git push ... ; [ ${PIPESTATUS[0]} -eq 0 ]`
+or capture to a file and check separately. This masked a real 403 on
+2026-08-04.
+
+**"access denied by the git proxy ... not in this session's authorized
+repository set"** is not a token problem — the sandbox proxy refuses to
+inject a credential at all, and no token in the URL will change it. The
+repo has to be added to the session's sources by the user. Commit
+locally and wait; nothing is lost.
+
 **Cache busting:** bump `?v=NN` on `styles.css` / `app.js` / `config.js` in
 `index.html` on every code change, and `siteVersion` in `config.js`. The badge
 in the header corner shows `siteVersion · dataVersion` — it is the proof a

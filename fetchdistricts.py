@@ -21,6 +21,7 @@ This writes its OWN file rather than joining places.json. Districts are
 minutes — so they stay out of the tile archive until there is a reason.
 """
 import argparse
+import math
 import json
 import sys
 import time
@@ -86,12 +87,62 @@ def in_ct(rings):
     return False
 
 
+def shape_stats(rings):
+    """Bounding-box span in km, and how much of that box the shape fills."""
+    xs = [p[0] for r in rings for p in r]
+    ys = [p[1] for r in rings for p in r]
+    lat = (min(ys) + max(ys)) / 2
+    kx = 111.32 * math.cos(math.radians(lat))
+    w = (max(xs) - min(xs)) * kx
+    h = (max(ys) - min(ys)) * 111.32
+    area = 0.0
+    for r in rings:
+        acc = 0.0
+        for i in range(len(r) - 1):
+            acc += r[i][0] * r[i + 1][1] - r[i + 1][0] * r[i][1]
+        area += abs(acc) / 2
+    area *= kx * 111.32
+    box = w * h
+    return max(w, h), (area / box if box > 0 else 0.0)
+
+
+def reject(name, rings):
+    """Why this record is not a walkable district, or None to keep it.
+
+    The National Register is a register of *listings*, not of places you
+    can stroll, and three kinds of listing came through looking absurd on
+    the map — spans of 20, 48 and 76 km over ground that is nothing like
+    a town centre.
+    """
+    n = name.lower()
+    # Amendments to an existing listing, not places. The parent district
+    # is already in this dataset, and the amendment's geometry is often a
+    # crude envelope around it: Manchester's spans 20 km.
+    if "boundary increase" in n or "boundary decrease" in n:
+        return "amendment"
+    # Commemorative ROUTES. Linear by definition, and the short segments
+    # are too small to trip the geometry test below.
+    if "march route" in n:
+        return "route"
+    span, fill = shape_stats(rings)
+    # Nothing you can walk around is 8 km across. Catches the Merritt
+    # Parkway (48.7 km) and the Farmington Canal (76.6 km).
+    if span > 8:
+        return "oversized"
+    # A corridor barely fills its bounding box: canals, rail lines and
+    # scenic routes run near 0.02 where a real district sits near 0.45.
+    # These belong in the future rail-trails layer, not this one.
+    if span > 1.5 and fill < 0.15:
+        return "corridor"
+    return None
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("-o", "--out", default="data/districts.json")
     args = ap.parse_args()
 
-    feats, offset = [], 0
+    feats, offset, dropped = [], 0, []
     while True:
         for attempt in (1, 2, 3):
             try:
@@ -115,6 +166,10 @@ def main():
             name = (a.get("RESNAME") or "").strip()
             if not name:
                 continue
+            bad = reject(name, rings)
+            if bad:
+                dropped.append((bad, name))
+                continue
             feats.append({
                 "name": name,
                 "town": (a.get("City") or "").strip(),
@@ -133,6 +188,12 @@ def main():
               "field values, they fail silently rather than erroring")
         return 1
 
+    from collections import Counter
+    if dropped:
+        print(f"  dropped {len(dropped)}: "
+              + ", ".join(f"{k} x{v}" for k, v in Counter(r for r, _ in dropped).items()))
+        for r, n in dropped:
+            print(f"    {r:9s} {n}")
     feats.sort(key=lambda d: (d["town"], d["name"]))
     doc = {
         "kind": "districts",
