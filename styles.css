@@ -770,6 +770,55 @@ header { border-bottom: 2px solid var(--ep-brass); }
 .iso-menu .iso-slider { flex-direction: column; align-items: stretch; gap: 4px; }
 .iso-menu .iso-slider input { width: 100%; }
 
+/* "Still fetching" mark, beside the time-of-day button. Deliberately
+   small and quiet: the terrain is already usable, this only says more
+   is coming. */
+.iso-load {
+  align-self: center; width: 15px; height: 15px; display: block;
+  border: 2px solid rgba(245,242,230,.28);
+  border-top-color: var(--ep-brass); border-radius: 50%;
+  animation: iso-rot .9s linear infinite;
+}
+.iso-load[hidden] { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .iso-load { animation-duration: 2.4s; }
+}
+
+/* The loader centres over the stage, which keeps its full size while
+   the canvas is merely invisible — it used to be a block with a fixed
+   120px margin before a display:none canvas, so the stage collapsed
+   around it and the panel jumped when terrain arrived. */
+.iso-stage > .iso-spin {
+  position: absolute; top: 50%; left: 50%;
+  margin: 0; transform: translate(-50%, -50%); z-index: 3;
+}
+/* Nothing to operate on yet, so the chrome stays out of the way. */
+#isoOverlay.iso-loading .iso-corner-tr,
+#isoOverlay.iso-loading .iso-corner-bl,
+#isoOverlay.iso-loading .iso-corner-br,
+#isoOverlay.iso-loading .iso-part { visibility: hidden; }
+
+/* Separate pieces of one place: arrows on the flanks, label under. */
+.iso-part {
+  position: absolute; top: 50%; transform: translateY(-50%); z-index: 5;
+  width: 34px; height: 54px; display: grid; place-items: center;
+  background: rgba(13,42,30,.72); color: var(--ep-paper);
+  border: 1px solid rgba(217,164,65,.55); border-radius: var(--ep-radius);
+  font-size: 1.3rem; line-height: 1; cursor: pointer; backdrop-filter: blur(3px);
+}
+.iso-part:hover { background: var(--ep-brass); color: var(--ep-ink); }
+.iso-part[hidden] { display: none; }
+.iso-part-prev { left: 10px; }
+.iso-part-next { right: 10px; }
+.iso-part-lab {
+  position: absolute; left: 50%; transform: translateX(-50%); bottom: 44px;
+  z-index: 5; padding: 3px 9px; border-radius: var(--ep-radius);
+  background: rgba(13,42,30,.72); backdrop-filter: blur(3px);
+  font-family: var(--ep-mono); font-size: .62rem; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--ep-paper);
+}
+.iso-part-lab[hidden] { display: none; }
+
 /* The lore ribbon: game dialogue over the terrain. Inset past the top
    corner buttons so it never sits on Season or Time of day. */
 .iso-lore {
@@ -858,6 +907,10 @@ header { border-bottom: 2px solid var(--ep-brass); }
   .iso-corner-br { bottom: 8px; right: 8px; }
   .iso-menu { bottom: 42px; min-width: min(72vw, 230px); }
   .iso-menu .iso-slider input { width: 100%; }
+  .iso-part { width: 30px; height: 46px; }
+  .iso-part-prev { left: 6px; }
+  .iso-part-next { right: 6px; }
+  .iso-part-lab { bottom: 38px; font-size: .56rem; }
 }
 
 

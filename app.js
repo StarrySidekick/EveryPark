@@ -2486,7 +2486,7 @@
          <div class="popup-name">Trails with no listed place</div>
          <div class="popup-sub">${town} &middot; roughly ${approxAcres.toLocaleString()} acres of trail coverage</div>
          <div class="popup-fee">Something is here but nothing in our data claims it. Worth checking whether it's a preserve we're missing, or private land.</div>
-         <div class="popup-links"><a href="https://www.google.com/maps/search/?api=1&query=${c.lat},${c.lng}" target="_blank" rel="noopener">Look at it</a></div>`
+         `
       ).addTo(gapLayer);
     }
     gapsBuilt = true;
@@ -2726,13 +2726,48 @@
     }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 });
   }
 
+  // Opening Near me starts from where you are and searches immediately
+  // (Timothy, 2026-08-05). "Near me" answers itself: making people press
+  // Here first was asking a question we already knew the answer to. The
+  // box is filled with the resolved place name rather than left empty,
+  // so changing origin is select-all-and-type instead of a second click.
   if (nearBtn) nearBtn.addEventListener("click", () => {
     const panel = nearPanel();
     panel.hidden = false;
-    setNear("Near me", "", "Type a place above, or use Here for your own location.");
     const w = panel.querySelector("#nearWhere");
-    if (w) w.focus();
+    if (!navigator.geolocation) {
+      setNear("Near me", "", "Type a place above — this browser can't share your location.");
+      if (w) w.focus();
+      return;
+    }
+    setNear("Near me", "", "Finding you…");
+    navigator.geolocation.getCurrentPosition(async pos => {
+      const { latitude: lat, longitude: lng } = pos.coords;
+      if (w && !w.value.trim()) w.value = "My location";
+      originHere(lat, lng, "You are here");
+      setNear("Near me", "", "Working out driving times…");
+      // Name the origin properly if the lookup answers, but never block
+      // the driving times on it — the times are the point.
+      reverseName(lat, lng).then(nm => {
+        if (nm && w && w.value === "My location") w.value = nm;
+      }).catch(() => { /* "My location" is a fine label */ });
+      await findNear(lat, lng);
+    }, () => {
+      setNear("Near me", "", "Type a place above — location sharing is off.");
+      if (w) w.focus();
+    }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 });
   });
+
+  // Nominatim's reverse endpoint, same courtesy rules as the forward
+  // one: one lookup per click, no key, low volume.
+  async function reverseName(lat, lng) {
+    const url = "https://nominatim.openstreetmap.org/reverse?format=json&zoom=14"
+              + "&lat=" + lat + "&lon=" + lng;
+    const r = await fetch(url, { headers: { "Accept": "application/json" } });
+    const j = await r.json();
+    const a = (j && j.address) || {};
+    return a.town || a.city || a.village || a.hamlet || a.suburb || a.county || "";
+  }
 
   // ------------------------------------------------------------------
   // Places to wander — the second class of walkable place.
@@ -2863,8 +2898,6 @@
              ${window.EveryParkIso
                ? `<a class="iso-btn" href="#" data-district="${esc(d.ref)}"
                      title="Isometric terrain of this place">${FEAT_SVG.relief} 3D terrain</a>` : ""}
-             <a href="https://www.google.com/maps/search/?api=1&query=${latlng.lat},${latlng.lng}"
-                target="_blank" rel="noopener">Look at it</a>
              <a href="https://www.google.com/search?q=${q}" target="_blank"
                 rel="noopener">More info</a>
            </div>

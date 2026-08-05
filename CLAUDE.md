@@ -328,6 +328,58 @@ slider label rather than hidden: the grid floors at 48 a side, so a very
 small park lands near 10 m; and it clamps at 176, so a big forest lands
 coarser than 20.
 
+### Streaming and the loading mark (v0.38.0)
+
+The five dressing sources already ran concurrently, but the caller
+awaited **all** of them, so the island stayed bare until the slowest
+answered — usually Overpass, the least important of the five. Now each
+source fills its slice of one shared `raw` object and repaints as it
+lands, so trails appear when trails arrive. `raw` is mutated in place
+because the block-size slider's rebuild reads it later.
+
+Overpass mirrors are **raced**, not tried in turn. Sequentially, a
+rate-limited first endpoint cost its entire 12 s timeout before the
+second was attempted. `Promise.any` over all three, with an inverted
+`Promise.race` fallback for browsers without it.
+
+A small spinner beside the time-of-day button says more is still coming.
+It is keyed (`loading(key, on)`) because six things load at once and the
+last to finish owns when it disappears — the difference between "there
+are no trails here" and "the trails have not arrived yet".
+
+The loader itself is absolutely centred over the stage and the canvas
+keeps its box while merely `visibility: hidden`. It used to be a block
+with a fixed 120px margin inserted before a `display: none` canvas, so
+the stage collapsed to the spinner's size, the corner controls landed on
+top of it, and the panel jumped when terrain appeared.
+
+### Separate pieces of one place (v0.38.0)
+
+A place is often several polygons that do not touch — a state forest in
+five blocks. Drawn together they share one bounding box, so the grid
+spans the gaps and each real piece is a pinhead in an ocean of nothing.
+`splitParts()` groups rings and the viewer shows one at a time, with
+arrows on the flanks.
+
+- **Grouping is by bounding-box containment, not winding order.** ArcGIS
+  marks holes by reversing the ring, but these sources disagree about
+  that often enough that trusting it drops real land.
+- **Slivers under 3% of the largest piece are merged into the nearest
+  one, never dropped.** Losing mapped land is the failure mode nothing
+  else in the app would report.
+- Stepping between pieces reopens the viewer with `p.rings` already set,
+  so the boundary is never refetched.
+
+`tools/isotest/parts.mjs` asserts the split, the wrap in both directions,
+that single-polygon places grow no arrows, and that all rings survive.
+
+### The lore ribbon opens on request only
+
+Hidden until the bottom-right button is pressed, and pressing it
+**resumes** rather than restarts — the reveal used to replay from the
+first letter, so a glance away cost you your place. The button only ever
+opens; the × on the ribbon is the only thing that closes it.
+
 ### Viewer chrome layout
 
 Four corners, all 38px icons: time of day (TL), season (TR), terrain menu

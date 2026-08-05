@@ -127,6 +127,71 @@ const EveryParkIso = (() => {
     return pool[0];
   }
 
+  // ---- Separate pieces of one place --------------------------------
+  // A place is often several polygons that do not touch: a state forest
+  // in five blocks, a town's open space scattered across the map. Drawn
+  // together they share one bounding box, so the grid has to span the
+  // gaps between them and each actual piece ends up a pinhead in an
+  // ocean of nothing — which is exactly what Timothy saw on the big
+  // ones. Splitting lets the viewer show one piece at a time, at a size
+  // where it means something.
+  //
+  // Grouping is by bounding-box containment rather than winding order.
+  // ArcGIS marks holes by reversing the ring, but the sources here
+  // disagree about that often enough that trusting it drops real land;
+  // containment is a weaker signal that never does.
+  function splitParts(rings) {
+    const bbOf = r => {
+      let w = 180, s = 90, e = -180, n = -90;
+      for (const [x, y] of r) {
+        if (x < w) w = x; if (x > e) e = x;
+        if (y < s) s = y; if (y > n) n = y;
+      }
+      return [w, s, e, n];
+    };
+    const areaOf = r => {
+      let a = 0;
+      for (let i = 0; i < r.length - 1; i++)
+        a += r[i][0] * r[i + 1][1] - r[i + 1][0] * r[i][1];
+      return Math.abs(a / 2);
+    };
+    const encloses = (outer, inner) =>
+      inner[0] >= outer[0] && inner[1] >= outer[1]
+      && inner[2] <= outer[2] && inner[3] <= outer[3];
+
+    const items = rings.map(r => ({ r, bb: bbOf(r), a: areaOf(r) }))
+                       .sort((x, y) => y.a - x.a);
+    const parts = [];
+    for (const it of items) {
+      const host = parts.find(pt => encloses(pt.bb, it.bb));
+      if (host) { host.rings.push(it.r); host.a += 0; continue; }
+      parts.push({ rings: [it.r], bb: it.bb.slice(), a: it.a });
+    }
+    if (parts.length < 2) return parts;
+
+    // Slivers are not worth a page of their own — a 40-acre forest does
+    // not want four arrow presses to reach a quarter-acre offcut. They
+    // are merged into the nearest real piece rather than dropped, so no
+    // mapped land ever stops being drawn.
+    const big = parts[0].a;
+    const keep = parts.filter(pt => pt.a >= big * 0.03);
+    const rest = parts.filter(pt => pt.a < big * 0.03);
+    const mid = bb => [(bb[0] + bb[2]) / 2, (bb[1] + bb[3]) / 2];
+    for (const sliver of rest) {
+      const [sx, sy] = mid(sliver.bb);
+      let best = keep[0], bd = Infinity;
+      for (const pt of keep) {
+        const [px, py] = mid(pt.bb);
+        const d = (px - sx) ** 2 + (py - sy) ** 2;
+        if (d < bd) { bd = d; best = pt; }
+      }
+      best.rings.push(...sliver.rings);
+      best.bb = [Math.min(best.bb[0], sliver.bb[0]), Math.min(best.bb[1], sliver.bb[1]),
+                 Math.max(best.bb[2], sliver.bb[2]), Math.max(best.bb[3], sliver.bb[3])];
+    }
+    return keep;
+  }
+
   // ---- Elevation & imagery ----------------------------------------
   function tileXY(lat, lng, z) {
     const n = 2 ** z;
@@ -349,6 +414,34 @@ const EveryParkIso = (() => {
   const PUBLIC_RANK = { library: 0, townhall: 1, museum: 2, community: 3,
                         post: 4, worship: 5, school: 6, civic: 7 };
 
+  const OVERPASS = ["https://overpass-api.de/api/interpreter",
+                    "https://overpass.kumi.systems/api/interpreter",
+                    "https://overpass.osm.jp/api/interpreter"];
+
+  // First mirror with a usable answer wins. Promise.any rejects only if
+  // every one fails, which is exactly the old behaviour's outcome
+  // without the old behaviour's queueing.
+  async function raceOverpass(q) {
+    const once = async url => {
+      const r = await fetch(url, { method: "POST",
+        body: "data=" + encodeURIComponent(q),
+        headers: { "Content-Type": "application/x-www-form-urlencoded" } });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const j = await r.json();
+      if (!j || !j.elements) throw new Error("no elements");
+      return j;
+    };
+    if (typeof Promise.any === "function")
+      return Promise.any(OVERPASS.map(once));
+    // Safari 14 and older have no Promise.any. Invert Promise.race:
+    // a success rejects, so the first winner short-circuits, and the
+    // whole thing resolving means everybody failed.
+    return Promise.race(OVERPASS.map(u => once(u).then(
+      v => Promise.reject({ ok: v }), () => new Promise(() => {}))))
+      .then(() => { throw new Error("no overpass endpoint answered"); },
+            e => { if (e && e.ok) return e.ok; throw e; });
+  }
+
   async function fetchOverpass(bbox) {
     const [w, s, e, n] = bbox;
     const amen = Object.keys(PUBLIC_AMENITY).join("|");
@@ -363,21 +456,15 @@ const EveryParkIso = (() => {
     // Mirrors: the main endpoint rate-limits and times out often, which
     // silently cost every road on the island while ArcGIS-sourced trails
     // kept working — the "roads broken on some maps" report.
-    const ENDPOINTS = ["https://overpass-api.de/api/interpreter",
-                       "https://overpass.kumi.systems/api/interpreter",
-                       "https://overpass.osm.jp/api/interpreter"];
-    let j = null, lastErr = null;
-    for (const url of ENDPOINTS) {
-      try {
-        const r = await fetch(url, { method: "POST",
-          body: "data=" + encodeURIComponent(q),
-          headers: { "Content-Type": "application/x-www-form-urlencoded" } });
-        if (!r.ok) throw new Error("HTTP " + r.status);
-        j = await r.json();
-        if (j && j.elements) break;
-      } catch (e) { lastErr = e; j = null; }
-    }
-    if (!j) throw lastErr || new Error("no overpass endpoint answered");
+    //
+    // RACE them rather than trying each in turn. Sequentially, a
+    // rate-limited first endpoint costs its ENTIRE timeout before the
+    // second is even attempted, so the common slow case was 12 s of
+    // waiting for a mirror that would have answered in one. Asking all
+    // three at once and taking the first good answer costs two extra
+    // requests and removes that whole stall. Overpass mirrors exist to
+    // spread load and this is three small queries, not a crawl.
+    const j = await raceOverpass(q);
     const roads = [], buildings = [], parking = [], publics = [];
     for (const el of j.elements || []) {
       const tags = el.tags || {};
@@ -406,7 +493,19 @@ const EveryParkIso = (() => {
   // ---- Trails + water + courts (ArcGIS) + Overpass extras ---------
   // Fetch once, keep the raw geometry; rasterising to the current grid
   // is a separate step so the block-size slider can rebuild instantly.
-  async function fetchRawDressing(bbox) {
+  // Five sources, applied AS THEY LAND rather than after the slowest.
+  //
+  // These already ran concurrently, but the caller awaited all five, so
+  // the island stayed bare until the last one answered — usually
+  // Overpass, which is also the least important of them. Trails are what
+  // people are waiting to see. Now each source fills its own slice of
+  // one shared `raw` object and calls back, so trails appear the moment
+  // trails arrive and roads catch up whenever roads do.
+  //
+  // `raw` is mutated in place because the block-size slider's rebuild
+  // reads it later; handing back a new object each time would leave the
+  // rebuild holding a stale one.
+  function streamDressing(bbox, onPart) {
     const [w, s, e, n] = bbox;
     const env = JSON.stringify({ xmin: w, ymin: s, xmax: e, ymax: n,
                                  spatialReference: { wkid: 4326 } });
@@ -414,45 +513,48 @@ const EveryParkIso = (() => {
                      inSR: "4326", outSR: "4326", outFields: "",
                      returnGeometry: "true", maxAllowableOffset: "0.00008",
                      resultRecordCount: "400" };
-    const [trails, blue, water, leisure, over] = await Promise.allSettled([
-      arc(OSM6 + "OSM_NA_Trails/FeatureServer/0/query",
-          { ...common, where: "highway IN ('path','track','bridleway')" }),
-      arc(DEEP + "BlueBlazedHikingTrails/FeatureServer/0/query",
-          { ...common, where: "1=1" }),
-      arc(OSM6 + "OSM_NA_Water/FeatureServer/0/query", { ...common, where: "1=1" }),
-      arc(OSM6 + "OSM_NA_Leisure/FeatureServer/0/query",
-          { ...common, outFields: "leisure,sport",
-            where: "leisure IN ('pitch','playground','swimming_pool'," +
-                   "'dog_park','track')" }),
-      fetchOverpass(bbox)
-    ]);
-    const val = r => r.status === "fulfilled" ? r.value : [];
-    const raw = {
-      trailFeats: [...val(trails), ...val(blue)],
-      waterRings: val(water).filter(f => f.geometry && f.geometry.rings)
-                            .map(f => f.geometry.rings),
-      courts: val(leisure).filter(f => f.geometry && f.geometry.rings)
-        .map(f => {
-          const a = f.attributes || {};
-          if (a.leisure === "pitch") {
-            const sport = String(a.sport || "").toLowerCase();
-            const hit = SPORT.find(([re]) => re.test(sport)) || SPORT[SPORT.length - 1];
-            return { rings: f.geometry.rings, code: hit[1], emoji: hit[3] };
-          }
-          if (KIND[a.leisure])
-            return { rings: f.geometry.rings, code: KIND[a.leisure][0],
-                     emoji: KIND[a.leisure][2] };
-          return null;
-        }).filter(Boolean),
-      roads: [], buildings: [], parking: [], publics: []
-    };
-    if (over.status === "fulfilled") {
-      raw.roads = over.value.roads;
-      raw.buildings = over.value.buildings;
-      raw.parking = over.value.parking;
-      raw.publics = over.value.publics || [];
-    }
-    return raw;
+    const raw = { trailFeats: [], waterRings: [], courts: [],
+                  roads: [], buildings: [], parking: [], publics: [] };
+    const ringsOf = feats => feats.filter(f => f.geometry && f.geometry.rings)
+                                  .map(f => f.geometry.rings);
+    const courtsOf = feats => feats
+      .filter(f => f.geometry && f.geometry.rings)
+      .map(f => {
+        const a = f.attributes || {};
+        if (a.leisure === "pitch") {
+          const sport = String(a.sport || "").toLowerCase();
+          const hit = SPORT.find(([re]) => re.test(sport)) || SPORT[SPORT.length - 1];
+          return { rings: f.geometry.rings, code: hit[1], emoji: hit[3] };
+        }
+        if (KIND[a.leisure])
+          return { rings: f.geometry.rings, code: KIND[a.leisure][0],
+                   emoji: KIND[a.leisure][2] };
+        return null;
+      }).filter(Boolean);
+
+    const jobs = [
+      [arc(OSM6 + "OSM_NA_Trails/FeatureServer/0/query",
+           { ...common, where: "highway IN ('path','track','bridleway')" }),
+       v => { raw.trailFeats = raw.trailFeats.concat(v); }],
+      [arc(DEEP + "BlueBlazedHikingTrails/FeatureServer/0/query",
+           { ...common, where: "1=1" }),
+       v => { raw.trailFeats = raw.trailFeats.concat(v); }],
+      [arc(OSM6 + "OSM_NA_Water/FeatureServer/0/query", { ...common, where: "1=1" }),
+       v => { raw.waterRings = ringsOf(v); }],
+      [arc(OSM6 + "OSM_NA_Leisure/FeatureServer/0/query",
+           { ...common, outFields: "leisure,sport",
+             where: "leisure IN ('pitch','playground','swimming_pool'," +
+                    "'dog_park','track')" }),
+       v => { raw.courts = courtsOf(v); }],
+      [fetchOverpass(bbox),
+       v => { raw.roads = v.roads; raw.buildings = v.buildings;
+              raw.parking = v.parking; raw.publics = v.publics || []; }]
+    ];
+    let left = jobs.length;
+    const settled = jobs.map(([pr, take]) => pr
+      .then(v => { take(v); }, () => { /* this source is simply absent */ })
+      .then(() => { left--; onPart(raw, left === 0); }));
+    return { raw, done: Promise.all(settled).then(() => raw) };
   }
 
   // ---- NLCD: what the ground actually is ---------------------------
@@ -634,21 +736,9 @@ const EveryParkIso = (() => {
       `way["landuse"~"^(cemetery|forest|recreation_ground)$"](${s},${w},${n},${e});` +
       `way["amenity"="grave_yard"](${s},${w},${n},${e});`;
     const q = `[out:json][timeout:12];(${kinds});out tags center 60;`;
-    const ENDPOINTS = ["https://overpass-api.de/api/interpreter",
-                       "https://overpass.kumi.systems/api/interpreter",
-                       "https://overpass.osm.jp/api/interpreter"];
     let j = null;
-    for (const url of ENDPOINTS) {
-      try {
-        const r = await withTimeout(fetch(url, { method: "POST",
-          body: "data=" + encodeURIComponent(q),
-          headers: { "Content-Type": "application/x-www-form-urlencoded" } }),
-          LORE_TIMEOUT);
-        if (!r.ok) throw new Error("HTTP " + r.status);
-        j = await r.json();
-        if (j && j.elements) break;
-      } catch (err) { j = null; }
-    }
+    try { j = await withTimeout(raceOverpass(q), LORE_TIMEOUT); }
+    catch (err) { j = null; }
     if (!j || !j.elements || !j.elements.length) return null;
     // Best candidate: name agreement first, nearness second. An unnamed
     // polygon can still win, but only if it is nearly under the pin.
@@ -2279,7 +2369,13 @@ const EveryParkIso = (() => {
             <p class="iso-lore-body"></p>
             <span class="iso-lore-next" hidden></span>
           </div>
-          <div class="iso-corner iso-corner-tl"><button id="isoTod" title="Time of day"></button></div>
+          <div class="iso-corner iso-corner-tl">
+            <div class="iso-corner-row">
+              <button id="isoTod" title="Time of day"></button>
+              <span id="isoLoad" class="iso-load" hidden
+                    title="Still fetching map data"></span>
+            </div>
+          </div>
           <div class="iso-corner iso-corner-tr"><button id="isoSeason" title="Season"></button></div>
           <div class="iso-corner iso-corner-bl">
             <div class="iso-menu" id="isoMenu" hidden></div>
@@ -2288,6 +2384,9 @@ const EveryParkIso = (() => {
               <button id="isoSpinBtn" class="iso-spin-btn active" title="Pause / resume the turntable"></button>
             </div>
           </div>
+          <button class="iso-part iso-part-prev" title="Previous piece" hidden>&#8249;</button>
+          <button class="iso-part iso-part-next" title="Next piece" hidden>&#8250;</button>
+          <div class="iso-part-lab" hidden></div>
           <div class="iso-corner iso-corner-br">
             <div class="iso-corner-row">
               <button id="isoLoreBtn" title="Read about this place" hidden></button>
@@ -2320,10 +2419,33 @@ const EveryParkIso = (() => {
     requestAnimationFrame(fit);
     const sub = ov.querySelector(".iso-sub");
     const tools = ov.querySelector(".iso-tools");
+
+    // A quiet "still fetching" mark beside the time-of-day button. The
+    // viewer draws terrain first and streams everything else in behind
+    // it, which is fast but looks finished before it is — this is the
+    // difference between "there are no trails here" and "the trails have
+    // not arrived yet". Keyed, because six things load at once and the
+    // last one to finish owns when it goes away.
+    const loadKeys = new Set();
+    const loadEl = ov.querySelector("#isoLoad");
+    const loading = (key, on) => {
+      if (on) loadKeys.add(key); else loadKeys.delete(key);
+      if (loadEl) {
+        loadEl.hidden = loadKeys.size === 0;
+        loadEl.title = loadKeys.size
+          ? "Still fetching: " + [...loadKeys].join(", ") : "";
+      }
+    };
+    // The loader is absolutely centred over the stage and the canvas
+    // keeps its box while hidden. It used to be a block with a fixed
+    // 120px margin inserted BEFORE a display:none canvas — so the stage
+    // collapsed to the spinner's own size, the corner controls landed on
+    // top of it, and the panel jumped when the terrain appeared.
     const spin = document.createElement("div");
     spin.className = "iso-spin";
-    canvas.parentElement.insertBefore(spin, canvas);
-    canvas.style.display = "none";
+    canvas.parentElement.appendChild(spin);
+    canvas.style.visibility = "hidden";
+    ov.classList.add("iso-loading");
     // The lore ribbon runs its own animation frame, so closing the
     // viewer has to stop that too or it keeps typing into a dead node.
     let loreCancel = null;
@@ -2341,6 +2463,28 @@ const EveryParkIso = (() => {
     // would find nothing, because a town centre is not anybody's parcel.
     if (p.rings && p.rings.length) boundary = { rings: p.rings, label: p.boundaryLabel || "supplied" };
     else { try { boundary = await fetchBoundary(p); } catch (e) { /* fall through */ } }
+
+    // Separate pieces get their own view, reachable with the arrows. The
+    // parts list is computed once and then carried on the place object,
+    // so stepping between them never refetches the boundary.
+    let parts = p._parts || null;
+    let partIndex = p._partIndex || 0;
+    if (!parts && boundary && boundary.rings.length > 1) {
+      const ps = splitParts(boundary.rings);
+      if (ps.length > 1) {
+        parts = ps;
+        partIndex = 0;
+        boundary = { rings: ps[0].rings, label: boundary.label };
+      }
+    }
+    const partLabel = boundary ? boundary.label : "";
+    const goPart = i => {
+      const next = Object.assign({}, p, {
+        rings: parts[i].rings, boundaryLabel: partLabel,
+        _parts: parts, _partIndex: i });
+      close();
+      setTimeout(() => open(next), 60);
+    };
     let bbox;
     if (boundary) {
       let w = 180, s2 = 90, e2 = -180, n2 = -90;
@@ -2411,7 +2555,8 @@ const EveryParkIso = (() => {
     // TERRAIN FIRST. Trails/roads/buildings/courts stream in after —
     // this is what makes the view feel fast.
     spin.remove();
-    canvas.style.display = "";
+    canvas.style.visibility = "";
+    ov.classList.remove("iso-loading");
     const empty = () => new Uint8Array(GRID * GRID);
     const S = { H, inside, dropM, edge, p,
                 trailM: empty(), waterM: empty(), roadM: empty(),
@@ -2451,8 +2596,10 @@ const EveryParkIso = (() => {
       }
       S.labels = labels;
     };
+    loading("place names", true);
     fetchNames(bbox).then(ns => { rawNames = ns; buildLabels(); })
-                    .catch(() => { /* nameless land is fine */ });
+                    .catch(() => { /* nameless land is fine */ })
+                    .finally(() => loading("place names", false));
 
     // Resolved when the dressing fetch settles either way, so the lore
     // queries can queue behind it rather than race it.
@@ -2519,10 +2666,24 @@ const EveryParkIso = (() => {
       typeRaf = requestAnimationFrame(step);
     };
 
+    // Shown only on request, and showing it RESUMES rather than
+    // restarts (Timothy, 2026-08-05). The text used to open over the
+    // terrain uninvited, and hiding then showing again replayed the
+    // whole reveal from the first letter — so a glance away cost you
+    // your place. The corner button only ever opens; the × on the
+    // ribbon is the only thing that closes it.
+    let loreSeen = false;
     const showLore = on => {
       lore.hidden = !on;
       loreBtn.hidden = on;
-      if (on) startPage(); else cancelAnimationFrame(typeRaf);
+      loreBtn.classList.toggle("active", on);
+      if (!on) { cancelAnimationFrame(typeRaf); return; }
+      if (!loreSeen) { loreSeen = true; startPage(); return; }
+      // Resume: repaint what was already revealed and carry on from
+      // there. lastT is reset because it holds a timestamp from before
+      // the pause, and a stale one makes the first frame back leap.
+      paintPage();
+      if (typing) { lastT = 0; typeRaf = requestAnimationFrame(step); }
     };
     loreCancel = () => cancelAnimationFrame(typeRaf);
 
@@ -2554,7 +2715,8 @@ const EveryParkIso = (() => {
     // appearing. The network sources then replace it if they land.
     pages = lorePages(p, null, null, loreExtra());
     page = 0;
-    showLore(true);
+    showLore(false);          // opens only when the corner button is pressed
+    loading("about this place", true);
     (async () => {
       // Wait for the dressing query before asking Overpass anything
       // else. Firing both at once is how you get rate-limited, and a
@@ -2564,6 +2726,7 @@ const EveryParkIso = (() => {
       await dressingReady;
       const tags = await fetchOsmTags(p, bbox).catch(() => null);
       const wiki = await fetchWiki(p, tags).catch(() => null);
+      loading("about this place", false);
       if (!document.body.contains(ov)) return;      // viewer closed meanwhile
       if (!tags && !wiki) return;                   // nothing to add
       const fresh = lorePages(p, tags, wiki, loreExtra());
@@ -2577,7 +2740,10 @@ const EveryParkIso = (() => {
       else paintPage();
     })();
 
-    fetchRawDressing(bbox).then(raw => {
+    // Each source paints the island the moment it arrives. Rebuilding
+    // the whole dressing per source is a few ms of local work against
+    // seconds of network — not worth being clever about.
+    const stream = streamDressing(bbox, (raw, last) => {
       rawDressing = raw;
       const d = buildDressing(raw, bbox, S.inside);
       Object.assign(S, d);
@@ -2585,33 +2751,39 @@ const EveryParkIso = (() => {
       for (const sp of d.sprites) S.spriteAt.set(sp.gy * GRID + sp.gx, sp.kind);
       const bits = [baseSub];
       if (d.trailM.some(v => v)) bits.push("trails");
-      bits.push((d.roadPieces && d.roadPieces.length) ? "roads"
-                                                        : "roads unavailable");
+      if (last) bits.push((d.roadPieces && d.roadPieces.length) ? "roads"
+                                                                : "roads unavailable");
+      else if (d.roadPieces && d.roadPieces.length) bits.push("roads");
       if (d.waterM.some(v => v)) bits.push("water");
       if (d.buildM.some(v => v)) bits.push("buildings");
       if (d.sprites.length) bits.push(`${d.sprites.length} facilities`);
       if ((p.attrs || {}).cover) bits.push(p.attrs.cover);
       bits.push("drag to rotate");
       sub.textContent = bits.join(" · ");
-    }).catch(() => {
-      sub.textContent = baseSub + " · extras unavailable · drag to rotate";
-    }).finally(() => dressingDone());
+      if (last) loading("dressing", false);
+    });
+    loading("dressing", true);
+    stream.done.finally(() => { loading("dressing", false); dressingDone(); });
 
     // Canopy: fetch the imagery sample in the background so trees can
     // stand where the imagery actually shows trees. Doesn't turn the
     // satellite drape on — just informs the forest.
+    loading("imagery", true);
     fetchSatSample(bbox).then(t => {
       satSample = t;
       S.tex = satTexFrom(t, bbox);
       S.treeMask = treeMaskFrom(S.tex, S.inside);
-    }).catch(() => { /* uniform cover fallback */ });
+    }).catch(() => { /* uniform cover fallback */ })
+      .finally(() => loading("imagery", false));
 
     // NLCD ground classes: wetland, sand, meadow, scrub, crops,
     // pavement — per cell, so the ground can show what it is.
+    loading("ground cover", true);
     fetchCoverGrid(bbox).then(cg => {
       coverSample = cg;
       S.coverM = coverGridFrom(cg, bbox);
-    }).catch(() => { /* uniform palette fallback */ });
+    }).catch(() => { /* uniform palette fallback */ })
+      .finally(() => loading("ground cover", false));
 
     // Toolbar: time of day, satellite drape, export.
     const todBtn = ov.querySelector("#isoTod");
@@ -2713,6 +2885,22 @@ const EveryParkIso = (() => {
       clearTimeout(sliderTimer);
       sliderTimer = setTimeout(rebuild, 160);
     });
+
+    // Arrows through the separate pieces. Only appear when there is more
+    // than one, so an ordinary single-polygon park is untouched.
+    if (parts && parts.length > 1) {
+      const prev = ov.querySelector(".iso-part-prev");
+      const next = ov.querySelector(".iso-part-next");
+      const lab = ov.querySelector(".iso-part-lab");
+      prev.hidden = next.hidden = lab.hidden = false;
+      lab.textContent = `Piece ${partIndex + 1} of ${parts.length}`;
+      // Wrapping, because a place with five blocks has no first or last
+      // in any meaningful sense — they are just pieces of one place.
+      prev.addEventListener("click", () =>
+        goPart((partIndex - 1 + parts.length) % parts.length));
+      next.addEventListener("click", () =>
+        goPart((partIndex + 1) % parts.length));
+    }
 
     const seasonBtn = ov.querySelector("#isoSeason");
     const paintSeason = () => {
@@ -2826,6 +3014,13 @@ const EveryParkIso = (() => {
     // drive yaw to exact values either side of a quadrant boundary,
     // which no user gesture can do repeatably.
     window.__isoS = S;
+    // Test hooks for tools/isotest/parts.mjs: the split is only correct
+    // if every ring survives it, and that cannot be checked from the
+    // outside without seeing the pieces.
+    window.__isoParts = parts;
+    window.__isoPartIndex = partIndex;
+    window.__isoPartRings = parts ? parts[partIndex].rings.length
+                                  : (boundary ? boundary.rings.length : 0);
     window.__isoSetYaw = v => { yaw = target = v; draw(canvas, S, yaw); };
     // One finger rotates, two fingers pinch to zoom.
     const pointers = new Map();
