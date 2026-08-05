@@ -550,9 +550,17 @@ const EveryParkIso = (() => {
        v => { raw.roads = v.roads; raw.buildings = v.buildings;
               raw.parking = v.parking; raw.publics = v.publics || []; }]
     ];
+    // Every source is bounded. `arc()` has no timeout of its own, so a
+    // hung ArcGIS request used to wait forever — which under the old
+    // await-everything code meant the dressing NEVER applied and nothing
+    // said why. Streaming made it visible (the loading mark sat there),
+    // and this makes it finite: a source that does not answer in time is
+    // simply absent, which is already how a failed one is treated.
+    // Timing out does not abort the request, it just stops waiting.
+    const SOURCE_TIMEOUT = 20000;
     let left = jobs.length;
-    const settled = jobs.map(([pr, take]) => pr
-      .then(v => { take(v); }, () => { /* this source is simply absent */ })
+    const settled = jobs.map(([pr, take]) => withTimeout(pr, SOURCE_TIMEOUT)
+      .then(v => { take(v); }, () => { /* absent, for whatever reason */ })
       .then(() => { left--; onPart(raw, left === 0); }));
     return { raw, done: Promise.all(settled).then(() => raw) };
   }
@@ -2597,7 +2605,7 @@ const EveryParkIso = (() => {
       S.labels = labels;
     };
     loading("place names", true);
-    fetchNames(bbox).then(ns => { rawNames = ns; buildLabels(); })
+    withTimeout(fetchNames(bbox), 20000).then(ns => { rawNames = ns; buildLabels(); })
                     .catch(() => { /* nameless land is fine */ })
                     .finally(() => loading("place names", false));
 
@@ -2769,7 +2777,7 @@ const EveryParkIso = (() => {
     // stand where the imagery actually shows trees. Doesn't turn the
     // satellite drape on — just informs the forest.
     loading("imagery", true);
-    fetchSatSample(bbox).then(t => {
+    withTimeout(fetchSatSample(bbox), 25000).then(t => {
       satSample = t;
       S.tex = satTexFrom(t, bbox);
       S.treeMask = treeMaskFrom(S.tex, S.inside);
@@ -2779,7 +2787,7 @@ const EveryParkIso = (() => {
     // NLCD ground classes: wetland, sand, meadow, scrub, crops,
     // pavement — per cell, so the ground can show what it is.
     loading("ground cover", true);
-    fetchCoverGrid(bbox).then(cg => {
+    withTimeout(fetchCoverGrid(bbox), 20000).then(cg => {
       coverSample = cg;
       S.coverM = coverGridFrom(cg, bbox);
     }).catch(() => { /* uniform palette fallback */ })
