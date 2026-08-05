@@ -2185,6 +2185,7 @@ const EveryParkIso = (() => {
     if (!S.moving || S._lodShape !== shape) {
       S._lodShape = shape;
       S._lodCoarse = false;        // every burst starts optimistic
+      S._lodOver = 0;
     }
     S.lod = window.__forceLod != null ? window.__forceLod
           : (S.moving && S._lodCoarse ? 2 : 1);
@@ -2213,8 +2214,24 @@ const EveryParkIso = (() => {
       // Only a full-detail frame tells us whether full detail is
       // affordable. Timing a coarse one would just confirm that the
       // cheap path is cheap, and the viewer would never come back.
-      if (S.lod === 1 && S.moving && window.__forceLod == null)
-        S._lodCoarse = (performance.now() - t0) > LOD_BUDGET_MS;
+      //
+      // A HIDDEN tab is not evidence. Chrome throttles rAF and
+      // deprioritises raster there, and a backgrounded tab reported
+      // 200-320 ms for scenes that render in single-digit ms — enough to
+      // latch the coarse step permanently on a machine that never needed
+      // it. This cost a whole round of wrong measurements before it was
+      // spotted, so it is checked here rather than trusted.
+      //
+      // Two consecutive over-budget frames, not one: a single slow frame
+      // is as likely to be a GC pause or a texture decode as a genuine
+      // inability to keep up, and latching on one sample is how you get
+      // a permanently chunky viewer from a momentary hiccup.
+      if (S.lod === 1 && S.moving && window.__forceLod == null
+          && !document.hidden) {
+        const over = (performance.now() - t0) > LOD_BUDGET_MS;
+        S._lodOver = over ? (S._lodOver || 0) + 1 : 0;
+        S._lodCoarse = S._lodOver >= 2;
+      }
       S._sig = sig;
     }
     ctx.clearRect(0, 0, W, Hh);

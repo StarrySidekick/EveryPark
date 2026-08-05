@@ -300,13 +300,22 @@ burst if it blew `LOD_BUDGET_MS` (22 ms).** Resolution follows the same
 decision, so there is never a frame that is sharp but chunky. On hardware
 that keeps up, motion is byte-identical to rest.
 
+Two guards on that decision, both put there by evidence rather than
+caution:
+
+- **A hidden tab is not evidence.** Chrome throttles rAF and
+  deprioritises raster when `document.hidden`, and a backgrounded tab
+  reported 200-320 ms frames for scenes that render in single-digit ms —
+  enough to latch the coarse step forever on a machine that never needed
+  it. The renderer skips the decision entirely while hidden.
+- **Two consecutive over-budget frames, not one.** A single slow frame is
+  as likely to be a GC pause or a texture decode as a real inability to
+  keep up.
+
 **Do not try to pin absolute frame times from this sandbox** — its
-browser has no GPU. And the live measurement that first looked
-authoritative was taken in a **backgrounded tab**, where rAF is throttled
-and raster deprioritised; it reported 200-320 ms frames for a scene that
-is fluid in the foreground. `document.hidden` is worth asserting in any
-in-browser benchmark. Measuring inside the running viewer avoids the
-whole question.
+browser has no GPU. And check `document.hidden` in any in-browser
+benchmark; a whole round of measurements here was wrong because of it,
+and looked entirely plausible while being wrong.
 
 `tools/isotest/lodbench.mjs` asserts BOTH branches via the
 `window.__lodBudgetMs` test seam: unlimited budget → the moving frame
