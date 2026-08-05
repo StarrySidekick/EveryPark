@@ -24,6 +24,10 @@ await page.evaluate(() => window.openTest({
 }));
 await page.waitForSelector("#isoPanel canvas", { state: "visible", timeout: 15000 });
 
+// The ribbon is hidden until asked for now, so the run starts by asking.
+await page.waitForTimeout(400);
+await page.screenshot({ path: "/tmp/ui-0-closed.png" });
+await page.click("#isoLoreBtn");
 await page.waitForTimeout(700);
 await page.screenshot({ path: "/tmp/ui-1-typing.png" });
 
