@@ -380,6 +380,34 @@ Hidden until the bottom-right button is pressed, and pressing it
 first letter, so a glance away cost you your place. The button only ever
 opens; the × on the ribbon is the only thing that closes it.
 
+### Gestures and the marks canvas (v0.39.0)
+
+**Marks are hidden for the length of a zoom animation.** They are drawn
+at layer points onto a canvas in `overlayPane`, and Leaflet animates a
+zoom by putting a CSS scale on that pane — correct for geographic vector
+shapes, wrong for fixed-size point icons, which swell and drift off their
+polygons before `zoomend` repaints. Counter-transforming does not help;
+the marks would still sit at the old zoom's positions. Redrawing every
+animation frame would need intermediate state Leaflet does not expose.
+So: fade out during the flight (`.ep-mark-zooming`).
+
+**3D zoom anchors on the viewer's middle, not the island's origin.** The
+scene projects around `(W/2 + panX, Hh*0.60 + panY)`, so scaling alone
+made a panned island walk out of frame. Holding the projection's base
+point still works out to scaling the pan by the same factor — and by the
+factor **actually applied**, not the one requested, or the pan keeps
+growing after the zoom clamps at 9 and the island crawls.
+
+**Two fingers pinch, pan and twist.** The twist sign matches the
+one-finger touch convention: the island follows the hand. The ±pi seam is
+handled explicitly, or one frame spins it most of a full turn.
+
+`tools/isotest/gestures.mjs` asserts all of this arithmetically — a
+30-degree twist must move the target 30 degrees in the right direction,
+pan must track zoom exactly across a scroll round trip and through the
+clamp, and the seam must not fling. These are sign-and-algebra bugs that
+look fine in a screenshot and are wrong the moment you touch them.
+
 ### Viewer chrome layout
 
 Four corners, all 38px icons: time of day (TL), season (TR), terrain menu

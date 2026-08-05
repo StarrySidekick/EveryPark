@@ -2999,10 +2999,25 @@ const EveryParkIso = (() => {
 
     tools.append(randBtn);
 
-    // Scroll to zoom, centred on the island.
+    // Zoom about the MIDDLE OF THE VIEWER, not the island's own origin.
+    //
+    // The scene is projected around (W/2 + panX, Hh*0.60 + panY), so
+    // scaling alone anchors the zoom to the island's origin: once you
+    // had panned, zooming in walked the thing you were looking at out of
+    // frame and you had to chase it. Holding the projection's base point
+    // still while the scale changes works out to scaling the pan by the
+    // same factor — one line, and now zoom goes where you are looking.
+    const zoomBy = f => {
+      const before = S.zoom;
+      S.zoom = Math.min(9, Math.max(.5, S.zoom * f));
+      const g = S.zoom / before;                 // the factor ACTUALLY applied
+      S.panX = (S.panX || 0) * g;
+      S.panY = (S.panY || 0) * g;
+    };
+
     canvas.addEventListener("wheel", e => {
       e.preventDefault();
-      S.zoom = Math.min(9, Math.max(.5, S.zoom * (e.deltaY < 0 ? 1.1 : 0.9)));
+      zoomBy(e.deltaY < 0 ? 1.1 : 0.9);
     }, { passive: false });
 
     // The turntable toggle sits beside the terrain icon rather than
@@ -3030,9 +3045,20 @@ const EveryParkIso = (() => {
     window.__isoPartRings = parts ? parts[partIndex].rings.length
                                   : (boundary ? boundary.rings.length : 0);
     window.__isoSetYaw = v => { yaw = target = v; draw(canvas, S, yaw); };
-    // One finger rotates, two fingers pinch to zoom.
+    // tools/isotest/gestures.mjs needs to see the rotation TARGET, not
+    // the eased yaw — a twist is judged by what it asked for, and the
+    // easing would otherwise hide a wrong sign behind a slow approach.
+    window.__isoGetTarget = () => target;
+    // One finger rotates; two fingers pinch, pan AND twist to rotate,
+    // the way a phone map does.
     const pointers = new Map();
-    let pinchDist = 0;
+    let pinchDist = 0, pinchAng = null;
+    // Angle of the line between the two fingers. Screen y points down,
+    // so a rising angle is a clockwise twist.
+    const twist = () => {
+      const [a, b2] = [...pointers.values()];
+      return Math.atan2(b2.y - a.y, b2.x - a.x);
+    };
     const midpoint = () => {
       const p = [...pointers.values()];
       if (!p.length) return { x: 0, y: 0 };
@@ -3050,15 +3076,30 @@ const EveryParkIso = (() => {
       // Losing capture costs a smooth drag, not correctness.
       try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* fine */ }
       if (pointers.size === 1) { dragging = true; lastX = e.clientX; }
-      else if (pointers.size === 2) { dragging = false; pinchDist = spread(); pinchMid = midpoint(); }
+      else if (pointers.size === 2) {
+        dragging = false; pinchDist = spread(); pinchMid = midpoint();
+        pinchAng = twist();
+      }
     });
     canvas.addEventListener("pointermove", e => {
       if (!pointers.has(e.pointerId)) return;
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (pointers.size >= 2) {
         const d = spread(), m = midpoint();
-        if (pinchDist > 0 && d > 0)
-          S.zoom = Math.min(9, Math.max(.5, S.zoom * (d / pinchDist)));
+        if (pinchDist > 0 && d > 0) zoomBy(d / pinchDist);
+        // Twisting the two fingers turns the island, like a phone map.
+        // The sign matches the one-finger touch convention: the island
+        // follows your hand rather than the camera doing the opposite.
+        if (pinchAng != null) {
+          const a2 = twist();
+          let dA = a2 - pinchAng;
+          // Take the short way round, or crossing the ±pi seam spins the
+          // island most of a full turn in one frame.
+          if (dA > Math.PI) dA -= 2 * Math.PI;
+          if (dA < -Math.PI) dA += 2 * Math.PI;
+          target -= dA;
+          pinchAng = a2;
+        }
         // Two fingers pinch AND pan: the midpoint between them drags the
         // island, so you can zoom into a corner and then bring it to the
         // middle without letting go.
@@ -3079,7 +3120,7 @@ const EveryParkIso = (() => {
     });
     const release = e => {
       pointers.delete(e.pointerId);
-      if (pointers.size < 2) { pinchDist = 0; pinchMid = null; }
+      if (pointers.size < 2) { pinchDist = 0; pinchMid = null; pinchAng = null; }
       if (pointers.size === 1) {
         dragging = true; lastX = [...pointers.values()][0].x;
       } else if (pointers.size === 0) dragging = false;

@@ -705,6 +705,16 @@ header { border-bottom: 2px solid var(--ep-brass); }
 .ep-mark svg { display: block; }
 .ep-mark-grave { color: rgba(226,214,240,.94); }
 
+/* Point icons cannot ride Leaflet's CSS zoom animation: the pane gets a
+   scale transform, which is correct for geographic shapes and wrong for
+   fixed-size glyphs, so they swell and drift off their polygons before
+   zoomend repaints them. Fade them out for the flight instead. */
+.ep-mark-canvas { transition: opacity .12s linear; }
+.ep-mark-canvas.ep-mark-zooming { opacity: 0; transition: opacity .08s linear; }
+@media (prefers-reduced-motion: reduce) {
+  .ep-mark-canvas, .ep-mark-canvas.ep-mark-zooming { transition: none; }
+}
+
 /* --- iso panel inherits the guide ---------------------------- */
 #isoPanel { background: var(--ep-ink); border: 1px solid var(--ep-brass); }
 .iso-tool {

@@ -651,6 +651,25 @@
   }
   map.on("moveend zoomend", paintMarks);
 
+  // Marks are hidden for the length of a zoom animation.
+  //
+  // They are drawn at LAYER points for the zoom they were painted at,
+  // onto a canvas that lives in overlayPane. Leaflet animates a zoom by
+  // putting a CSS scale on that pane, which is right for geographic
+  // vector shapes — they are supposed to grow with the map — but wrong
+  // for fixed-size point icons: the glyphs balloon and their anchors
+  // drift off the polygons, then snap back when zoomend repaints. That
+  // slide-and-reattach is exactly what Timothy saw.
+  //
+  // Counter-transforming the canvas does not fix it either; the marks
+  // would still be sitting at the old zoom's positions. The honest
+  // options are redrawing every animation frame (Leaflet gives no
+  // intermediate state to redraw FROM) or not drawing marks mid-flight.
+  // A ~250 ms fade is a great deal less distracting than icons sliding
+  // off the thing they label.
+  map.on("zoomstart", () => markCanvas.classList.add("ep-mark-zooming"));
+  map.on("zoomend", () => markCanvas.classList.remove("ep-mark-zooming"));
+
   // A place with no mapped boundary has no polygon to click, so fall
   // back to the nearest one when a click hits bare ground.
   map.on("click", e => {
