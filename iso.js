@@ -286,24 +286,52 @@ const EveryParkIso = (() => {
     return t;
   }
 
+  // The drape, BOX-FILTERED rather than point-sampled.
+  //
+  // This used to take one nearest-neighbour pixel per terrain cell. At a
+  // 20 m cell that throws away almost all of the imagery and keeps
+  // whichever single pixel happened to land under the sample point, so
+  // the result was not merely coarse, it was aliased — speckled with
+  // stray roof and car colours that are not what that patch of ground
+  // looks like. Averaging every source pixel the cell actually covers is
+  // what a photograph downsampled properly looks like.
+  //
+  // The cell's own resolution is still the limit, which is why turning
+  // the drape on also drops to the finest grid the park allows; see the
+  // Satellite button.
   function satTexFrom(t, bbox) {
     const tex = new Uint8ClampedArray(GRID * GRID * 3);
+    // Source pixel for a grid position, in fractional coordinates so the
+    // cell's extent can be worked out rather than guessed.
+    const srcAt = (gx, gy) => {
+      const [lng, lat] = gridToLL(bbox, gx, gy);
+      if (t.mode === "linear") {
+        const [w, s2, e2, n2] = t.bbox;
+        return [(lng - w) / (e2 - w) * (t.w - 1),
+                (n2 - lat) / (n2 - s2) * (t.h - 1)];
+      }
+      const tt = tileXY(lat, lng, t.zoom);
+      return [(tt.x - t.x0) * 256, (tt.y - t.y0) * 256];
+    };
+    const [ax, ay] = srcAt(0, 0), [bx, by] = srcAt(1, 1);
+    // Half a cell in source pixels, capped: a huge park over a small
+    // image would otherwise average hundreds of pixels per cell for no
+    // visible gain and a lot of time.
+    const hx = Math.min(6, Math.max(0, Math.abs(bx - ax) / 2));
+    const hy = Math.min(6, Math.max(0, Math.abs(by - ay) / 2));
     for (let gy = 0; gy < GRID; gy++)
       for (let gx = 0; gx < GRID; gx++) {
-        let ix, iy;
-        if (t.mode === "linear") {
-          const [w, s2, e2, n2] = t.bbox;
-          const [lng, lat] = gridToLL(bbox, gx, gy);
-          ix = Math.min(t.w - 1, Math.max(0, Math.round((lng - w) / (e2 - w) * (t.w - 1))));
-          iy = Math.min(t.h - 1, Math.max(0, Math.round((n2 - lat) / (n2 - s2) * (t.h - 1))));
-        } else {
-          const [lng, lat] = gridToLL(bbox, gx, gy);
-          const tt = tileXY(lat, lng, t.zoom);
-          ix = Math.min(t.w - 1, Math.max(0, Math.round((tt.x - t.x0) * 256)));
-          iy = Math.min(t.h - 1, Math.max(0, Math.round((tt.y - t.y0) * 256)));
-        }
-        const k = (iy * t.w + ix) * 4, o = (gy * GRID + gx) * 3;
-        tex[o] = t.px[k]; tex[o + 1] = t.px[k + 1]; tex[o + 2] = t.px[k + 2];
+        const [fx, fy] = srcAt(gx, gy);
+        const x0 = Math.max(0, Math.round(fx - hx)), x1 = Math.min(t.w - 1, Math.round(fx + hx));
+        const y0 = Math.max(0, Math.round(fy - hy)), y1 = Math.min(t.h - 1, Math.round(fy + hy));
+        let r = 0, g = 0, b = 0, n = 0;
+        for (let y = y0; y <= y1; y++)
+          for (let x = x0; x <= x1; x++) {
+            const k = (y * t.w + x) * 4;
+            r += t.px[k]; g += t.px[k + 1]; b += t.px[k + 2]; n++;
+          }
+        const o = (gy * GRID + gx) * 3;
+        if (n) { tex[o] = r / n; tex[o + 1] = g / n; tex[o + 2] = b / n; }
       }
     return tex;
   }
@@ -885,11 +913,16 @@ const EveryParkIso = (() => {
           // trails that do not exist yet, and promising someone a path
           // that was never built is worse than saying nothing.
           { ...base, outFields: TRAIL_FIELDS, where: "TRAILSTAT = 'Constructed'" }),
+      // Geometry, because these are also drawn on the terrain: where you
+      // enter a park is half of using it, and the viewer had nothing.
       arc(DEEP_ORG + "DEEP_Property_Access_Locations/FeatureServer/0/query",
-          { ...base, outFields: "*", where: "1=1" })
+          { ...base, outFields: "*", where: "1=1", returnGeometry: "true", outSR: "4326" })
     ]);
     const val = r => (r.status === "fulfilled" ? r.value : []).map(f => f.attributes || {});
-    return { trails: val(trails), access: val(access) };
+    const pts = (access.status === "fulfilled" ? access.value : [])
+      .filter(f => f.geometry && f.geometry.x != null)
+      .map(f => ({ a: f.attributes || {}, lng: f.geometry.x, lat: f.geometry.y }));
+    return { trails: val(trails), access: val(access), points: pts };
   }
 
   // Aggregate a permission across many segments. DEEP records these per
@@ -2204,7 +2237,10 @@ const EveryParkIso = (() => {
           const cell = atlas.cells[v];
           // Each variant keeps its own proportions and its own height:
           // sharing one atlas cell size drew every bush as tall as a pine.
-          const th = s * (1.5 + hash(dgx, dgy + 3)) * 1.35 * treeScale[v];
+          // 0.75 of the old size (Timothy, 2026-08-05). They were reading
+          // as a crowd of oversized props rather than a forest; smaller
+          // trees let the ground and the trails show through.
+          const th = s * (1.5 + hash(dgx, dgy + 3)) * 1.35 * .75 * treeScale[v];
           const tw = th * (cell.w / cell.h);
           decor.push({ d: dd, f: () => {
             ctx.imageSmoothingEnabled = false;
@@ -2836,9 +2872,13 @@ const EveryParkIso = (() => {
     // block-size slider, so keep the raw list and re-pin on rebuild.
     const buildLabels = () => {
       if (!rawNames) return;
-      const order = c => /Summit/i.test(c) ? 0
-                       : /Lake|Reservoir/i.test(c) ? 1
-                       : /Ridge|Falls|Gap|Cliff/i.test(c) ? 2 : 3;
+      // Access points outrank scenery. There are only eight label slots,
+      // and knowing where the entrance is beats knowing the name of a
+      // hill you can already see.
+      const order = c => /Access/i.test(c) ? 0
+                       : /Summit/i.test(c) ? 1
+                       : /Lake|Reservoir/i.test(c) ? 2
+                       : /Ridge|Falls|Gap|Cliff/i.test(c) ? 3 : 4;
       const seen = new Set();
       const labels = [];
       for (const nm of rawNames.slice()
@@ -2989,6 +3029,17 @@ const EveryParkIso = (() => {
       const deep = deepRaw
         ? { trails: deepRaw.trails, mine: deepMine(p, deepRaw.access) || [] }
         : null;
+      // Put the access points on the ground. "Where do I go in" is the
+      // question the viewer could not answer at all, and DEEP names
+      // every one of them — trailheads, boat launches, park entrances.
+      if (deepRaw && deepRaw.points && deepRaw.points.length) {
+        const marks = deepRaw.points.map(q => ({
+          name: (q.a.ACCSS_NAME || q.a.PROPERTY || "Access").trim(),
+          cls: "Access", water: /launch|boat|water/i.test(q.a.ACCSS_TYPE || ""),
+          lng: q.lng, lat: q.lat }));
+        rawNames = (rawNames || []).concat(marks);
+        buildLabels();
+      }
       if (deep && !lore.hidden) {   // show the rules without waiting on the rest
         pages = lorePages(p, null, null, loreExtra(), deep);
         page = Math.min(page, pages.length - 1);
@@ -3068,8 +3119,24 @@ const EveryParkIso = (() => {
     const satBtn = document.createElement("button");
     satBtn.className = "iso-tool";
     satBtn.textContent = "Satellite";
+    // Turning the drape ON also drops to the finest grid this park
+    // allows, and turning it off restores the block size you chose.
+    //
+    // The drape is painted one colour per terrain cell, so the cell size
+    // IS the image resolution. At a 20 m block a photograph cannot help
+    // but look like a mosaic, however well it is sampled — the fix is
+    // more cells, not better filtering, and the two together are what
+    // make it read as imagery rather than as a pixel filter.
+    let cellBeforeSat = null;
     satBtn.addEventListener("click", async () => {
-      if (S.useSat) { S.useSat = false; satBtn.classList.remove("active"); return; }
+      if (S.useSat) {
+        S.useSat = false; satBtn.classList.remove("active");
+        if (cellBeforeSat != null && S.cellM !== cellBeforeSat) {
+          S.cellM = cellBeforeSat; slider.value = String(cellBeforeSat); rebuild();
+        }
+        cellBeforeSat = null;
+        return;
+      }
       if (!S.tex) {
         satBtn.textContent = "Loading…";
         try {
@@ -3079,6 +3146,11 @@ const EveryParkIso = (() => {
         }
         catch (e) { satBtn.textContent = "No imagery"; return; }
         satBtn.textContent = "Satellite";
+      }
+      cellBeforeSat = S.cellM;
+      if (S.cellM > minCell) {
+        S.cellM = minCell; slider.value = String(minCell);
+        rebuild();                      // re-samples the drape at the new grid
       }
       S.useSat = true; satBtn.classList.add("active");
     });
@@ -3340,14 +3412,14 @@ const EveryParkIso = (() => {
       try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* fine */ }
       if (pointers.size === 1) {
         dragging = true; lastX = e.clientX; lastY = e.clientY;
-        // Google Maps' desktop convention, which is what was asked for:
-        // a plain left-drag PANS, and rotation moves to the right button
-        // or a held modifier. There was no way to pan with a mouse at all
-        // before — two-finger pan covered touch and desktop had nothing.
-        // Touch keeps rotating on one finger: it already has two-finger
-        // pan, and changing it would break the gesture people have.
-        dragMode = (e.pointerType === "touch" || e.button === 1 || e.button === 2
-                    || e.ctrlKey || e.shiftKey || e.metaKey) ? "rotate" : "pan";
+        // LEFT ROTATES, RIGHT PANS (Timothy, 2026-08-05 — the reverse of
+        // the Google Maps convention this briefly used). Rotation is the
+        // thing you do constantly in a turntable viewer, so it keeps the
+        // button you already have your finger on; panning is occasional
+        // and moves to the right button. Touch is unchanged: one finger
+        // rotates, two fingers pan.
+        dragMode = (e.button === 1 || e.button === 2
+                    || e.ctrlKey || e.shiftKey || e.metaKey) ? "pan" : "rotate";
         canvas.style.cursor = dragMode === "pan" ? "grabbing" : "ew-resize";
       }
       else if (pointers.size === 2) {
