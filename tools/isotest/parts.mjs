@@ -91,6 +91,35 @@ await page.waitForTimeout(600);
 const single = await state();
 if (single.arrows) fails.push("single-polygon place grew arrows it does not need");
 
+// --- holes are drawn as excluded land, not bitten out ---
+// A private inholding used to be a gap in the island, which reads as
+// missing data. It should now be part of the shape and coloured grey.
+await openWith([box(-73.50, 41.40, 0.040, 0.040),   // outer
+                box(-73.49, 41.41, 0.012, 0.012)]); // hole inside it
+await page.waitForSelector("#isoPanel canvas", { state: "visible", timeout: 15000 });
+await page.waitForTimeout(800);
+const holes = await page.evaluate(() => {
+  const S = window.__isoS;
+  const n = S.holeM ? S.holeM.reduce((a, v) => a + v, 0) : 0;
+  const inside = S.inside.reduce((a, v) => a + v, 0);
+  // Every hole cell must also be inside: the hole is part of the island's
+  // geometry now, and only its colour says otherwise.
+  let orphan = 0;
+  if (S.holeM) for (let i = 0; i < S.holeM.length; i++)
+    if (S.holeM[i] && !S.inside[i]) orphan++;
+  return { holeCells: n, insideCells: inside, orphan,
+           grid: Math.round(Math.sqrt(S.H.length)) };
+});
+if (!holes.holeCells)
+  fails.push("a ring inside another ring produced no hole mask");
+if (holes.orphan)
+  fails.push(`${holes.orphan} hole cells are outside the island; the hole was bitten out `
+           + `instead of being drawn as excluded`);
+// Sanity on scale: the hole is 0.012 of 0.040 a side, so ~9% of the area.
+const frac = holes.holeCells / holes.insideCells;
+if (frac < 0.03 || frac > 0.25)
+  fails.push(`hole covers ${(frac * 100).toFixed(1)}% of the island; expected roughly 9%`);
+
 // --- the loading chrome is positioned, not stacked ---
 const loader = await page.evaluate(() => {
   const stageEl = document.querySelector(".iso-stage");
@@ -113,7 +142,7 @@ if (loader.position !== "absolute")
 if (!loader.centredX || !loader.centredY)
   fails.push("loader is not centred on the stage");
 
-console.log(JSON.stringify({ first, totalRings, afterWrap, back, single, loader }, null, 1));
+console.log(JSON.stringify({ first, totalRings, afterWrap, back, single, holes, loader }, null, 1));
 await browser.close();
 if (fails.length) { console.error("FAIL:\n- " + fails.join("\n- ")); process.exit(1); }
 console.log("OK — pieces split, step and wrap; single polygons untouched");
