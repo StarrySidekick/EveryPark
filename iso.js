@@ -3032,7 +3032,8 @@ const EveryParkIso = (() => {
     });
     S.spin = true;
 
-    let yaw = 0, target = 0, dragging = false, lastX = 0, pinchMid = null;
+    let yaw = 0, target = 0, dragging = false, lastX = 0, lastY = 0;
+    let pinchMid = null, dragMode = "pan";
     // Test hooks for tools/isotest. The rotation-stability check has to
     // drive yaw to exact values either side of a quadrant boundary,
     // which no user gesture can do repeatably.
@@ -3075,7 +3076,18 @@ const EveryParkIso = (() => {
       // (and always does for synthetic events in the test harness).
       // Losing capture costs a smooth drag, not correctness.
       try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* fine */ }
-      if (pointers.size === 1) { dragging = true; lastX = e.clientX; }
+      if (pointers.size === 1) {
+        dragging = true; lastX = e.clientX; lastY = e.clientY;
+        // Google Maps' desktop convention, which is what was asked for:
+        // a plain left-drag PANS, and rotation moves to the right button
+        // or a held modifier. There was no way to pan with a mouse at all
+        // before — two-finger pan covered touch and desktop had nothing.
+        // Touch keeps rotating on one finger: it already has two-finger
+        // pan, and changing it would break the gesture people have.
+        dragMode = (e.pointerType === "touch" || e.button === 1 || e.button === 2
+                    || e.ctrlKey || e.shiftKey || e.metaKey) ? "rotate" : "pan";
+        canvas.style.cursor = dragMode === "pan" ? "grabbing" : "ew-resize";
+      }
       else if (pointers.size === 2) {
         dragging = false; pinchDist = spread(); pinchMid = midpoint();
         pinchAng = twist();
@@ -3110,24 +3122,42 @@ const EveryParkIso = (() => {
         }
         pinchDist = d; pinchMid = m;
       } else if (dragging) {
-        // Touch drags the ISLAND; a mouse drags the CAMERA. With a finger
-        // on the thing itself, pushing right should carry the near edge
-        // right, which is the opposite sign — the mouse convention felt
-        // backwards on a phone.
-        const dir = e.pointerType === "touch" ? -1 : 1;
-        target += (e.clientX - lastX) * .008 * dir; lastX = e.clientX;
+        if (dragMode === "pan") {
+          // Pan in DEVICE pixels: panX/panY are added to the projection
+          // centre, which lives in the canvas backing store, and that is
+          // 2x the CSS box on a retina screen. Without the ratio the
+          // island moves half as far as the cursor.
+          const q = canvas.width / canvas.getBoundingClientRect().width;
+          S.panX = (S.panX || 0) + (e.clientX - lastX) * q;
+          S.panY = (S.panY || 0) + (e.clientY - lastY) * q;
+        } else {
+          // Touch drags the ISLAND; a mouse drags the CAMERA. With a
+          // finger on the thing itself, pushing right should carry the
+          // near edge right, which is the opposite sign — the mouse
+          // convention felt backwards on a phone.
+          const dir = e.pointerType === "touch" ? -1 : 1;
+          target += (e.clientX - lastX) * .008 * dir;
+        }
+        lastX = e.clientX; lastY = e.clientY;
       }
     });
     const release = e => {
       pointers.delete(e.pointerId);
       if (pointers.size < 2) { pinchDist = 0; pinchMid = null; pinchAng = null; }
       if (pointers.size === 1) {
-        dragging = true; lastX = [...pointers.values()][0].x;
-      } else if (pointers.size === 0) dragging = false;
+        const only = [...pointers.values()][0];
+        dragging = true; lastX = only.x; lastY = only.y;
+      } else if (pointers.size === 0) {
+        dragging = false;
+        canvas.style.cursor = "grab";
+      }
     };
     canvas.addEventListener("pointerup", release);
     canvas.addEventListener("pointercancel", release);
+    // A right-drag is a rotate, so the menu must not interrupt it.
+    canvas.addEventListener("contextmenu", e => e.preventDefault());
     canvas.style.touchAction = "none";
+    canvas.style.cursor = "grab";
     const loop = () => {
       if (!document.getElementById("isoOverlay")) return;
       if (!dragging && S.spin) target += 0.0012;
