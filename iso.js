@@ -834,6 +834,90 @@ const EveryParkIso = (() => {
     return wikiGuess(p).catch(() => null);
   }
 
+  // ---- CT DEEP: the rules, from the agency that makes them ----------
+  //
+  // This is the source that closes the biggest hole in the lore ribbon.
+  // RULES used to have to say "Nothing recorded about dogs" for every
+  // place in the state; DEEP publishes the answer per trail segment and
+  // per access point, free, keyless and CORS-enabled.
+  //
+  // Two services, two different vocabularies, and mixing them up would
+  // print confident nonsense:
+  //   Trails (layer 3)  -> "True" / "False" / "Unknown"   (strings)
+  //   Access points (0) -> "Yes"  / "No"                  (strings)
+  // Neither is a boolean. `=== "True"` and `=== "Yes"`, never truthiness.
+  //
+  // Verified against the live services 2026-08-05: 13,873 trail segments
+  // of which 13,842 are Constructed, and 385 access points.
+  const DEEP_ORG = "https://services1.arcgis.com/FjPcSmEFuDYlIdKC/arcgis/rest/services/";
+  const TRAIL_FIELDS = ["TRAILNAME", "TRAILCLASS", "TRAILSURF", "TRAILSTAT",
+    "TRAILMARK", "PUBACCESS", "HIKE", "BIKE", "MTNBIKE", "EQUESTRIAN",
+    "CROSSCSKI", "SNOWMOBILE", "ADAACCESS", "DOGLEASH", "DOGUNLEASH",
+    "NATURTRAIL", "SPECIALPERMIT", "TRAILCOMMENTS"].join(",");
+
+  // Every activity flag worth saying out loud, in the order a walker
+  // would care about. Camping counts are handled separately.
+  const DEEP_ACTS = [
+    ["HIKING", "hiking"], ["SWIM", "swimming"], ["FISH_FRESH", "freshwater fishing"],
+    ["FISH_SALT", "saltwater fishing"], ["FISH_SHELL", "shellfishing"],
+    ["BOAT_PDDLE", "paddling"], ["BOAT_MOTOR", "motor boating"],
+    ["BIKE_PAVED", "road cycling"], ["BIKE_UNPVD", "off-road cycling"],
+    ["HORSE_RIDE", "horse riding"], ["BIRDING", "birding"],
+    ["PICNIC", "picnicking"], ["PAVILION", "a pavilion"],
+    ["CAMPING", "camping"], ["CAMP_BCKPK", "backpack camping"],
+    ["CABINS", "cabins"], ["HUNTING", "hunting"], ["SCUBA", "diving"],
+    ["ICE_SKATE", "ice skating"], ["SNOWMOBILE", "snowmobiling"],
+    ["SPORTS_FLD", "playing fields"], ["WATERFALL", "a waterfall"],
+    ["OVRLK_TOWR", "an overlook or tower"], ["HISTORIC", "something historic"],
+    ["ED_CTR_MSM", "a nature centre or museum"], ["CONCESSION", "a concession"]
+  ];
+
+  async function fetchDeepRules(p, bbox) {
+    const [w, s, e, n] = bbox;
+    const env = JSON.stringify({ xmin: w, ymin: s, xmax: e, ymax: n,
+                                 spatialReference: { wkid: 4326 } });
+    const base = { geometry: env, geometryType: "esriGeometryEnvelope",
+                   inSR: "4326", spatialRel: "esriSpatialRelIntersects",
+                   returnGeometry: "false", resultRecordCount: "400" };
+    const [trails, access] = await Promise.allSettled([
+      arc(DEEP_ORG + "DEEP_Trails_Set/FeatureServer/3/query",
+          // Constructed only. 31 segments statewide are "Potential" —
+          // trails that do not exist yet, and promising someone a path
+          // that was never built is worse than saying nothing.
+          { ...base, outFields: TRAIL_FIELDS, where: "TRAILSTAT = 'Constructed'" }),
+      arc(DEEP_ORG + "DEEP_Property_Access_Locations/FeatureServer/0/query",
+          { ...base, outFields: "*", where: "1=1" })
+    ]);
+    const val = r => (r.status === "fulfilled" ? r.value : []).map(f => f.attributes || {});
+    return { trails: val(trails), access: val(access) };
+  }
+
+  // Aggregate a permission across many segments. DEEP records these per
+  // segment, so a park is rarely unanimous — and "some trails here allow
+  // it" is a different fact from "the park allows it". Say which.
+  function deepConsensus(rows, field) {
+    let yes = 0, no = 0;
+    for (const r of rows) {
+      if (r[field] === "True") yes++;
+      else if (r[field] === "False") no++;
+    }
+    if (!yes && !no) return null;                 // only Unknown, or nothing
+    if (yes && !no) return "all";
+    if (!yes && no) return "none";
+    return yes >= no * 3 ? "most" : "some";
+  }
+
+  // Access points belonging to THIS place, by name. The PROPERTY field
+  // is DEEP's own name for the property, so a match is the agency
+  // agreeing with us about what this place is called — which is also
+  // what makes it safe to attribute the activities to the park rather
+  // than to "somewhere in this rectangle".
+  function deepMine(p, access) {
+    const mine = access.filter(a => nameScore(p.name, a.PROPERTY) >= 0.5
+                                 || nameScore(p.name, a.ACCSS_NAME) >= 0.5);
+    return mine.length ? mine : null;
+  }
+
   // ---- Composing the pages ------------------------------------------
   // Every sentence below is either a fact from the record, a fact an OSM
   // editor recorded, or Wikipedia's own words. Nothing is inferred to
@@ -851,10 +935,52 @@ const EveryParkIso = (() => {
 
   function tidy(v) { return String(v || "").replace(/_/g, " ").trim(); }
 
-  function lorePages(p, tags, wiki, extra) {
+  // Make a source-layer name readable without inventing anything.
+  //
+  // The dataset carries names exactly as the upstream layer held them,
+  // and some upstream layers store an owner rather than a place:
+  // "TOWN OF NEW MILFORD (CLATTER VALLEY)" is a parcel record, not a
+  // park name. Everything here is reversible presentation — the record's
+  // own `name` is untouched, because research binds to it and a rename
+  // would break that binding. See the ids-and-aka note in CLAUDE.md.
+  function prettyName(raw) {
+    let s = String(raw || "").trim();
+    if (!s) return s;
+    // A parenthesised tail after an owner prefix is usually the real
+    // name: "Town Of X (Clatter Valley)" -> "Clatter Valley".
+    const paren = s.match(/^(?:town|city|borough)\s+of\s+[^(]+\(([^)]+)\)\s*$/i);
+    if (paren) s = paren[1].trim();
+    // SHOUTED names become Title Case; mixed case is left alone, because
+    // "McLean Game Refuge" and "Lake of Isles" are already right and
+    // title-casing them would be a downgrade.
+    if (s === s.toUpperCase() && /[A-Z]{3}/.test(s)) {
+      const small = new Set(["of", "the", "and", "at", "on", "in", "de", "du"]);
+      s = s.toLowerCase().replace(/\b[a-z]+/g, (wd, i) =>
+        i > 0 && small.has(wd) ? wd : wd[0].toUpperCase() + wd.slice(1));
+    }
+    return s.replace(/\s{2,}/g, " ").trim();
+  }
+
+  function lorePages(p, tags, wiki, extra, deep) {
     const a = p.attrs || {};
     const pages = [];
     const t = tags || {};
+    const D = deep || {};
+    const dTrails = D.trails || [];
+    const dMine = D.mine || [];
+
+    // 0. What this place is actually called.
+    //
+    // Dataset names are whatever the source layer happened to hold, and
+    // some are frankly ugly: "Town Of New Milford (Clatter Valley)",
+    // or a bare steward category. DEEP's PROPERTY field is the agency's
+    // own name for its own land, so where it matches, it wins — that is
+    // not a guess, it is the owner saying what the place is called.
+    // Anything else gets tidied rather than replaced.
+    const official = (dMine.find(m => m.PROPERTY
+                        && nameScore(p.name, m.PROPERTY) >= 0.5) || {}).PROPERTY;
+    const shown = official || prettyName(p.name);
+    const alsoKnown = official && norm(official) !== norm(p.name) ? p.name : "";
 
     // 1. Who and where.
     const bits = [];
@@ -863,7 +989,8 @@ const EveryParkIso = (() => {
                                               : Math.round(acres)} acres`);
     if (p.subtype) bits.push(String(p.subtype).toLowerCase());
     const steward = p.agency || t.operator || OWNER_WORD[p.type] || "";
-    let open = p.town ? `${p.name}, in ${p.town}.` : `${p.name}.`;
+    let open = p.town ? `${shown}, in ${p.town}.` : `${shown}.`;
+    if (alsoKnown) open += ` Listed elsewhere as ${alsoKnown}.`;
     if (bits.length) open += ` ${bits.join(", ").replace(/^./, c => c.toUpperCase())}`
                              + (steward ? `, looked after by ${steward}.` : ".");
     else if (steward) open += ` Looked after by ${steward}.`;
@@ -899,7 +1026,44 @@ const EveryParkIso = (() => {
       const named = extra.publics.filter(q => q.name).slice(0, 2).map(q => q.name);
       if (named.length) here.push(`Nearby: ${named.join(", ")}.`);
     }
-    if (here.length) pages.push({ head: "WHAT'S HERE", body: here.join(" ") });
+    // Named trails, with their surface and blaze. This is the level of
+    // detail a walker actually plans with, and it comes from the state's
+    // own trail inventory rather than being inferred from geometry.
+    if (dTrails.length) {
+      const names = [...new Set(dTrails.map(r => (r.TRAILNAME || "").trim())
+                                       .filter(Boolean))].slice(0, 4);
+      if (names.length) here.push(`Marked trails: ${names.join(", ")}.`);
+      const blazes = [...new Set(dTrails.map(r => (r.TRAILMARK || "").trim())
+                                        .filter(b => b && b !== "None"))].slice(0, 3);
+      if (blazes.length) here.push(`Blazed ${blazes.join(", ").toLowerCase()}.`);
+      const surf = [...new Set(dTrails.map(r => r.TRAILSURF)
+                                      .filter(v => v && v !== "Unknown"))];
+      if (surf.length) here.push(`Surface: ${surf.join(", ").toLowerCase()}.`);
+    }
+    if (here.length) pages.push({ head: "WHAT'S HERE", body: here.join(" "),
+                                  src: dTrails.length ? "trails from CT DEEP" : "" });
+
+    // What you can actually DO. Straight from DEEP's access points, and
+    // only for points whose PROPERTY name matches this place — the
+    // agency agreeing about what this place is called is what makes it
+    // safe to attribute these to the park rather than to the rectangle.
+    if (dMine.length) {
+      const has = key => dMine.some(m => m[key] === "Yes");
+      const acts = DEEP_ACTS.filter(([k]) => has(k)).map(([, label]) => label);
+      const bits = [];
+      if (acts.length) bits.push(`You can find ${acts.slice(0, 10).join(", ")}.`);
+      const beds = dMine.reduce((s2, m) => s2 + (Number(m.NUMBER_CAMPSITES) || 0), 0);
+      if (beds > 0) bits.push(`${beds} campsites.`);
+      const shut = dMine.filter(m => m.STATUS && m.STATUS !== "Open");
+      if (shut.length)
+        bits.push(`Note: ${shut.length === dMine.length ? "listed as" : "one access point is"} `
+                + `${String(shut[0].STATUS).toLowerCase()}.`);
+      const types = [...new Set(dMine.map(m => m.ACCSS_TYPE).filter(Boolean))];
+      if (types.length) bits.push(`Access: ${types.join(", ").toLowerCase()}.`);
+      if (bits.length)
+        pages.push({ head: "WHAT YOU CAN DO", body: bits.join(" "),
+                     src: "CT DEEP", url: (dMine.find(m => m.LINK) || {}).LINK || "" });
+    }
 
     // 4. Rules. The honest page. Everything here is attributed, and an
     //    absence is stated as an absence rather than dressed up as
@@ -918,6 +1082,46 @@ const EveryParkIso = (() => {
       ruleSrc = "OpenStreetMap";
     }
     if (t.dog && DOG_WORD[t.dog]) { rules.push(DOG_WORD[t.dog]); ruleSrc = "OpenStreetMap"; }
+
+    // CT DEEP's own rules, which outrank an OSM tag and are citable to
+    // the agency that sets them. Stated with their scope: "on every
+    // marked trail" and "on some of them" are different facts and the
+    // difference is the one that gets someone in trouble.
+    const scope = { all: "on every marked trail here", most: "on most trails here",
+                    some: "on some trails here", none: "" };
+    const dog = deepConsensus(dTrails, "DOGLEASH");
+    const dogOff = deepConsensus(dTrails, "DOGUNLEASH");
+    if (dog === "none") { rules.push("No dogs on the marked trails."); ruleSrc = "CT DEEP"; }
+    else if (dog) {
+      rules.push(`Dogs on a lead ${scope[dog]}.`
+        + (dogOff === "all" ? " Off the lead is allowed too." : ""));
+      ruleSrc = "CT DEEP";
+    }
+    const pub = deepConsensus(dTrails, "PUBACCESS");
+    if (pub === "all") { rules.push("DEEP records the trails here as open to the public."); ruleSrc = "CT DEEP"; }
+    else if (pub === "some" || pub === "most")
+      { rules.push("Not every trail here is recorded as public — check signs at the trailhead."); ruleSrc = "CT DEEP"; }
+    const ada = deepConsensus(dTrails, "ADAACCESS");
+    if (ada === "all") rules.push("Accessible trails throughout.");
+    else if (ada === "some" || ada === "most") rules.push("Some trails are accessible.");
+    const permits = [...new Set(dTrails.map(r => r.SPECIALPERMIT)
+      .filter(v => v && v !== "None" && v !== "Unknown"))];
+    if (permits.length) {
+      rules.push(`A permit is needed for: ${permits.join(", ").toLowerCase()}.`);
+      ruleSrc = "CT DEEP";
+    }
+    // Modes worth naming, positively. Riding and mountain biking are the
+    // two people most often guess wrong about.
+    const modeWords = [["MTNBIKE", "mountain bikes"], ["BIKE", "bicycles"],
+                       ["EQUESTRIAN", "horses"], ["CROSSCSKI", "cross-country skis"],
+                       ["SNOWMOBILE", "snowmobiles"]];
+    const yes = modeWords.filter(([f]) => {
+      const c = deepConsensus(dTrails, f); return c === "all" || c === "most";
+    }).map(([, wrd]) => wrd);
+    const no = modeWords.filter(([f]) => deepConsensus(dTrails, f) === "none")
+                        .map(([, wrd]) => wrd);
+    if (yes.length) rules.push(`Allowed: ${yes.join(", ")}.`);
+    if (no.length) rules.push(`Not allowed: ${no.join(", ")}.`);
     if (t.access === "permit") { rules.push("A permit is wanted."); ruleSrc = "OpenStreetMap"; }
     if (t.access === "private") { rules.push("Mapped as private."); ruleSrc = "OpenStreetMap"; }
     if (a.researched && a.checked)
@@ -926,7 +1130,7 @@ const EveryParkIso = (() => {
     else if (p.status !== "park")
       rules.push("We have not confirmed public access here — treat it as unknown.");
     if (!t.opening_hours) rules.push("No posted hours recorded.");
-    if (!t.dog) rules.push("Nothing recorded about dogs.");
+    if (!t.dog && !dog) rules.push("Nothing recorded about dogs.");
     pages.push({ head: "RULES", body: rules.join(" "),
                  src: ruleSrc ? "rules from " + ruleSrc : "" });
 
@@ -1612,7 +1816,7 @@ const EveryParkIso = (() => {
 
   function renderScene(canvas, S, yaw) {
     const { H, inside, trailM, waterM, roadM, buildM, parkM, courtM,
-            dropM, edge, p, spriteAt, tex, coverM } = S;
+            dropM, edge, p, spriteAt, tex, coverM, holeM } = S;
     const useSat = S.useSat && tex;
     const tod = TOD[S.tod].fn;
     // Satellite is a photo — always drape it on the continuous mesh
@@ -1821,6 +2025,17 @@ const EveryParkIso = (() => {
       }
       if (!useSat && !isWater && !courtM[i] && !parkM[i] && !isBuild)
         [r, g, b] = SEASONS[S.season || 0].ground(r, g, b);
+      // Land inside the outline that is NOT part of the park — an
+      // inholding, a fenced reservoir, a private parcel the boundary
+      // wraps around. It used to be a bite out of the island, which
+      // reads as missing data. Drawn as flat grey it says the true
+      // thing instead: we know something is here, and it is not yours
+      // to walk on. Timothy's ask, 2026-08-05.
+      const isHole = holeM && holeM[i];
+      if (isHole) {
+        const lum = (r * .35 + g * .45 + b * .2);
+        r = g = b = 96 + lum * .22;
+      }
       [r, g, b] = tod(r, g, b);
       const topFill = rgbStr(r, g, b);
 
@@ -1981,7 +2196,7 @@ const EveryParkIso = (() => {
         // the sprites are the forest standing on it. Without a canopy
         // mask, don't invent trees on ground NLCD calls treeless
         // (marsh, sand, crops, pavement).
-        if (!courtM[j] && hash(dgx, dgy) < density
+        if (!courtM[j] && !(holeM && holeM[j]) && hash(dgx, dgy) < density
             && (!S.treeMask || S.treeMask[j])
             && (S.treeMask || !COVER_NO_TREES.has(cvr))) {
           const jx = (hash(dgx + 7, dgy) - .5) * s * .97;
@@ -2527,9 +2742,44 @@ const EveryParkIso = (() => {
     let heightSample = null;
     try { heightSample = await fetchHeightSample(bbox); } catch (e) { /* */ }
 
+    // Rings that nothing else encloses. Everything else is an inner
+    // ring — a hole — and the difference between the two masks is the
+    // land the boundary wraps around but does not include.
+    const outerRingsOf = rings => {
+      const bb = r => {
+        let w2 = 180, s2 = 90, e2 = -180, n2 = -90;
+        for (const [x, y] of r) {
+          if (x < w2) w2 = x; if (x > e2) e2 = x;
+          if (y < s2) s2 = y; if (y > n2) n2 = y;
+        }
+        return [w2, s2, e2, n2];
+      };
+      const boxes = rings.map(bb);
+      return rings.filter((r, i) => !boxes.some((o, j) => j !== i
+        && boxes[i][0] >= o[0] && boxes[i][1] >= o[1]
+        && boxes[i][2] <= o[2] && boxes[i][3] <= o[3]
+        && (o[2] - o[0]) * (o[3] - o[1]) > (boxes[i][2] - boxes[i][0]) * (boxes[i][3] - boxes[i][1])));
+    };
+
     const buildTerrain = () => {
       const inside = boundary ? maskFromRings(boundary.rings, bbox)
                               : new Uint8Array(GRID * GRID).fill(1);
+      // Holes become part of the island's GEOMETRY and are then coloured
+      // as excluded, rather than being cut out of it. A bite out of the
+      // shape reads as missing data; flat grey inside the outline reads
+      // as "not part of the park", which is the truth.
+      let holeM = null;
+      if (boundary && boundary.rings.length > 1) {
+        const outers = outerRingsOf(boundary.rings);
+        if (outers.length && outers.length < boundary.rings.length) {
+          const outer = maskFromRings(outers, bbox);
+          holeM = new Uint8Array(GRID * GRID);
+          let any = 0;
+          for (let i = 0; i < holeM.length; i++)
+            if (outer[i] && !inside[i]) { holeM[i] = 1; inside[i] = 1; any++; }
+          if (!any) holeM = null;
+        }
+      }
       const H = heightSample ? heightsFrom(heightSample, bbox)
                              : proceduralHeights(p);
       const dropM = new Float32Array(GRID * GRID);
@@ -2549,7 +2799,7 @@ const EveryParkIso = (() => {
           dropM[i] = H[i] - lo;
           edge[i] = isEdge;
         }
-      return { inside, H, dropM, edge };
+      return { inside, H, dropM, edge, holeM };
     };
 
     // The default block size, defined once. The slider below re-derives
@@ -2558,7 +2808,7 @@ const EveryParkIso = (() => {
     const minCell = Math.max(4, Math.ceil(spanM / 176 / 2) * 2);
     const defCell = Math.min(Math.max(20, minCell), minCell + 16);
     GRID = gridFor(defCell);
-    const { inside, H, dropM, edge } = buildTerrain();
+    const { inside, H, dropM, edge, holeM } = buildTerrain();
 
     // TERRAIN FIRST. Trails/roads/buildings/courts stream in after —
     // this is what makes the view feel fast.
@@ -2566,7 +2816,7 @@ const EveryParkIso = (() => {
     canvas.style.visibility = "";
     ov.classList.remove("iso-loading");
     const empty = () => new Uint8Array(GRID * GRID);
-    const S = { H, inside, dropM, edge, p,
+    const S = { H, inside, dropM, edge, holeM, p,
                 trailM: empty(), waterM: empty(), roadM: empty(),
                 buildM: empty(), parkM: empty(), courtM: empty(),
                 trailLines: [], roadLines: [], trailPieces: [], roadPieces: [],
@@ -2732,12 +2982,24 @@ const EveryParkIso = (() => {
       // while ArcGIS-sourced trails kept working — roads matter more
       // than lore, so lore queues behind them.
       await dressingReady;
+      // DEEP first and on its own: it is a state ArcGIS service like the
+      // ones already in flight, it does not touch Overpass, and it is
+      // the source most likely to actually answer.
+      const deepRaw = await fetchDeepRules(p, bbox).catch(() => null);
+      const deep = deepRaw
+        ? { trails: deepRaw.trails, mine: deepMine(p, deepRaw.access) || [] }
+        : null;
+      if (deep && !lore.hidden) {   // show the rules without waiting on the rest
+        pages = lorePages(p, null, null, loreExtra(), deep);
+        page = Math.min(page, pages.length - 1);
+        paintPage();
+      }
       const tags = await fetchOsmTags(p, bbox).catch(() => null);
       const wiki = await fetchWiki(p, tags).catch(() => null);
       loading("about this place", false);
       if (!document.body.contains(ov)) return;      // viewer closed meanwhile
-      if (!tags && !wiki) return;                   // nothing to add
-      const fresh = lorePages(p, tags, wiki, loreExtra());
+      if (!tags && !wiki && !deep) return;          // nothing to add
+      const fresh = lorePages(p, tags, wiki, loreExtra(), deep);
       // Do not yank the page out from under someone mid-read: keep their
       // place if the new set still has it, and only retype if the text
       // they are looking at actually changed.
