@@ -109,9 +109,10 @@ if (!near(Math.abs(twist.delta), 30 * Math.PI / 180, 0.02))
   fails.push(`a 30-degree twist should turn the island 30 degrees, `
            + `got ${(Math.abs(twist.delta) * 180 / Math.PI).toFixed(1)}`);
 
-// --- 3b. Desktop drag: left pans, modifier/right rotates -------------
-// Google Maps' convention, and the one that was missing entirely: there
-// was no way to pan with a mouse at all before this.
+// --- 3b. Desktop drag: left ROTATES, right/modifier PANS -------------
+// The reverse of the Google Maps convention, deliberately (Timothy,
+// 2026-08-05): rotation is what you do constantly in a turntable
+// viewer, so it keeps the button your finger is already on.
 const drag = await page.evaluate(() => {
   const S = window.__isoS;
   const c = document.querySelector("#isoPanel canvas");
@@ -132,20 +133,21 @@ const drag = await page.evaluate(() => {
   };
   return { plain: run({}), ctrl: run({ ctrlKey: true }), right: run({ button: 2 }), q };
 });
-// A plain left-drag must move the island by the cursor delta, in device
-// pixels — pan is added to a centre that lives in the backing store, so
-// on a 2x screen an unscaled delta moves the island half as far as the
-// hand.
-if (!near(drag.plain.panX, 60 * drag.q, 0.5) || !near(drag.plain.panY, 30 * drag.q, 0.5))
-  fails.push(`left-drag should pan by the cursor delta in device px `
-           + `(${60 * drag.q}, ${30 * drag.q}), got (${drag.plain.panX}, ${drag.plain.panY})`);
-if (Math.abs(drag.plain.turned) > 1e-9)
-  fails.push(`a plain left-drag rotated the island by ${drag.plain.turned}; it should only pan`);
+if (Math.abs(drag.plain.turned) < 1e-6)
+  fails.push("a plain left-drag should rotate, but the target did not move");
+if (Math.abs(drag.plain.panX) > 1e-9 || Math.abs(drag.plain.panY) > 1e-9)
+  fails.push(`a plain left-drag panned by (${drag.plain.panX}, ${drag.plain.panY}); `
+           + `it should only rotate`);
+// The panning buttons must move the island by the cursor delta in DEVICE
+// pixels — pan is added to a centre that lives in the canvas backing
+// store, so on a 2x screen an unscaled delta moves the island exactly
+// half as far as the hand, which feels like drag rather than a bug.
 for (const [name, r] of [["ctrl+drag", drag.ctrl], ["right-drag", drag.right]]) {
-  if (Math.abs(r.turned) < 1e-6)
-    fails.push(`${name} should rotate, but the target did not move`);
-  if (Math.abs(r.panX) > 1e-9 || Math.abs(r.panY) > 1e-9)
-    fails.push(`${name} should not pan, but moved (${r.panX}, ${r.panY})`);
+  if (!near(r.panX, 60 * drag.q, 0.5) || !near(r.panY, 30 * drag.q, 0.5))
+    fails.push(`${name} should pan by the cursor delta in device px `
+             + `(${60 * drag.q}, ${30 * drag.q}), got (${r.panX}, ${r.panY})`);
+  if (Math.abs(r.turned) > 1e-9)
+    fails.push(`${name} rotated the island by ${r.turned}; it should only pan`);
 }
 
 // --- 4. The +-pi seam must not fling it ------------------------------
