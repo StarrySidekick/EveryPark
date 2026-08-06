@@ -206,22 +206,22 @@ logging — a log nobody reads is the same as no check.
 
 ## Deploying
 
-**`api.github.com` is blocked from the sandbox; `github.com` is not.** Git
-over HTTPS works — clone, copy files, commit, push. Do not conclude GitHub is
-unreachable from an API 403; that mistake cost a round trip.
+Ordinary git. This project moved to Claude Code on 2026-08-06 and runs on a
+real machine with a real credential:
 
 ```bash
-T=$(tr -d '[:space:]' < .../github_token.txt)
-git clone --depth 1 "https://x-access-token:${T}@github.com/StarrySidekick/EveryPark.git" ep
-# copy changed files, commit, push. Always: git pull --rebase first.
+git pull --rebase
+git add -A && git commit -m "..." && git push
 ```
 
-Triggering a workflow needs the API, so use the Actions tab in the browser.
+Pages rebuilds from `main` in a minute or two. `gh` works for triggering
+workflows: `gh workflow run publish.yml`.
 
-**Token security:** stored in `outputs/github_token.txt`, used only via
-`--token-file` or an env var. Never print it, never commit it, always scrub
-`x-access-token:...@` from any output. Editing a fine-grained token's
-permissions **invalidates it** — it must be regenerated.
+**Cache busting:** bump `?v=NN` on `styles.css` / `app.js` / `config.js` /
+`iso.js` in `index.html` on every code change, **and** `siteVersion` in
+`config.js`. The badge in the header corner shows `siteVersion · dataVersion` —
+it is the proof a deploy actually reached the browser, and confirming it needs
+a **hard reload**, since Pages can serve the previous build for a minute.
 
 **Never pipe `git push` in a success check.** `if git push 2>&1 | sed ...`
 tests *sed's* exit code, which is always 0, so a rejected push reports
@@ -229,16 +229,23 @@ tests *sed's* exit code, which is always 0, so a rejected push reports
 or capture to a file and check separately. This masked a real 403 on
 2026-08-04.
 
-**"access denied by the git proxy ... not in this session's authorized
-repository set"** is not a token problem — the sandbox proxy refuses to
-inject a credential at all, and no token in the URL will change it. The
-repo has to be added to the session's sources by the user. Commit
-locally and wait; nothing is lost.
+**If a token is ever used explicitly:** never print it, never commit it, always
+scrub `x-access-token:...@` from any output. Editing a fine-grained token's
+permissions **invalidates it** — it must be regenerated.
 
-**Cache busting:** bump `?v=NN` on `styles.css` / `app.js` / `config.js` in
-`index.html` on every code change, and `siteVersion` in `config.js`. The badge
-in the header corner shows `siteVersion · dataVersion` — it is the proof a
-deploy actually reached the browser.
+### History, in case old notes turn up
+
+Ten deploys (v0.32 → v0.41) went through the GitHub **web uploader** driven by
+browser automation, because the previous cloud sandbox's git proxy refused
+every push with *"access denied by the git proxy … not in this session's
+authorized repository set"*. That was never a token problem — the proxy
+declined to inject a credential at all, and no token in a URL changed it.
+None of that applies now. If you find instructions about `github_token.txt`,
+`x-access-token@` clone URLs, or clicking Commit by screen coordinates, they
+are obsolete.
+
+**See also `docs/START-HERE.md`** — current state, decisions already settled,
+what to build next, and the traps that have cost real time.
 
 ---
 
