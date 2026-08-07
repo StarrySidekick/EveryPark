@@ -198,7 +198,7 @@ def run_section(cache, stale, prev, name, keys, fn):
     cache.update(got)
 
 
-def fetch_attributes(outdir, prev=None):
+def fetch_attributes(outdir, prev=None, only=None):
     prev = prev or {}
     cache = {}
     stale = []
@@ -250,6 +250,66 @@ def fetch_attributes(outdir, prev=None):
                               "url": a.get("LINK"), "lat": round(g["y"], 5),
                               "lng": round(g["x"], 5)})
         return {"ctparks_boat_v2": boats}
+
+    # --- coastal access sites ------------------------------------------
+    def s_coastal():
+        """CT DEEP Coastal Access Sites: 357 points, fees and facilities.
+
+        Two services publish this layer, both with 357 features and the
+        same description. The one with the NEWER edit date
+        (CT_Coastal_Public_Access_Sites, 2023-01-05) is a shapefile round
+        trip: field names truncated to ten characters (SiteAddres,
+        Directio_1) and Fee, Restrooms, HandicappedAccess, ParkingDesc
+        and all twenty-odd activity flags dropped. It keeps 11 fields of
+        the 67. This one is a year older and complete; prefer it.
+
+        The flags are the strings "YES"/"NO" — a THIRD vocabulary, after
+        the trails layer's "True"/"False"/"Unknown" and the access-point
+        layer's "Yes"/"No". "NO" is truthy in both Python and JS, so a
+        plain `if a["Fee"]:` calls every one of the 357 fee-charging when
+        only 69 are. They are collapsed to a list of the YES ones here,
+        at the edge, while the vocabulary is still in view.
+        """
+        FLAGS = [
+            ("Restrooms", "restrooms"), ("HandicappedAccess", "accessible"),
+            ("PicnicArea", "picnic area"), ("Trails", "trails"),
+            ("Walkway", "walkway"), ("AccessPier", "access pier"),
+            ("Fishing", "fishing"), ("Shellfishing", "shellfishing"),
+            ("Crabbing", "crabbing"), ("Scuba", "scuba"),
+            ("SupervisedSwimming", "supervised swimming"),
+            ("UnsupervisedSwimming", "unsupervised swimming"),
+            ("BirdWildlife", "birding and wildlife"),
+            ("WaterfowlHunting", "waterfowl hunting"),
+            ("BoatLaunchRamp", "boat launch ramp"),
+            ("CarTopBoatAccess", "car-top boat access"),
+            ("Camping", "camping"), ("RvCamping", "RV camping"),
+            ("NatureCenter", "nature centre"), ("Lighthouse", "lighthouse"),
+            ("FoodConcession", "food concession"),
+            ("HistoricCultural", "historic or cultural site"),
+        ]
+        out = []
+        j = post(DEEP + "Coastal_Access_Sites_Feature_Service/FeatureServer/0/query",
+                 {"where": "1=1", "outSR": "4326", "outFields": "*",
+                  "returnGeometry": "true", "resultRecordCount": "1000"})
+        for f in j.get("features") or []:
+            g, a = f.get("geometry"), f["attributes"]
+            nm = str(a.get("SiteName") or "").strip()
+            if not g or g.get("x") is None or not nm:
+                continue
+            rec = {"n": nm, "town": a.get("Town") or "",
+                   "lat": round(g["y"], 5), "lng": round(g["x"], 5),
+                   "owner": a.get("OwnerType") or "Unknown",
+                   "ownerName": a.get("OwnerName") or "",
+                   "fee": a.get("Fee") == "YES",
+                   "has": [label for fld, label in FLAGS if a.get(fld) == "YES"]}
+            for src, key in (("SiteWebsite", "url"), ("MapLink", "map"),
+                             ("ParkingDesc", "parking"),
+                             ("SiteDescription", "desc")):
+                v = str(a.get(src) or "").strip()
+                if v:
+                    rec[key] = v
+            out.append(rec)
+        return {"ctparks_coastal_v1": out}
 
     # --- town parks ----------------------------------------------------
     def s_municipal():
@@ -485,6 +545,7 @@ def fetch_attributes(outdir, prev=None):
     sections = [
         ("DEEP wildlife/hatchery/flood land", ["ctparks_stateextra_v1"], s_stateextra),
         ("boat launches", ["ctparks_boat_v2"], s_boats),
+        ("coastal access sites", ["ctparks_coastal_v1"], s_coastal),
         ("town parks", ["ctparks_municipal_v3"], s_municipal),
         ("greens and rec grounds", ["ctparks_landuse_v1"], s_landuse),
         ("preserves", ["ctparks_preserve_raw_v1"], s_preserves),
@@ -496,6 +557,18 @@ def fetch_attributes(outdir, prev=None):
         ("PAD-US places", ["ctparks_padusplaces_v1"], s_padus),
         ("trail grid", ["ctparks_trailgrid_v2"], s_trailgrid),
     ]
+    # --only exists so one source can be exercised on its own. The full
+    # attribute pass is ~13 minutes across eight services, which is long
+    # enough that the alternative is testing a hand-copied version of the
+    # fetcher rather than the fetcher — and this project has already been
+    # burned once verifying tiles with the same broken decoder that made
+    # them.
+    if only:
+        want = {s.strip() for s in only.split(",") if s.strip()}
+        sections = [s for s in sections if s[0] in want or set(s[1]) & want]
+        if not sections:
+            raise SystemExit(f"--only matched no section: {sorted(want)}")
+
     for name, keys, fn in sections:
         run_section(cache, stale, prev, name, keys, fn)
 
@@ -513,6 +586,10 @@ def main():
                          "(default: data/baked.json when it exists)")
     ap.add_argument("--skip-geometry", action="store_true")
     ap.add_argument("--only-attributes", action="store_true")
+    ap.add_argument("--only", default=None,
+                    help="run only these attribute sections (comma separated, "
+                         "by section name or cache key); writes "
+                         "baked-partial.json, never baked.json")
     args = ap.parse_args()
     os.makedirs(args.out, exist_ok=True)
 
@@ -529,15 +606,22 @@ def main():
                   "sections have no fallback this run", flush=True)
 
     print("Attributes and place lists:", flush=True)
-    cache, stale = fetch_attributes(args.out, prev)
+    cache, stale = fetch_attributes(args.out, prev, args.only)
     doc = {"built": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
            "cache": cache}
     if stale:
         doc["stale"] = stale
-    with open(os.path.join(args.out, "baked.json"), "w") as fh:
+    # A partial run must not land on baked.json. buildplaces.py would read
+    # it, find eleven of twelve sections missing, and build a near-empty
+    # places.json without anything failing — the silent-success trap.
+    name = "baked-partial.json" if args.only else "baked.json"
+    with open(os.path.join(args.out, name), "w") as fh:
         json.dump(doc, fh, separators=(",", ":"))
+    if args.only:
+        print(f"\npartial run — wrote {args.out}/{name}, "
+              "NOT baked.json; do not feed this to buildplaces.py", flush=True)
 
-    if not (args.skip_geometry or args.only_attributes):
+    if not (args.only or args.skip_geometry or args.only_attributes):
         print("\nGeometry for tiles:", flush=True)
         fetch_geometry(args.out)
     print("\ndone")

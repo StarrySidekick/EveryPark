@@ -826,6 +826,135 @@ def main():
     removed = B.dedupe()
     print(f"  -{removed:,} cross-source duplicates = {len(B.places):,}", flush=True)
 
+    # --- 11b. Coastal access sites -------------------------------------
+    # 357 DEEP sites, but only a minority are new places: 141 of them land
+    # on 128 places already in the dataset. Adding those again would
+    # not merge them — dedupe() KEEPS the richer record and DROPS the
+    # other, so the fee and facility data would be thrown away, or the
+    # acreage would. So this pass enriches what already exists, and only
+    # adds a site as a new place when there is nothing at all within
+    # 400 m and it is free and publicly owned. Runs after dedupe() for
+    # that reason: it must see the final set of places to match against.
+    #
+    # Nothing here flips an existing place's verdict. A coastal site is a
+    # point on a shoreline, often a corner of a much larger park, and its
+    # Fee flag describes the site, not the park. Stating the fact in the
+    # card is honest; re-deriving feeState from it would be an inference.
+    coastal = baked.get("ctparks_coastal_v1") or []
+    if coastal:
+        GENERIC = {"the", "of", "and", "at", "park", "area", "site", "access",
+                   "public", "point", "beach", "state", "town", "city",
+                   "municipal", "open", "space", "preserve", "landing",
+                   "boat", "launch", "memorial"}
+
+        def toks(s):
+            return {w for w in norm(s).split() if w and w not in GENERIC}
+
+        cgrid = Grid(0.01)
+        for p in B.places:
+            cgrid.add(p["lat"], p["lng"], p)
+
+        # A park can hold several access sites — Fort Griswold matches two,
+        # and Sherwood Island more. They are collected per place and
+        # applied once, because writing them one at a time meant the last
+        # site's facilities overwrote the first's and the source string
+        # was appended twice. Nothing raised; the record just quietly
+        # described one access point as though it were the whole park.
+        matched = defaultdict(list)
+        new = skipped = 0
+        for c in coastal:
+            cand = cgrid.near(c["lat"], c["lng"], 400)
+            ct = toks(c["n"])
+            hit = None
+            for _, p in sorted(cand, key=lambda x: x[0]):
+                pt = toks(p["name"])
+                if not ct or not pt:
+                    continue
+                if len(ct & pt) / max(1, min(len(ct), len(pt))) >= 0.5:
+                    hit = p
+                    break
+
+            if hit is not None:
+                matched[id(hit)].append((hit, c))
+                continue
+
+            # Publicly owned and free, with nothing else mapped nearby.
+            if cand or c["fee"] or c["owner"] not in ("Municipal", "State",
+                                                      "Federal"):
+                skipped += 1
+                continue
+
+            kind = {"Municipal": "town", "State": "state",
+                    "Federal": "national"}[c["owner"]]
+            bits = ["Listed by CT DEEP as a public coastal access site."]
+            if c["has"]:
+                bits.append("Recorded here: " + ", ".join(c["has"]) + ".")
+            if c.get("parking"):
+                bits.append("Parking: " + c["parking"] + ".")
+            if B.add(name=c["n"], type=kind, subtype="Coastal Access Site",
+                     lat=c["lat"], lng=c["lng"],
+                     town=c.get("town") or towns.find(c["lat"], c["lng"]),
+                     url=c.get("url"), agency=c.get("ownerName") or None,
+                     note=" ".join(bits),
+                     attrs={"water": True, "coastal": True,
+                            "coastalFacilities": c["has"],
+                            "restrooms": "restrooms" in c["has"],
+                            "accessible": "accessible" in c["has"],
+                            "coastalParking": c.get("parking"),
+                            "coastalMap": c.get("map"),
+                            "coastalSites": 1,
+                            "sources": ["CT DEEP Coastal Access Sites"]}):
+                new += 1
+            else:
+                skipped += 1
+
+        for group in matched.values():
+            place = group[0][0]
+            a = place.setdefault("attrs", {})
+            a["coastal"] = True
+            facs = []
+            for _, c in group:
+                for f in c["has"]:
+                    if f not in facs:
+                        facs.append(f)
+            if facs:
+                a["coastalFacilities"] = facs
+            if "restrooms" in facs:
+                a["restrooms"] = True
+            if "accessible" in facs:
+                a["accessible"] = True
+            # Parking is per access point and genuinely differs between
+            # them — one of Fort Griswold's two records says "None" and
+            # taking the first would print that for the whole park. Keep
+            # every distinct answer.
+            parks = []
+            for _, c in group:
+                v = (c.get("parking") or "").strip()
+                if v and v not in parks:
+                    parks.append(v)
+                if c.get("map") and "coastalMap" not in a:
+                    a["coastalMap"] = c["map"]
+                if not place.get("url") and c.get("url"):
+                    place["url"] = c["url"]
+            if parks:
+                a["coastalParking"] = "; ".join(parks)
+            # Scope, not a bare flag. A park with three access points where
+            # one charges is neither "free" nor "paid", and START-HERE's
+            # third DEEP trap is exactly this: state the count, let the
+            # card say "one of three", and never average it into a verdict.
+            fees = sum(1 for _, c in group if c["fee"])
+            a["coastalSites"] = len(group)
+            if fees:
+                a["coastalFeeSites"] = fees
+            if "CT DEEP Coastal Access Sites" not in a.setdefault("sources", []):
+                a["sources"].append("CT DEEP Coastal Access Sites")
+
+        sites = sum(len(g) for g in matched.values())
+        print(f"  coastal access: {sites:,} sites enriched "
+              f"{len(matched):,} existing places, +{new:,} new, "
+              f"{skipped:,} held back (fee-charging, privately owned, or "
+              f"already covered) = {len(B.places):,}", flush=True)
+
     # --- 12. What's actually there -------------------------------------
     fac = Grid(0.01)
     for row in baked.get("ctparks_fac_v1") or []:
