@@ -204,11 +204,27 @@ picks up the 13,903 PAD-US NY units and ~8,200 NY OSM parks on top.
 
 **Not done:**
 
-1. **NY access rules.** New York is 0% settled and entirely amber. This is
-   correct — no one has cited New York law — but it is the single biggest
-   gap. Start at 6 NYCRR Part 190 (DEC public use of state lands) and
-   Article XIV of the NY Constitution for Forest Preserve. **Each rule
-   turns hundreds of places green, so these get reviewed before landing.**
+1. ~~**NY access rules.**~~ Six landed 2026-08-07 — Forest Preserve, its
+   detached parcels, State Forest, WMA, Unique Area, Multiple Use Area —
+   scoped `"states": ["NY"]` and settling **1,155 of 2,085 NY places
+   (55%)**. Deliberately NOT covered: Tidal Wetland, Special Use,
+   Educational, Conservation Easement, Leased Access, Fishing Access and
+   Waterway Access. Nothing found supports a public-entry claim for
+   those, so they stay amber.
+
+   **What the citations do and do not carry.** DEC publishes no blanket
+   "open to the public, free" statement the way CT DEEP does. Its
+   rules-for-use page only says "Anyone enjoying State Forests… must
+   observe the following rules" — presupposing public use, not granting
+   it. Free rests on the structured `Fee: Free` field on each unit's own
+   DEC place page. If that reading is ever challenged, these six rules
+   are where to look first.
+
+   **Do not cite the per-record `URL` field as a rule source.** 15% of a
+   40-URL sample were dead: the layer stores legacy
+   `www.dec.ny.gov/outdoor/NNNNN.html` links, most of which 302 three
+   times into the new `/places/` scheme and some of which 404. They are
+   fine as a place's own link, useless as the evidence a rule rests on.
 2. **`app.js` knows nothing about states.** It still fetches the CT-only
    `towns.geojson`, has no state filter, and no NY town boundaries.
 3. **Progressive load.** Not the download — `places.json` is 3.97 MB on

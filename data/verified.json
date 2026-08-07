@@ -1389,6 +1389,144 @@
    ],
    "checked": "2026-08-02",
    "why": "Land recorded in PAD-US as city or town owned is municipal open space. Under Leydon v. Greenwich (2001) a Connecticut municipality may not close its parks and open space to non-residents, so this land is public by law."
+  },
+  {
+   "id": "ny-forest-preserve",
+   "match": {
+    "subtype": "Forest Preserve",
+    "agency": "NYS DEC"
+   },
+   "states": [
+    "NY"
+   ],
+   "siteRules": [
+    "Camping is prohibited within 150 feet of any road, trail or water, except at sites DEC has designated",
+    "Fires may use dead and downed wood only, must never be left unattended, and must be drowned and raked cold",
+    "Motor vehicles are permitted only on access roads posted as open to them; off-road use is prohibited",
+    "Groups over 20, and camping either over three consecutive nights or in a group of ten or more, need a permit from DEC"
+   ],
+   "source": [
+    "https://dec.ny.gov/nature/forests-trees/state-forests/rules-for-use",
+    "http://nyrules.elaws.us/nycrr/title6_chapterii_part190"
+   ],
+   "checked": "2026-08-07",
+   "why": "New York's Forest Preserve in the Adirondack and Catskill parks is state land held under Article XIV of the state constitution and administered by DEC for public recreation. Hiking and backcountry camping are permitted throughout, so a Forest Preserve parcel does not need a mapped trail to be reachable. DEC publishes no blanket admission statement; the individual DEC place page for each unit carries a structured 'Fee: Free' field, which is what free rests on here. Checked against 6 NYCRR Part 190, whose scope clause names these land classes explicitly as state lands under DEC jurisdiction open to public use.",
+   "reachable": true
+  },
+  {
+   "id": "ny-forest-preserve-detached",
+   "match": {
+    "subtype": "Forest Preserve (detached parcel)",
+    "agency": "NYS DEC"
+   },
+   "states": [
+    "NY"
+   ],
+   "siteRules": [
+    "Camping is prohibited within 150 feet of any road, trail or water, except at sites DEC has designated",
+    "Fires may use dead and downed wood only, must never be left unattended, and must be drowned and raked cold",
+    "Motor vehicles are permitted only on access roads posted as open to them; off-road use is prohibited",
+    "Groups over 20, and camping either over three consecutive nights or in a group of ten or more, need a permit from DEC"
+   ],
+   "source": [
+    "https://dec.ny.gov/nature/forests-trees/state-forests/rules-for-use",
+    "http://nyrules.elaws.us/nycrr/title6_chapterii_part190"
+   ],
+   "checked": "2026-08-07",
+   "why": "A detached Forest Preserve parcel is Forest Preserve outside the two park boundaries. Same constitutional status, same DEC administration, same public use. DEC publishes no blanket admission statement; the individual DEC place page for each unit carries a structured 'Fee: Free' field, which is what free rests on here. Checked against 6 NYCRR Part 190, whose scope clause names these land classes explicitly as state lands under DEC jurisdiction open to public use.",
+   "reachable": true
+  },
+  {
+   "id": "ny-state-forest",
+   "match": {
+    "subtype": "State Forest",
+    "agency": "NYS DEC"
+   },
+   "states": [
+    "NY"
+   ],
+   "siteRules": [
+    "Camping is prohibited within 150 feet of any road, trail or water, except at sites DEC has designated",
+    "Fires may use dead and downed wood only, must never be left unattended, and must be drowned and raked cold",
+    "Motor vehicles are permitted only on access roads posted as open to them; off-road use is prohibited",
+    "Groups over 20, and camping either over three consecutive nights or in a group of ten or more, need a permit from DEC"
+   ],
+   "source": [
+    "https://dec.ny.gov/nature/forests-trees/state-forests/rules-for-use",
+    "http://nyrules.elaws.us/nycrr/title6_chapterii_part190"
+   ],
+   "checked": "2026-08-07",
+   "why": "DEC state forests are open to the public for hiking, camping, hunting, fishing, biking, riding and skiing, and are open to public hunting except in intensive use areas. Walking is permitted throughout, so a state forest does not need a mapped trail to be reachable. DEC publishes no blanket admission statement; the individual DEC place page for each unit carries a structured 'Fee: Free' field, which is what free rests on here. Checked against 6 NYCRR Part 190, whose scope clause names these land classes explicitly as state lands under DEC jurisdiction open to public use.",
+   "reachable": true
+  },
+  {
+   "id": "ny-wma",
+   "match": {
+    "subtype": "Wildlife Management Area",
+    "agency": "NYS DEC"
+   },
+   "states": [
+    "NY"
+   ],
+   "siteRules": [
+    "Camping is prohibited within 150 feet of any road, trail or water, except at sites DEC has designated",
+    "Fires may use dead and downed wood only, must never be left unattended, and must be drowned and raked cold",
+    "Motor vehicles are permitted only on access roads posted as open to them; off-road use is prohibited",
+    "Groups over 20, and camping either over three consecutive nights or in a group of ten or more, need a permit from DEC"
+   ],
+   "source": [
+    "https://dec.ny.gov/nature/forests-trees/state-forests/rules-for-use",
+    "http://nyrules.elaws.us/nycrr/title6_chapterii_part190"
+   ],
+   "checked": "2026-08-07",
+   "why": "New York wildlife management areas are DEC land acquired and managed for wildlife and for public wildlife-related recreation, including hunting, fishing and wildlife observation. Open to the public; expect hunting in season and dress accordingly. DEC publishes no blanket admission statement; the individual DEC place page for each unit carries a structured 'Fee: Free' field, which is what free rests on here. Checked against 6 NYCRR Part 190, whose scope clause names these land classes explicitly as state lands under DEC jurisdiction open to public use.",
+   "reachable": true
+  },
+  {
+   "id": "ny-unique-area",
+   "match": {
+    "subtype": "Unique Area",
+    "agency": "NYS DEC"
+   },
+   "states": [
+    "NY"
+   ],
+   "siteRules": [
+    "Camping is prohibited within 150 feet of any road, trail or water, except at sites DEC has designated",
+    "Fires may use dead and downed wood only, must never be left unattended, and must be drowned and raked cold",
+    "Motor vehicles are permitted only on access roads posted as open to them; off-road use is prohibited",
+    "Groups over 20, and camping either over three consecutive nights or in a group of ten or more, need a permit from DEC"
+   ],
+   "source": [
+    "https://dec.ny.gov/nature/forests-trees/state-forests/rules-for-use",
+    "http://nyrules.elaws.us/nycrr/title6_chapterii_part190"
+   ],
+   "checked": "2026-08-07",
+   "why": "DEC unique areas are state lands of exceptional scenic, ecological or recreational character, named in the scope clause of 6 NYCRR Part 190 and administered for public use. DEC publishes no blanket admission statement; the individual DEC place page for each unit carries a structured 'Fee: Free' field, which is what free rests on here. Checked against 6 NYCRR Part 190, whose scope clause names these land classes explicitly as state lands under DEC jurisdiction open to public use.",
+   "reachable": true
+  },
+  {
+   "id": "ny-multiple-use-area",
+   "match": {
+    "subtype": "Multiple Use Area",
+    "agency": "NYS DEC"
+   },
+   "states": [
+    "NY"
+   ],
+   "siteRules": [
+    "Camping is prohibited within 150 feet of any road, trail or water, except at sites DEC has designated",
+    "Fires may use dead and downed wood only, must never be left unattended, and must be drowned and raked cold",
+    "Motor vehicles are permitted only on access roads posted as open to them; off-road use is prohibited",
+    "Groups over 20, and camping either over three consecutive nights or in a group of ten or more, need a permit from DEC"
+   ],
+   "source": [
+    "https://dec.ny.gov/nature/forests-trees/state-forests/rules-for-use",
+    "http://nyrules.elaws.us/nycrr/title6_chapterii_part190"
+   ],
+   "checked": "2026-08-07",
+   "why": "DEC multiple use areas are state lands managed for a range of public outdoor recreation and named in the scope clause of 6 NYCRR Part 190. DEC publishes no blanket admission statement; the individual DEC place page for each unit carries a structured 'Fee: Free' field, which is what free rests on here. Checked against 6 NYCRR Part 190, whose scope clause names these land classes explicitly as state lands under DEC jurisdiction open to public use.",
+   "reachable": true
   }
  ]
 }

@@ -204,12 +204,12 @@ const CONFIG = {
   //
   // Bump dataVersion whenever you regenerate it, otherwise browsers will
   // keep serving the copy they already have.
-  dataVersion: "20260803",
+  dataVersion: "20260807",
 
   // Shown in the top-right corner. Bumped by hand on every code change,
   // so there's visible proof of which build is actually loaded rather
   // than guessing whether a cached copy is being served.
-  siteVersion: "v0.43.0",
+  siteVersion: "v0.44.0",
 
   // ---- VECTOR TILES --------------------------------------------------
   // Every boundary and trail, pre-cut into map tiles and packed into one

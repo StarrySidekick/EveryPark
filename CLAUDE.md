@@ -101,11 +101,28 @@ behaves exactly as before. A rule that genuinely travels says so:
 "states": ["CT", "NY"]
 ```
 
-**No NY rules exist yet.** New York settles at 0% and renders amber, which
-is honest — nobody has cited New York law. Writing them is real research
-(6 NYCRR Part 190, Article XIV of the NY Constitution for Forest Preserve)
-and each one turns hundreds of places green, so they get reviewed before
-they land.
+Six NY rules exist, added 2026-08-07: Forest Preserve, its detached
+parcels, State Forest, Wildlife Management Area, Unique Area and Multiple
+Use Area. They settle **1,155 of 2,085 NY places (55%)** and cite DEC's
+rules-for-use page plus 6 NYCRR Part 190.
+
+**What those citations actually carry.** DEC publishes no blanket "open to
+the public, free" statement of the kind CT DEEP does. Its rules page says
+only "Anyone enjoying State Forests… must observe the following rules",
+which presupposes public use rather than granting it; `free` rests on the
+structured `Fee: Free` field on each unit's own DEC place page. That is a
+weaker footing than the Connecticut rules stand on, and it is the first
+place to look if a NY verdict is ever challenged.
+
+Tidal Wetland, Special Use, Educational, Conservation Easement, Leased
+Access, Fishing Access and Waterway Access are deliberately left amber —
+nothing found supports a public-entry claim for them.
+
+**Do not cite the layer's per-record `URL` as a rule source.** 15% of a
+40-URL sample were dead; the field stores legacy
+`www.dec.ny.gov/outdoor/NNNNN.html` links, most redirecting three times
+into the new `/places/` scheme, some 404. Fine as a place's own link,
+useless as evidence.
 
 ### NY sources
 
