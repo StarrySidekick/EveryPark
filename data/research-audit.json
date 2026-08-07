@@ -3,50 +3,45 @@
  "matched": 52,
  "unmatched": [],
  "rules": 16,
- "rule_hits": 3456,
- "dead_rules": [
+ "rule_hits": 3455,
+ "dead_rules": [],
+ "dormant_rules": [
   {
    "id": "ny-forest-preserve",
-   "match": {
-    "subtype": "Forest Preserve",
-    "agency": "NYS DEC"
-   }
+   "states": [
+    "NY"
+   ]
   },
   {
    "id": "ny-forest-preserve-detached",
-   "match": {
-    "subtype": "Forest Preserve (detached parcel)",
-    "agency": "NYS DEC"
-   }
+   "states": [
+    "NY"
+   ]
   },
   {
    "id": "ny-state-forest",
-   "match": {
-    "subtype": "State Forest",
-    "agency": "NYS DEC"
-   }
+   "states": [
+    "NY"
+   ]
   },
   {
    "id": "ny-wma",
-   "match": {
-    "subtype": "Wildlife Management Area",
-    "agency": "NYS DEC"
-   }
+   "states": [
+    "NY"
+   ]
   },
   {
    "id": "ny-unique-area",
-   "match": {
-    "subtype": "Unique Area",
-    "agency": "NYS DEC"
-   }
+   "states": [
+    "NY"
+   ]
   },
   {
    "id": "ny-multiple-use-area",
-   "match": {
-    "subtype": "Multiple Use Area",
-    "agency": "NYS DEC"
-   }
+   "states": [
+    "NY"
+   ]
   }
  ],
- "researched_places": 3427
+ "researched_places": 3426
 }
