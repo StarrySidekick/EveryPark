@@ -2,8 +2,51 @@
  "entries": 52,
  "matched": 52,
  "unmatched": [],
- "rules": 10,
- "rule_hits": 3464,
- "dead_rules": [],
- "researched_places": 3435
+ "rules": 16,
+ "rule_hits": 3456,
+ "dead_rules": [
+  {
+   "id": "ny-forest-preserve",
+   "match": {
+    "subtype": "Forest Preserve",
+    "agency": "NYS DEC"
+   }
+  },
+  {
+   "id": "ny-forest-preserve-detached",
+   "match": {
+    "subtype": "Forest Preserve (detached parcel)",
+    "agency": "NYS DEC"
+   }
+  },
+  {
+   "id": "ny-state-forest",
+   "match": {
+    "subtype": "State Forest",
+    "agency": "NYS DEC"
+   }
+  },
+  {
+   "id": "ny-wma",
+   "match": {
+    "subtype": "Wildlife Management Area",
+    "agency": "NYS DEC"
+   }
+  },
+  {
+   "id": "ny-unique-area",
+   "match": {
+    "subtype": "Unique Area",
+    "agency": "NYS DEC"
+   }
+  },
+  {
+   "id": "ny-multiple-use-area",
+   "match": {
+    "subtype": "Multiple Use Area",
+    "agency": "NYS DEC"
+   }
+  }
+ ],
+ "researched_places": 3427
 }
