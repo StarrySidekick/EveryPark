@@ -87,8 +87,24 @@ def apply_verified(places, path):
     rule_hits = 0
     for rule in rules:
         m = rule.get("match") or {}
+        # Which states a rule is allowed to speak for. Every rule written
+        # before New York existed was derived from Connecticut law or CT
+        # DEEP regulation, and they key on type/subtype/agency -- fields
+        # that say nothing about which state a place is in. Unscoped,
+        # {"type": "state"} cited to portal.ct.gov settles New York's
+        # Forest Preserve, and {"agency": "City or town"} cited to
+        # Leydon v. Greenwich settles New York municipal land. Measured:
+        # that put a Connecticut citation on 1,712 New York places and
+        # made NY look 82% verified against Connecticut's 45%.
+        #
+        # Defaulting to CT keeps every existing rule doing exactly what
+        # it did before. A rule that genuinely travels says so:
+        #   "states": ["CT", "NY"]
+        scope = rule.get("states") or ["CT"]
         this_rule = 0
         for p in places:
+            if (p.get("state") or "CT") not in scope:
+                continue
             if any(p.get(k) != v for k, v in m.items()):
                 continue
             this_rule += 1

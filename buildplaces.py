@@ -203,16 +203,32 @@ class Grid:
 
 
 class Towns:
-    """Point-in-polygon town lookup, matching buildTownIndex/findTown."""
+    """Point-in-polygon municipality lookup, matching buildTownIndex/findTown.
+
+    Carries the state as well as the name. With Connecticut alone the
+    state was implicit; with New York in the same file it is the only
+    thing separating "Greenwich, CT" from "Greenwich, NY" -- both exist,
+    35 miles apart, and dedupe groups by (name, town), so without it two
+    unrelated places merge into one.
+
+    New York villages are deliberately NOT in this file. A village sits
+    INSIDE a town, so both polygons contain the point and a first-match
+    scan would return whichever happened to be earlier in the file --
+    Lake Placid or North Elba for the same park, depending on nothing.
+    Towns and cities alone tile the state: across 300 random upstate
+    points, zero returned more than one match.
+    """
 
     def __init__(self, geojson):
         self.items = []
         for f in geojson.get("features") or []:
+            props = f.get("properties") or {}
             name = None
             for k in ("NAME", "TOWN", "name", "town"):
-                if (f.get("properties") or {}).get(k):
-                    name = f["properties"][k]
+                if props.get(k):
+                    name = props[k]
                     break
+            state = props.get("state") or props.get("STATE") or "CT"
             g = f.get("geometry") or {}
             polys = []
             if g.get("type") == "Polygon":
@@ -223,25 +239,60 @@ class Towns:
                 ring = poly[0]
                 xs = [c[0] for c in ring]
                 ys = [c[1] for c in ring]
-                self.items.append((name, min(xs), min(ys), max(xs), max(ys), ring))
+                self.items.append((name, state, min(xs), min(ys),
+                                   max(xs), max(ys), ring))
+
+    # Islands and boat launches sit OUTSIDE every municipal polygon --
+    # town boundaries stop at the shore. Nine current places land there,
+    # including three McKinney refuge island units and Greenwich Point,
+    # and seven of the nine are verified parks. Rejecting on containment
+    # alone would delete them and nothing would report it, so a miss
+    # falls back to the nearest municipality within this distance.
+    # Kept tight because the same fallback, made generous, would claim
+    # New Jersey and Massachusetts land across a state line.
+    SNAP_M = 3000.0
+
+    def locate(self, lat, lng):
+        """(town, state), or (None, None) if outside the region entirely."""
+        best = None
+        near = []
+        for (name, state, x0, y0, x1, y1, ring) in self.items:
+            if x0 <= lng <= x1 and y0 <= lat <= y1:
+                inside = False
+                n = len(ring)
+                j = n - 1
+                for i in range(n):
+                    xi, yi = ring[i][0], ring[i][1]
+                    xj, yj = ring[j][0], ring[j][1]
+                    if ((yi > lat) != (yj > lat)) and \
+                       (lng < (xj - xi) * (lat - yi) / ((yj - yi) or 1e-12) + xi):
+                        inside = not inside
+                    j = i
+                if inside:
+                    return name, state
+            # Envelope distance is only a PREFILTER. It is badly wrong as
+            # a measure on its own: Southold's bounding box runs the
+            # length of the North Fork, so a Connecticut boat launch 30 km
+            # away across the Sound measures 2 km to the box and snapped
+            # to Long Island. Cheap to reject with, useless to decide on.
+            dx = max(x0 - lng, 0.0, lng - x1)
+            dy = max(y0 - lat, 0.0, lat - y1)
+            if dist_m(lat, lng, lat + dy, lng + dx) <= self.SNAP_M * 4:
+                near.append((name, state, ring))
+
+        # Real distance, to the nearest vertex of the boundary itself.
+        # Only the handful of envelope survivors reach here.
+        for (name, state, ring) in near:
+            for pt in ring:
+                d = dist_m(lat, lng, pt[1], pt[0])
+                if best is None or d < best[0]:
+                    best = (d, name, state)
+        if best and best[0] <= self.SNAP_M:
+            return best[1], best[2]
+        return None, None
 
     def find(self, lat, lng):
-        for (name, x0, y0, x1, y1, ring) in self.items:
-            if not (x0 <= lng <= x1 and y0 <= lat <= y1):
-                continue
-            inside = False
-            n = len(ring)
-            j = n - 1
-            for i in range(n):
-                xi, yi = ring[i][0], ring[i][1]
-                xj, yj = ring[j][0], ring[j][1]
-                if ((yi > lat) != (yj > lat)) and \
-                   (lng < (xj - xi) * (lat - yi) / ((yj - yi) or 1e-12) + xi):
-                    inside = not inside
-                j = i
-            if inside:
-                return name
-        return None
+        return self.locate(lat, lng)[0]
 
 
 def park_radius_m(p):
@@ -341,6 +392,16 @@ class Builder:
                                           or COMPANY_NAME.search(name)):
             return False
         p["name"] = name
+        # The one region gate. fetchsources.py asks for a rectangle that
+        # necessarily overhangs New Jersey, Pennsylvania, Massachusetts
+        # and Vermont; the municipality polygons are what actually decide
+        # what is in scope. A place in no CT or NY municipality is out.
+        town, state = self.towns.locate(p["lat"], p["lng"])
+        if not state:
+            return False
+        p["state"] = state
+        if not p.get("town"):
+            p["town"] = town
         k = self.key(name, p["lat"], p["lng"])
         if k in self.seen:
             return False
@@ -635,7 +696,17 @@ def main():
     args = ap.parse_args()
 
     baked = load(os.path.join(args.raw, "baked.json"))["cache"]
-    towns = Towns(load(os.path.join(args.data, "towns.geojson")))
+    # municipalities.geojson is CT + NY. towns.geojson is the CT-only
+    # predecessor, still read by app.js and kept as a fallback so a build
+    # cannot silently lose every place if the new file is missing.
+    muni = os.path.join(args.data, "municipalities.geojson")
+    if not os.path.exists(muni):
+        muni = os.path.join(args.data, "towns.geojson")
+        print("  WARNING: municipalities.geojson absent, "
+              "falling back to CT-only towns.geojson", flush=True)
+    towns = Towns(load(muni))
+    print(f"  municipalities: {len(towns.items):,} rings from "
+          f"{os.path.basename(muni)}", flush=True)
     B = Builder(towns)
     print("  sources loaded", flush=True)
 
@@ -695,6 +766,46 @@ def main():
               lat=b["lat"], lng=b["lng"], town=b.get("town") or towns.find(b["lat"], b["lng"]),
               url=b.get("url"), agency="CT DEEP", note=" ".join(bits) or None,
               attrs={"water": True, "waterName": b.get("w") or "Water access", "parking": True})
+
+    # --- 5b. New York DEC lands ----------------------------------------
+    # NY's equivalent of Connecticut_DEEP_Property. CATEGORY carries the
+    # kind of land; CLASS carries the Adirondack/Catskill classification,
+    # which is the part that actually says what you may do there -- a
+    # WILDERNESS parcel and an INTENSIVE USE parcel are both "public" and
+    # nothing like each other on the ground.
+    #
+    # No access verdict is derived here. PUBLICUSE would have supplied
+    # one and is 'Y' on every row, which is not evidence. These land
+    # amber until a cited NY rule settles them, the same way CT land did
+    # before verified.json had rules for it.
+    NYDEC_LABEL = {
+        "FOREST PRESERVE": "Forest Preserve",
+        "FOR PRES DET PAR": "Forest Preserve (detached parcel)",
+        "STATE FOREST": "State Forest",
+        "WILDLIFE MANAGEMENT": "Wildlife Management Area",
+        "FISHING ACCESS": "Fishing Access Site",
+        "WATERWAY ACCESS": "Waterway Access",
+        "TIDAL WETLAND": "Tidal Wetland",
+        "UNIQUE AREA": "Unique Area",
+        "MULTIPLE USE AREA": "Multiple Use Area",
+        "SPECIAL USE": "Special Use Area",
+        "EDUCATIONAL": "Environmental Education Area",
+        "CONSERVATION EASEMENT": "Conservation Easement",
+    }
+    nydec = 0
+    for d in baked.get("nyparks_dec_v1") or []:
+        attrs = {"nyDecClass": d["cls"]} if d.get("cls") else {}
+        if attrs:
+            attrs["sources"] = ["NYS DEC Lands"]
+        else:
+            attrs = {"sources": ["NYS DEC Lands"]}
+        if B.add(name=d["n"], type="state",
+                 subtype=NYDEC_LABEL.get(d.get("cat"), "State Land"),
+                 lat=d["lat"], lng=d["lng"], acres=d.get("a"),
+                 url=d.get("url"), agency="NYS DEC", attrs=attrs):
+            nydec += 1
+    if baked.get("nyparks_dec_v1"):
+        print(f"  +{nydec:,} New York DEC parcels = {len(B.places):,}", flush=True)
 
     # --- 6. Town parks -------------------------------------------------
     for m in baked.get("ctparks_municipal_v3") or []:

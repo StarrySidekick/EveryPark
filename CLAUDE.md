@@ -1,7 +1,7 @@
 # EveryPark — working notes
 
-An interactive map of every publicly accessible outdoor place in Connecticut.
-Free to host, no server, no database.
+An interactive map of every publicly accessible outdoor place in Connecticut
+and New York. Free to host, no server, no database.
 
 - **Live:** https://everypark.starrysidekick.com
 - **Repo:** `StarrySidekick/EveryPark` (GitHub Pages from `main`)
@@ -46,6 +46,98 @@ we have not checked — see "Failure modes" below, this has happened.
 
 **Cemeteries stay in the dataset** (Timothy, 2026-08-02): walkable public
 green space, purple-coded, filterable off. Settled — don't re-litigate.
+
+---
+
+## Two states
+
+New York was added 2026-08-07. Connecticut behaviour is unchanged and was
+held to that by measurement at every step: 0 CT places changed town, 0 CT
+places lost, CT still settles at 45%, and the research audit still matches
+52 of 52.
+
+**`data/municipalities.geojson` is the region.** 1,164 polygons — CT's 169
+towns plus NY's 995 towns and cities. It replaces `towns.geojson` on the
+build side (`app.js` still reads the old CT-only file). Three things it
+decides:
+
+- **What is in scope.** `REGION_BBOX` in `fetchsources.py` is a rectangle
+  that necessarily overhangs New Jersey, Pennsylvania, Massachusetts and
+  Vermont; an envelope cannot follow a state line. `Builder.add` drops any
+  place landing in no municipality, so the polygons are the real filter.
+  Anything added that bypasses `Builder.add` must do its own state check.
+- **Which state a place is in.** Records now carry `state`. Without it
+  dedupe merges Greenwich CT with Greenwich NY — both exist, 35 miles apart.
+- **Which rules may speak for it.** See below.
+
+**NY villages are deliberately excluded.** A village sits *inside* a town,
+so both polygons contain the point and a first-match scan returns whichever
+is earlier in the file — Lake Placid or North Elba for the same park,
+depending on nothing. Towns and cities alone tile the state: across 300
+random upstate points, zero returned more than one match.
+
+**Municipality misses snap to the nearest boundary within 3 km.** Town
+lines stop at the shore, so islands and boat launches sit outside every
+polygon — nine current places including three McKinney refuge island units
+and Greenwich Point, seven of them verified parks. Rejecting on containment
+alone would have deleted them silently. The snap measures distance to the
+nearest *vertex*, not the bounding box: the envelope version sent four
+Connecticut places 30 km across Long Island Sound to Southold, whose box
+runs the length of the North Fork.
+
+### Rules are scoped by state
+
+`verified.json` rules key on `type` / `subtype` / `agency` — fields that say
+nothing about where a place is. Unscoped, `{"type": "state"}` cited to
+`portal.ct.gov` settles New York's Forest Preserve, and
+`{"agency": "City or town"}` cited to *Leydon v. Greenwich* settles New York
+municipal land. Measured before the fix: **a Connecticut citation on 1,712
+New York places, making NY read 82% verified against Connecticut's 45%.**
+
+Rules now carry `states`, defaulting to `["CT"]`. Every existing rule
+behaves exactly as before. A rule that genuinely travels says so:
+
+```json
+"states": ["CT", "NY"]
+```
+
+**No NY rules exist yet.** New York settles at 0% and renders amber, which
+is honest — nobody has cited New York law. Writing them is real research
+(6 NYCRR Part 190, Article XIV of the NY Constitution for Forest Preserve)
+and each one turns hundreds of places green, so they get reviewed before
+they land.
+
+### NY sources
+
+| Source | What | Count |
+|---|---|---|
+| `NYS_DEC_Lands` | Forest Preserve, State Forests, WMAs — NY's `DEEP_Property` | 3,232 |
+| PAD-US | already national; carries OPRHP state parks | 13,903 NY public+named |
+| OSM | already national, now inside `REGION_BBOX` | ~8,200 NY parks |
+
+PAD-US already holds Letchworth (14,416 ac), Bear Mountain (5,477) and
+Jones Beach (6,048), so **no separate OPRHP fetcher is needed** — `dedupe()`
+handles the parcel fragmentation.
+
+Two `NYS_DEC_Lands` fields look useful and are not. **`PUBLICUSE` is `'Y'`
+on all 3,232 rows** — it reads like an access flag and discriminates
+nothing, so testing it stamps every parcel public on evidence that does not
+exist. It is also a *fourth* vocabulary, after the trails layer's
+`"True"/"False"/"Unknown"`, the access points' `"Yes"/"No"` and coastal's
+`"YES"/"NO"`. **`MANAGE_BY` is null on all 3,232.**
+
+`Municipal_Parks` (71) and `Town_County_Parks` (17) on the NYS GPO host are
+**not** inventories — the `VISIBLE`/`IMAGE_URL`/`TYPEID` schema is ArcGIS
+Map Notes, hand-placed story-map annotations. Promising names, no data.
+
+CT-tuned name filters produce NY false positives: `MEMBERS_ONLY` rejects
+"Wilmurt Club Road Primitive Area", a DEC Forest Preserve parcel on a road
+that happens to contain "Club". Expect more of this shape.
+
+`gisservices.dec.ny.gov` is materially less reliable than CT DEEP — it
+answered once then timed out at 60 s. Anything pulled from it needs the
+`run_section` degradation path. The layers above are on the GPO host
+(`services6.arcgis.com/DZHaqZm9cxOD4CWM`), which has been solid.
 
 ---
 
@@ -190,6 +282,10 @@ Every one of these produced output that looked fine.
 | Preserves named "Non-profit / land trust" | read `officialOwner` (category) before `agency` (name) | precedence fixed |
 | Reservation shown as "You can go here" | tile-fallback popup asserted access unconditionally | now "Unverified" |
 | Map panning dropped to ~30 fps with 250 ms stalls | 260 divIcon marks destroyed and rebuilt on every `moveend`, over a full 7,727-record scan | marks draw on ONE canvas in `overlayPane` + a 0.02° grid index; **do not put marks back into the DOM** |
+| NY read 82% verified against CT's 45%, with no NY rules written | rules key on `type`/`subtype`/`agency`, which say nothing about state; CT law settled 1,712 NY places | `states` on every rule, defaulting to `["CT"]` |
+| Four CT places jumped 30 km across Long Island Sound to Southold | offshore snap measured distance to the bounding BOX; Southold's box runs the length of the North Fork | snap measures distance to the nearest boundary vertex |
+| Coastal parks described by one access point as if it were the whole park | 141 sites applied one at a time; the last overwrote the first and doubled the citation | grouped per place, applied once, facilities unioned |
+| All 357 coastal sites would read as fee-charging | `Fee` is the string `"NO"`, which is truthy | flags collapsed to a list of only the YES ones, at the fetcher |
 
 **The pattern: silent success.** Nothing crashed, files stayed valid, the map
 rendered. That is why the research guard *fails the workflow* rather than

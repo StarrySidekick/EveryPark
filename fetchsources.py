@@ -24,7 +24,17 @@ from concurrent.futures import ThreadPoolExecutor
 
 import requests
 
-CT_BBOX = "-73.75,40.95,-71.77,42.06"
+# Connecticut and New York together. The box is a crude envelope and
+# necessarily spills into New Jersey, Pennsylvania, Massachusetts and
+# Vermont -- an envelope cannot follow a state line. That spill is not
+# filtered here on purpose: data/municipalities.geojson holds the 169 CT
+# towns and 995 NY towns and cities, and buildplaces.py drops any place
+# whose coordinates land in no municipality. The polygons are the state
+# filter; this box only decides what gets asked for.
+#
+# Anything added that does NOT go through the municipality lookup must do
+# its own state check, or it will quietly import New Jersey.
+REGION_BBOX = "-79.77,40.47,-71.77,45.02"
 OSM6 = "https://services6.arcgis.com/Do88DoK2xjTUCXd1/ArcGIS/rest/services/"
 DEEP = "https://services1.arcgis.com/FjPcSmEFuDYlIdKC/arcgis/rest/services/"
 PADUS = ("https://services.arcgis.com/v01gqwM5QqNysAAi/arcgis/rest/services/"
@@ -59,7 +69,7 @@ def post(url, params, tries=4):
 
 
 def count(url, where):
-    j = post(url, {"where": where, "geometry": CT_BBOX,
+    j = post(url, {"where": where, "geometry": REGION_BBOX,
                    "geometryType": "esriGeometryEnvelope", "inSR": "4326",
                    "returnCountOnly": "true"})
     return j.get("count", 0)
@@ -80,7 +90,7 @@ def paged(url, where, out_fields, per_feature, geometry=False, page=1000,
     got = [0]
 
     def grab(off):
-        p = {"where": where, "geometry": CT_BBOX,
+        p = {"where": where, "geometry": REGION_BBOX,
              "geometryType": "esriGeometryEnvelope", "inSR": "4326",
              "outSR": "4326", "outFields": out_fields,
              "resultOffset": str(off), "resultRecordCount": str(page)}
@@ -311,6 +321,54 @@ def fetch_attributes(outdir, prev=None, only=None):
             out.append(rec)
         return {"ctparks_coastal_v1": out}
 
+    # --- New York DEC lands --------------------------------------------
+    def s_nydec():
+        """NYS DEC Lands: 3,232 parcels, ~4M acres. NY's DEEP_Property.
+
+        Two fields on this layer look useful and are not:
+
+        PUBLICUSE is 'Y' on all 3,232 rows. It reads like an access flag
+        and discriminates nothing, so testing it would stamp every parcel
+        as public on evidence that does not exist -- the same shape as the
+        bug that once rendered a reservation as "You can go here". It is
+        deliberately not fetched. ('Y' is also a FOURTH vocabulary here,
+        after "True"/"False"/"Unknown", "Yes"/"No" and "YES"/"NO".)
+
+        MANAGE_BY is null on all 3,232 rows. The field exists and is
+        empty; the managing agency has to come from CATEGORY instead.
+
+        ADMINISTRATIVE parcels are DEC offices and depots, not places
+        anyone visits, so they are dropped here rather than downstream.
+        """
+        rows = []
+
+        def one(f):
+            a, c = f["attributes"], point_of(f)
+            nm = str(a.get("FACILITY") or "").strip()
+            if not nm or not c:
+                return
+            cat = str(a.get("CATEGORY") or "").strip()
+            if cat == "ADMINISTRATIVE":
+                return
+            rec = {"n": nm, "cat": cat, "lat": round(c["y"], 5),
+                   "lng": round(c["x"], 5)}
+            cls = str(a.get("CLASS") or "").strip()
+            if cls and cls not in ("N/A", "UNCLASSIFIED", "None"):
+                rec["cls"] = cls
+            if a.get("ACRES"):
+                rec["a"] = round(a["ACRES"])
+            if a.get("COUNTY"):
+                rec["county"] = a["COUNTY"]
+            u = str(a.get("URL") or "").strip()
+            if u.startswith("http"):
+                rec["url"] = u
+            rows.append(rec)
+
+        paged("https://services6.arcgis.com/DZHaqZm9cxOD4CWM/arcgis/rest/"
+              "services/NYS_DEC_Lands/FeatureServer/0/query",
+              "1=1", "CATEGORY,FACILITY,CLASS,COUNTY,ACRES,URL", one)
+        return {"nyparks_dec_v1": rows}
+
     # --- town parks ----------------------------------------------------
     def s_municipal():
         muni = []
@@ -508,7 +566,7 @@ def fetch_attributes(outdir, prev=None, only=None):
         def grab(off):
             j = post(OSM6 + "OSM_NA_Trails/FeatureServer/0/query",
                      {"where": "highway IN ('path','track','bridleway')",
-                      "geometry": CT_BBOX, "geometryType": "esriGeometryEnvelope",
+                      "geometry": REGION_BBOX, "geometryType": "esriGeometryEnvelope",
                       "inSR": "4326", "outSR": "4326", "outFields": "",
                       "returnGeometry": "true", "maxAllowableOffset": "0.004",
                       "geometryPrecision": "4", "resultOffset": str(off),
@@ -546,6 +604,7 @@ def fetch_attributes(outdir, prev=None, only=None):
         ("DEEP wildlife/hatchery/flood land", ["ctparks_stateextra_v1"], s_stateextra),
         ("boat launches", ["ctparks_boat_v2"], s_boats),
         ("coastal access sites", ["ctparks_coastal_v1"], s_coastal),
+        ("New York DEC lands", ["nyparks_dec_v1"], s_nydec),
         ("town parks", ["ctparks_municipal_v3"], s_municipal),
         ("greens and rec grounds", ["ctparks_landuse_v1"], s_landuse),
         ("preserves", ["ctparks_preserve_raw_v1"], s_preserves),

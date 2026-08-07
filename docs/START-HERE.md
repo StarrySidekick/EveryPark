@@ -16,8 +16,9 @@ Connecticut. Static site, no server, no database, free to host.
 
 - **Live:** https://everypark.starrysidekick.com
 - **Repo:** `StarrySidekick/EveryPark`, GitHub Pages from `main`
-- **Now:** `v0.41.0` · 7,727 places · 5,204 parks · 387 historic districts
-- **~2,900 places still unverified**
+- **Now:** `v0.43.0` · deployed dataset still 7,727 places (CT only) until
+  the next refresh; the pipeline currently builds CT 9,266 + NY 2,172
+- **~2,900 CT places unverified; New York is 100% unverified by design**
 
 **The goal, in Timothy's words:** *find a park near me, verified that it's
 a good park, go there and get all the info, a usable map for hiking and
@@ -182,6 +183,43 @@ feature inherits the same error visually.
 
 ---
 
+## New York — added 2026-08-07, half done
+
+The pipeline builds **CT 9,266 + NY 2,172** places today. Read that NY
+number as provisional: it comes from the *old* Connecticut bounding box
+plus DEC lands. A full `refresh-data.yml` with the widened `REGION_BBOX`
+picks up the 13,903 PAD-US NY units and ~8,200 NY OSM parks on top.
+
+**Done and measured:**
+
+- `data/municipalities.geojson` — CT 169 towns + NY 995 towns/cities, the
+  region gate and the source of each record's new `state` field
+- `NYS_DEC_Lands` fetched and consumed — 3,215 parcels, 2,983 places,
+  3.77M NY acres including High Peaks Wilderness at 274,745
+- Rules scoped by state, defaulting to CT
+
+**Connecticut was held still throughout, by measurement, not by hope:**
+0 towns changed, 0 places lost, still 45% settled, research audit still
+52 of 52 with no dead rules.
+
+**Not done:**
+
+1. **NY access rules.** New York is 0% settled and entirely amber. This is
+   correct — no one has cited New York law — but it is the single biggest
+   gap. Start at 6 NYCRR Part 190 (DEC public use of state lands) and
+   Article XIV of the NY Constitution for Forest Preserve. **Each rule
+   turns hundreds of places green, so these get reviewed before landing.**
+2. **`app.js` knows nothing about states.** It still fetches the CT-only
+   `towns.geojson`, has no state filter, and no NY town boundaries.
+3. **Progressive load.** Not the download — `places.json` is 3.97 MB on
+   disk but **442 KB over the wire**, so brotli already solved that. The
+   cost is *parse*: 42 ms today, **1,406 ms** at 4x, blocking the main
+   thread. Render CT immediately and stream NY in after, the same shape as
+   the v0.38.0 dressing work.
+4. **A real refresh.** Every NY number above is from a partial build.
+
+---
+
 ## What to do next, in order
 
 ### 1. The ETL batch — the biggest blocked chunk
@@ -191,9 +229,12 @@ Actions pipeline. The previous environment had no network to ArcGIS, so
 these fetchers could be written but never run. **On a real machine they
 can be tested, which is the whole reason to move.**
 
-- **CT DEEP Coastal Access Sites** — 350+ places, annually maintained,
-  with fees, restrooms, ADA and parking.
-- **DEEP boat launches** (trailered and cartop).
+- ~~**CT DEEP Coastal Access Sites**~~ — DONE 2026-08-06. Not the 350+ new
+  places this assumed: 141 of the 357 land on 128 places already in the
+  dataset, so it enriches those and adds only 43 that survive the merge.
+  The value is fee/restroom/ADA/activity data on places you already have.
+- ~~**DEEP boat launches**~~ — already in `fetchsources.py`, 92 trailered
+  + 25 cartop = 117, matching the merged DEEP layer exactly.
 - **A new access category: permit-required** — free, but you must carry
   one. Aquarion and RWA land is neither "open to all" nor "by
   permission", and the model has no room for it today.
