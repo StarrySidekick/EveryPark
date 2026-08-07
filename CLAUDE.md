@@ -101,6 +101,16 @@ behaves exactly as before. A rule that genuinely travels says so:
 "states": ["CT", "NY"]
 ```
 
+**Dormant is not dead.** `publish.py` exits 1 on a rule that matches
+nothing, because research that stops applying is invisible in the output.
+But a rule scoped to a state the dataset does not contain yet has nothing
+to fail against — the six NY rules were correct, live and well-cited, and
+broke the publish workflow purely because no refresh had put New York in
+`places.json`. A rule is dead when its match fails *despite its scope
+being present*; otherwise it is recorded in `dormant_rules` and the build
+passes. A genuinely dead CT rule still exits 1 — that was re-tested by
+injecting one.
+
 Six NY rules exist, added 2026-08-07: Forest Preserve, its detached
 parcels, State Forest, Wildlife Management Area, Unique Area and Multiple
 Use Area. They settle **1,155 of 2,085 NY places (55%)** and cite DEC's

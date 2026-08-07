@@ -85,6 +85,9 @@ def apply_verified(places, path):
     rules = doc.get("rules") or []
     audit["rules"] = len(rules)
     rule_hits = 0
+    # Which states this dataset actually contains. A rule scoped to a
+    # state with no places yet is dormant, not dead -- see below.
+    states_present = {(p.get("state") or "CT") for p in places}
     for rule in rules:
         m = rule.get("match") or {}
         # Which states a rule is allowed to speak for. Every rule written
@@ -122,9 +125,24 @@ def apply_verified(places, path):
             rule_hits += 1
         # A rule matching nothing means the upstream field it keys on has
         # changed shape. The citation is still good; the match is dead.
+        #
+        # Unless its state simply is not here yet. The NY rules were
+        # written before a refresh had put New York into places.json, and
+        # publish.py exits 1 on a dead rule -- so six correct, live,
+        # well-cited rules failed the publish workflow for describing land
+        # the dataset did not yet contain. A rule is dead when its match
+        # fails DESPITE its scope being present; with no NY places at all,
+        # there is nothing for it to have failed against.
         if this_rule == 0:
-            audit["dead_rules"].append({"id": rule.get("id"), "match": m})
-            print(f"  RULE MATCHED NOTHING: {rule.get('id')!r} {m}", flush=True)
+            if not (set(scope) & states_present):
+                audit.setdefault("dormant_rules", []).append(
+                    {"id": rule.get("id"), "states": scope})
+                print(f"  rule dormant, no {'/'.join(scope)} places in this "
+                      f"dataset yet: {rule.get('id')!r}", flush=True)
+            else:
+                audit["dead_rules"].append({"id": rule.get("id"), "match": m})
+                print(f"  RULE MATCHED NOTHING: {rule.get('id')!r} {m}",
+                      flush=True)
     audit["rule_hits"] = rule_hits
     if rule_hits:
         print(f"  {rule_hits:,} places settled by category rule", flush=True)
