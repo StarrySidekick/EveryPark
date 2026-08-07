@@ -259,6 +259,10 @@ def main():
     ap.add_argument("--in", dest="src", required=True)
     ap.add_argument("-o", "--out", required=True)
     ap.add_argument("--limit", type=int, default=0, help="for smoke tests")
+    ap.add_argument("--reuse-from", dest="reuse",
+                    help="previous places.json; places already carrying "
+                         "elevation and land cover are copied forward "
+                         "instead of resampled")
     args = ap.parse_args()
 
     data = json.load(open(args.src))
@@ -267,15 +271,56 @@ def main():
         places = places[:args.limit]
     print(f"  {len(places):,} places", flush=True)
 
-    t = time.time()
-    n = fetch_elevation(places)
-    print(f"  elevation: {n:,} places ({100*n/len(places):.1f}%) "
-          f"in {time.time()-t:.0f}s", flush=True)
+    # Elevation and land cover are the slowest stage here and the least
+    # volatile thing on the map: the ground does not move between monthly
+    # refreshes. Resampling all of them cost ~25 minutes for Connecticut
+    # alone, and adding New York triples the record count. Carrying the
+    # known values forward means a refresh only samples what is new.
+    #
+    # Keyed on id, which dedupe.py assigns once and never recomputes, with
+    # a coordinate fallback for records that predate an id.
+    KEYS = ("elev", "relief", "openPct", "cover", "coverTop")
+    todo = places
+    if args.reuse and os.path.exists(args.reuse):
+        prev = {}
+        for q in (json.load(open(args.reuse)).get("places") or []):
+            a = q.get("attrs") or {}
+            if a.get("elev") is None and not a.get("cover"):
+                continue
+            if q.get("id"):
+                prev[q["id"]] = a
+            if q.get("lat") is not None:
+                prev[(round(q["lat"], 5), round(q["lng"], 5))] = a
+        reused = 0
+        for p in places:
+            src = prev.get(p.get("id"))
+            if src is None and p.get("lat") is not None:
+                src = prev.get((round(p["lat"], 5), round(p["lng"], 5)))
+            if not src:
+                continue
+            A = p.setdefault("attrs", {})
+            for k in KEYS:
+                if k in src and A.get(k) is None:
+                    A[k] = src[k]
+            if A.get("elev") is not None:
+                reused += 1
+        todo = [p for p in places
+                if (p.get("attrs") or {}).get("elev") is None]
+        print(f"  reused elevation/land cover for {reused:,}; "
+              f"{len(todo):,} still to sample", flush=True)
 
-    t = time.time()
-    n = fetch_landcover(places)
-    print(f"  land cover: {n:,} places ({100*n/len(places):.1f}%) "
-          f"in {time.time()-t:.0f}s", flush=True)
+    if not todo:
+        print("  nothing new to sample", flush=True)
+    else:
+        t = time.time()
+        n = fetch_elevation(todo)
+        print(f"  elevation: {n:,} places ({100*n/len(todo):.1f}%) "
+              f"in {time.time()-t:.0f}s", flush=True)
+
+        t = time.time()
+        n = fetch_landcover(todo)
+        print(f"  land cover: {n:,} places ({100*n/len(todo):.1f}%) "
+              f"in {time.time()-t:.0f}s", flush=True)
 
     if not args.limit:
         with open(args.out, "w") as fh:

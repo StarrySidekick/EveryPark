@@ -237,9 +237,29 @@ so editing the knowledge base publishes itself.
 
 ### `refresh-data.yml` — the full rebuild (avoid unless needed)
 
-~65 minutes: 13 min fetching 8 services, 25 min elevation and land cover,
-25 min tiles. Monthly cron `17 6 1 * *` plus manual dispatch with a
-`skip_tiles` option.
+Was ~65 minutes for Connecticut: 13 min fetching 8 services, 25 min
+elevation and land cover, 25 min tiles. Monthly cron `17 6 1 * *` plus
+manual dispatch with a `skip_tiles` option.
+
+**New York changes the arithmetic.** The fetch area roughly quadruples and
+the record count roughly triples, which would have run past the old
+`timeout-minutes: 90` and aborted partway through the tile build, leaving
+nothing committed. Two changes:
+
+- **`timeout-minutes: 350`**, just under GitHub's 360-minute ceiling for a
+  single job. If a run ever approaches that, split the tile stage into a
+  second job — 360 is a wall, not a setting.
+- **`enrichraster.py --reuse-from`** carries known elevation and land
+  cover forward instead of resampling. The ground does not move between
+  refreshes, so a run with nothing new samples nothing and the stage drops
+  from ~25 minutes to seconds; the first NY run samples only New York.
+  Keyed on `id`, with a coordinate fallback. The workflow copies
+  `data/places.json` to `raw/places-prev.json` **before** `buildplaces.py`
+  overwrites it, or there would be nothing left to reuse.
+
+For the first New York run, consider `skip_tiles: true` to land the places
+first and build tiles in a second pass, rather than risking both in one
+job.
 
 Only needed when *sources* change. Correcting a fact about an existing place
 needs none of it.

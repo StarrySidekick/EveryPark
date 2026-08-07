@@ -35,7 +35,13 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    # 90 was sized for Connecticut, where the whole run took ~65 minutes.
+    # New York roughly quadruples the fetch area and triples the record
+    # count, so 90 would abort partway through the tile build and leave
+    # nothing committed. 350 is just under GitHub's own 360-minute ceiling
+    # for a job; if a run ever approaches it, split the tile stage into a
+    # second job rather than raising this further, because 360 is the wall.
+    timeout-minutes: 350
     steps:
       - uses: actions/checkout@v4
 
@@ -55,14 +61,26 @@ jobs:
           python3 fetchsources.py --out raw --prev data/baked.json
           cp raw/baked.json data/baked.json
 
+      # buildplaces.py overwrites data/places.json with a fresh list that
+      # has no elevation on it, so last month's samples have to be put
+      # somewhere before that happens or the reuse below finds nothing.
+      - name: Keep last refresh's dataset for reuse
+        run: cp data/places.json raw/places-prev.json || true
+
       - name: Build the place list
         run: python3 buildplaces.py --raw raw --data data -o data/places.json
 
       - name: Attach real boundaries and verify what counts as a park
         run: python3 verifyplaces.py --raw raw --data data --in data/places.json -o data/places.json
 
+      # The ground does not move between refreshes. Carrying known
+      # elevation and land cover forward means only genuinely new places
+      # are sampled -- seconds instead of ~25 minutes when nothing new
+      # arrived, and on the first New York run only New York is sampled.
       - name: Sample elevation and land cover
-        run: python3 enrichraster.py --in data/places.json -o data/places.json
+        run: |
+          python3 enrichraster.py --in data/places.json \
+                  --reuse-from raw/places-prev.json -o data/places.json
 
       - name: Build the tile archive
         if: ${{ !inputs.skip_tiles }}
@@ -150,6 +168,13 @@ jobs:
                 f"{a['rule_hits']:,} settled by {a['rules']} rules, "
                 f"{a.get('researched_places', 0):,} carry provenance")
           bad = False
+          # Not a failure: a rule scoped to a state this dataset does not
+          # contain yet has nothing to have failed against. Printed rather
+          # than swallowed, because after a refresh that DID pull that
+          # state, a still-dormant rule means the scope never matched.
+          for r in a.get("dormant_rules", []):
+              print(f"::notice::Rule {r['id']!r} dormant — no "
+                    f"{'/'.join(r.get('states') or [])} places in this build")
           for u in a.get("unmatched", []):
               print(f"::error::Research LOST — no place matches "
                     f"{u['name']!r} ({u.get('town')}). Add an `at` "
