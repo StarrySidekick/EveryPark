@@ -3413,9 +3413,24 @@ const EveryParkIso = (() => {
     randBtn.innerHTML = icon("dice");
     randBtn.title = "Jump to another park";
     randBtn.addEventListener("click", () => {
-      if (!window.EveryParkRandom) return;
+      // Stay in the viewer. The old path closed the panel and let the map
+      // fly for a second before reopening, which threw you out of the 3D
+      // view every time you rolled the die. open() refuses to stack on an
+      // existing overlay, so this closes and reopens in the SAME tick —
+      // no frame of map in between — and moves the map quietly behind, so
+      // closing later still leaves you where you are.
+      const pick = window.EveryParkRandomPick;
+      if (!pick) {
+        if (!window.EveryParkRandom) return;
+        close();
+        setTimeout(() => window.EveryParkRandom(), 80);
+        return;
+      }
+      const next = pick();
+      if (!next) return;
       close();
-      setTimeout(() => window.EveryParkRandom(), 80);
+      open(next);
+      if (window.EveryParkRandomSync) window.EveryParkRandomSync(next);
     });
 
     const pixBtn = document.createElement("button");
@@ -3536,6 +3551,18 @@ const EveryParkIso = (() => {
       spinBtn.title = S.spin ? "Pause the turntable" : "Resume the turntable";
       spinBtn.classList.toggle("active", S.spin);
     });
+    // Touching the island is you taking over, so the turntable stops and
+    // STAYS stopped until you press the button again. Auto-rotation
+    // fighting you while you are trying to look at one particular slope
+    // is worse than having to restart it deliberately. Called from the
+    // move handlers rather than pointerdown, so a plain click on the
+    // canvas does not silently switch it off.
+    const stopSpin = () => {
+      if (!S.spin) return;
+      S.spin = false;
+      spinBtn.title = "Resume the turntable";
+      spinBtn.classList.remove("active");
+    };
     S.spin = true;
 
     let yaw = 0, target = 0, dragging = false, lastX = 0, lastY = 0;
@@ -3627,7 +3654,9 @@ const EveryParkIso = (() => {
           S.panY = (S.panY || 0) + (m.y - pinchMid.y) * q;
         }
         pinchDist = d; pinchMid = m;
+        stopSpin();
       } else if (dragging) {
+        stopSpin();
         if (dragMode === "pan") {
           // Pan in DEVICE pixels: panX/panY are added to the projection
           // centre, which lives in the canvas backing store, and that is

@@ -2961,18 +2961,35 @@
   syncDistricts();
 
   // Random park: fly somewhere that passes the current filters.
-  function goRandom() {
-    // Somewhere you can definitely go, run by a public body, with
-    // terrain worth flying around AND a mapped trail to walk when you
-    // land (Timothy's spec, 2026-08-03) — the dice should never drop
-    // you somewhere with nothing to do.
+  // Choosing and going are separate, because the 3D viewer's own die
+  // wants the choice WITHOUT the map flight: it stays in the viewer and
+  // swaps the place under you rather than dropping you back on the map
+  // for a second while the camera flies.
+  function randomPlace() {
     const pool = allParks.filter(p =>
       visible(p) && p.status === "park" && (p.attrs || {}).relief != null
       && (p.attrs || {}).trails
       && ["town", "state", "national"].includes(p.type));
     const use = pool.length ? pool : allParks.filter(visible);
-    if (!use.length) return;
-    const p = use[Math.floor(Math.random() * use.length)];
+    if (!use.length) return null;
+    return use[Math.floor(Math.random() * use.length)];
+  }
+  // Move the map to a place without touching the viewer, so that closing
+  // the viewer later leaves you where you actually are.
+  window.EveryParkRandomPick = randomPlace;
+  window.EveryParkRandomSync = p => {
+    if (!p) return;
+    map.flyTo([p.lat, p.lng], Math.max(map.getZoom(), 14), { duration: 0.9 });
+    openPlace(p);
+  };
+
+  function goRandom() {
+    // Somewhere you can definitely go, run by a public body, with
+    // terrain worth flying around AND a mapped trail to walk when you
+    // land (Timothy's spec, 2026-08-03) — the dice should never drop
+    // you somewhere with nothing to do.
+    const p = randomPlace();
+    if (!p) return;
     map.flyTo([p.lat, p.lng], Math.max(map.getZoom(), 14), { duration: 0.9 });
     setTimeout(() => {
       openPlace(p);
