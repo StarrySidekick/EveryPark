@@ -104,7 +104,14 @@ const EveryParkIso = (() => {
         field: "name", label: "OpenStreetMap" },
       { url: OSM6 + "OSM_NA_Landuse/FeatureServer/0/query",
         field: "name", label: "OpenStreetMap" },
-      { url: PADUS, field: "Unit_Nm", label: "USGS PAD-US" }
+      { url: PADUS, field: "Unit_Nm", label: "USGS PAD-US" },
+      // New York's equivalent of the CT DEEP property layer. Without it a
+      // Forest Preserve unit falls back to whatever PAD-US drew over it,
+      // which is close but not the parcel. CT DEEP above simply returns
+      // nothing for a New York point, and vice versa — both are cheap.
+      { url: "https://services6.arcgis.com/DZHaqZm9cxOD4CWM/arcgis/rest/"
+           + "services/NYS_DEC_Lands/FeatureServer/0/query",
+        field: "FACILITY", label: "NYS DEC" }
     ];
     const results = await Promise.allSettled(sources.map(s =>
       arc(s.url, { ...common, outFields: s.field }).then(feats =>

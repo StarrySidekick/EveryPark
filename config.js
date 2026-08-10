@@ -170,9 +170,9 @@ const CONFIG = {
   categories: [
     {
       id: "state", label: "State land", swatch: "#1b5e20",
-      what: "Land owned by the State of Connecticut and managed by the Department of Energy and Environmental Protection — state parks, state forests, wildlife management areas, fish hatcheries, flood-control land and boat launches.",
-      why: "Classified from CT DEEP's own property layer, which is the authoritative record of what the state owns. The sub-label (State Park, State Forest, Wildlife Management Area…) comes straight from DEEP's category for that parcel.",
-      access: "Public by default. Some parks charge for parking rather than entry — Connecticut-registered vehicles park free under Passport to the Parks; out-of-state vehicles pay. Wildlife management areas are open but are working conservation land, not developed parks."
+      what: "Land owned by a state government. In Connecticut that is CT DEEP — state parks, state forests, wildlife management areas, fish hatcheries, flood-control land and boat launches. In New York it is DEC and State Parks — the Adirondack and Catskill Forest Preserve, state forests, wildlife management areas and unique areas.",
+      why: "Classified from each state's own property layer — CT DEEP's in Connecticut, NYS DEC Lands in New York — which is the authoritative record of what that state owns. The sub-label (State Park, State Forest, Forest Preserve, Wildlife Management Area…) comes straight from the agency's own category for that parcel.",
+      access: "Public by default, though the rules differ by state and each place's own card is what states them. In Connecticut some parks charge for parking rather than entry — CT-registered vehicles park free under Passport to the Parks, out-of-state vehicles pay. Wildlife management areas in both states are open, but are working conservation land rather than developed parks, and are hunted in season."
     },
     {
       id: "national", label: "Federal land", swatch: "#6d4c41",
@@ -184,7 +184,7 @@ const CONFIG = {
       id: "town", label: "Town or city", swatch: "#1565c0",
       what: "Municipal land: town and city parks, greens, recreation areas, town open space and the grounds of historic sites the town maintains.",
       why: "Mostly from OpenStreetMap, filtered to places tagged as publicly accessible, plus municipally owned land recorded in PAD-US. Town greens and recreation grounds are tagged as land use rather than as parks, so they're pulled in separately.",
-      access: "Open to everyone. Connecticut town parks may not shut out non-residents — that was settled in Leydon v. Greenwich (2001), which struck down a residents-only beach rule. Towns may still charge non-residents more, and often do at beaches."
+      access: "Open to everyone. In Connecticut, town parks may not shut out non-residents — settled in Leydon v. Greenwich (2001), which struck down a residents-only beach rule. That is Connecticut case law and does not carry to New York, where a handful of municipalities do restrict beaches to residents. Towns in both states may charge non-residents more, and often do at beaches."
     },
     {
       id: "preserve", label: "Land trust / non-profit", swatch: "#00838f",
@@ -288,7 +288,7 @@ const CONFIG = {
   // Shown in the top-right corner. Bumped by hand on every code change,
   // so there's visible proof of which build is actually loaded rather
   // than guessing whether a cached copy is being served.
-  siteVersion: "v0.48.0",
+  siteVersion: "v0.49.0",
 
   // ---- VECTOR TILES --------------------------------------------------
   // Every boundary and trail, pre-cut into map tiles and packed into one

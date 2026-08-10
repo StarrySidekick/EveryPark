@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Connecticut Parks Explorer</title>
-  <meta name="description" content="Interactive map of every state, national, and town park in Connecticut.">
+  <title>Every Park — Connecticut &amp; New York</title>
+  <meta name="description" content="Interactive map of every publicly accessible outdoor place in Connecticut and New York.">
   <link rel="icon" href="icons/state.svg">
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
   <!-- ?v= is a cache-buster: bump it on every deploy so visitors get fresh code -->
-  <link rel="stylesheet" href="styles.css?v=114">
+  <link rel="stylesheet" href="styles.css?v=115">
 </head>
 <body>
 
@@ -65,7 +65,7 @@
       <button id="guideClose" aria-label="Close">×</button>
       <h2 id="guideTitle">What's on this map</h2>
       <p class="g-intro">Every place here is somewhere you can go outdoors in
-        Connecticut. They're grouped by <strong>who owns and runs the land</strong>,
+        Connecticut or New York. They're grouped by <strong>who owns and runs the land</strong>,
         because that's what decides whether you can walk in, what it's likely to
         be like, and who to ask when something's unclear.</p>
       <div id="guideCats"></div>
@@ -106,7 +106,7 @@
         haven't found evidence either way — the popup says which test it failed.</div>
 
       <div class="legend-title">Border colour = who owns it</div>
-      <div class="legend-row"><span class="sw ring" style="border-color:#24603a"></span>State of Connecticut</div>
+      <div class="legend-row"><span class="sw ring" style="border-color:#24603a"></span>State land (CT or NY)</div>
       <div class="legend-row"><span class="sw ring" style="border-color:#8a5426"></span>Federal</div>
       <div class="legend-row"><span class="sw ring" style="border-color:#1f5c96"></span>Town or city</div>
       <div class="legend-row"><span class="sw ring" style="border-color:#0f6f7d"></span>Land trust / non-profit</div>
@@ -128,9 +128,9 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="https://unpkg.com/protomaps-leaflet@4.0.1/dist/protomaps-leaflet.js"></script>
-  <script src="config.js?v=114"></script>
-  <script src="vectorlayers.js?v=114"></script>
-  <script src="iso.js?v=114"></script>
-  <script src="app.js?v=114"></script>
+  <script src="config.js?v=115"></script>
+  <script src="vectorlayers.js?v=115"></script>
+  <script src="iso.js?v=115"></script>
+  <script src="app.js?v=115"></script>
 </body>
 </html>

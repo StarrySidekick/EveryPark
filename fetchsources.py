@@ -154,6 +154,16 @@ GEOMETRY_LAYERS = [
     # house lots. It was the input DEEP used *for* open-space mapping, not
     # the output. Pulling it would mean hundreds of megabytes of private
     # property, which is the opposite of what this map is for.
+    # New York DEC land as real outlines, not just centroids. Without
+    # this the 2,983 DEC places borrow whatever PAD-US or OSM happens to
+    # have over them, which covers most of the same ground but never
+    # parcel for parcel — a Forest Preserve unit would be drawn as
+    # somebody else's polygon. ADMINISTRATIVE is dropped here for the
+    # same reason it is dropped from the attribute pass: DEC offices and
+    # depots are not places anyone visits.
+    ("nydec", "https://services6.arcgis.com/DZHaqZm9cxOD4CWM/arcgis/rest/"
+              "services/NYS_DEC_Lands/FeatureServer/0/query",
+     "CATEGORY <> 'ADMINISTRATIVE'", "FACILITY,CATEGORY,ACRES"),
     ("trails", OSM6 + "OSM_NA_Trails/FeatureServer/0/query",
      "highway IN ('path','track','bridleway')", "name,highway,surface,access"),
     ("blueblazed", DEEP + "BlueBlazedHikingTrails/FeatureServer/0/query",

@@ -4,6 +4,11 @@
 (function () {
   "use strict";
 
+  // Records carry a two-letter state; anything user-facing that needs to
+  // name it spells it out from here. Defaults to Connecticut so records
+  // built before the field existed still read correctly.
+  const STATE_NAME = { CT: "Connecticut", NY: "New York" };
+
   // ------------------------------------------------------------------
   // Setup
   // ------------------------------------------------------------------
@@ -468,7 +473,7 @@
       <a class="badge ${p.type}" href="#" data-cat="${p.type}"
          title="What does this category mean?">${typeLabel(p)}</a>
       <div class="popup-name">${p.name}</div>
-      <div class="popup-sub">${p.town || "Connecticut"}${acres}</div>
+      <div class="popup-sub">${p.town || STATE_NAME[p.state] || "Connecticut"}${acres}</div>
 
       <div class="pblock acc-${st.cls}">
         <div class="pb-head">${st.icon} ${st.label}</div>
@@ -696,7 +701,7 @@
     const [stateData, natData, towns] = await Promise.all([
       fetch("data/state.json").then(r => r.json()),
       fetch("data/national.json").then(r => r.json()),
-      fetch("data/towns.geojson").then(r => r.json())
+      fetch("data/municipalities.geojson").then(r => r.json())
     ]);
 
     buildTownIndex(towns);
@@ -1872,7 +1877,11 @@
   // Everything else is presentation.
   // ------------------------------------------------------------------
   const STEWARD_BY_TYPE = {
-    state: "State of Connecticut (DEEP)",
+    // A function, because "which state" is not answerable from the type.
+    // Only ever a fallback: agency and officialOwner both win over this,
+    // and NY DEC land carries its agency explicitly.
+    state: p => ((p.state || "CT") === "CT"
+                 ? "State of Connecticut (DEEP)" : "State of New York"),
     national: "Federal government",
     town: "Town or city",
     preserve: "Land trust or non-profit",
@@ -1909,14 +1918,26 @@
 
     p.accessLabel = { open: "Open to all", permission: "Open by permission",
                       closed: "Closed to the public", unknown: "Access unverified" }[p.access];
+    // These two sentences cite Connecticut law — Leydon v. Greenwich for
+    // municipal land, and the state's Recreational Use Statute. They key
+    // on `type`, which says nothing about WHERE a place is, so on a
+    // two-state dataset they would state Connecticut law over New York
+    // land. Same shape as the unscoped verified.json rules that put a
+    // portal.ct.gov citation on the Adirondack Forest Preserve. Scoped by
+    // p.state, with a neutral sentence for anywhere without a CT-specific
+    // claim to make.
+    const inCT = (p.state || "CT") === "CT";
     p.accessWhy =
       p.access === "open"
         ? (A.officialAccess === "Open" ? "Officially open (USGS PAD-US)."
            : p.type === "state" ? "State land — public by default."
            : p.type === "national" ? "Federal land — public by default."
-           : "Municipal land — Connecticut town parks must admit non-residents.")
+           : inCT ? "Municipal land — Connecticut town parks must admit non-residents."
+           : "Municipal land — public by default.")
       : p.access === "permission"
-        ? "Privately held but customarily open. You're here by the owner's permission, not by legal right — Connecticut's Recreational Use Statute is what makes this common. Respect posted signs."
+        ? (inCT
+           ? "Privately held but customarily open. You're here by the owner's permission, not by legal right — Connecticut's Recreational Use Statute is what makes this common. Respect posted signs."
+           : "Privately held but customarily open. You're here by the owner's permission, not by legal right. Respect posted signs.")
       : p.access === "closed"
         ? (A.private
            ? "A members-only community facility — open to its members and their guests, not the general public."
@@ -1929,7 +1950,9 @@
     // ownership *category*, "Non-profit / land trust". Reading the
     // category first meant every preserve named its bucket instead of
     // its steward, hiding a name we already had.
-    p.steward = p.agency || A.officialOwner || STEWARD_BY_TYPE[p.type] || "Unknown";
+    const byType = STEWARD_BY_TYPE[p.type];
+    p.steward = p.agency || A.officialOwner
+              || (typeof byType === "function" ? byType(p) : byType) || "Unknown";
 
     // --- 3. What kind of place? ---
     p.kind = p.subtype || { state: "State Park", national: "Federal Land",
@@ -2495,7 +2518,7 @@
     }
     clusters.sort((a, b) => b.size - a.size);
     for (const c of clusters.slice(0, 400)) {
-      const town = findTown(c.lat, c.lng) || "Connecticut";
+      const town = findTown(c.lat, c.lng) || "this area";
       const approxAcres = Math.round(c.size * 6.7);   // ~165 m cell
       L.circleMarker([c.lat, c.lng], {
         radius: Math.min(16, 5 + Math.sqrt(c.size)),
@@ -2706,12 +2729,15 @@
     panel.querySelector(".near-note").style.display = "";
     try {
       const url = "https://nominatim.openstreetmap.org/search?format=json&limit=1"
-                + "&countrycodes=us&viewbox=-73.75,42.10,-71.75,40.95&bounded=1"
+                // Same envelope as fetchsources.py's REGION_BBOX: both
+                // states, so "Ithaca" and "Lake Placid" resolve rather
+                // than being rejected as outside Connecticut.
+                + "&countrycodes=us&viewbox=-79.77,45.02,-71.77,40.47&bounded=1"
                 + "&q=" + encodeURIComponent(q);
       const r = await fetch(url, { headers: { "Accept": "application/json" } });
       const j = await r.json();
       if (!j || !j.length) {
-        setNear("Near me", "", `Couldn't find “${q}” in Connecticut. Try a town name.`);
+        setNear("Near me", "", `Couldn't find “${q}” in Connecticut or New York. Try a town name.`);
         return;
       }
       const lat = +j[0].lat, lng = +j[0].lon;
@@ -3314,7 +3340,10 @@
     } catch (e) { return false; }
     if (!data || !Array.isArray(data.places) || !data.places.length) return false;
 
-    const towns = await fetch("data/towns.geojson").then(r => r.json());
+    // CT's 169 towns plus NY's 995 towns and cities. towns.geojson is the
+    // CT-only predecessor, still in the repo; this is what draws New York
+    // boundaries and what findTown answers from.
+    const towns = await fetch("data/municipalities.geojson").then(r => r.json());
     buildTownIndex(towns);
     if (CONFIG.townBorders.show) {
       L.geoJSON(towns, {
