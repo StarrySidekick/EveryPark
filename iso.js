@@ -1348,10 +1348,17 @@ const EveryParkIso = (() => {
       if (publics.length >= 14) break;
     }
 
+    // Trails are chopped into 0.5-unit pieces because that is how the
+    // dash phase is computed. Roads have no dash and were chopped anyway,
+    // which is what made them read as a row of separate grey rectangles:
+    // every piece was an independent quad with butt ends, so each change
+    // of direction left a wedge open on the outside of the turn and a
+    // real road curve became a staircase of slabs. Roads keep their whole
+    // polyline now and are drawn as one continuous ribbon.
     return { trailM, waterM, roadM, buildM, parkM, courtM, sprites, hikePath,
              trailLines, roadLines, publics,
              trailPieces: pathPieces(trailLines, [1.5, 1.1]),
-             roadPieces: pathPieces(roadLines, null) };
+             roadPaths: roadLines };
   }
 
   // Drawn icons for the corner controls — no emoji in the chrome either.
@@ -2007,6 +2014,44 @@ const EveryParkIso = (() => {
       }
     };
 
+    // A whole polyline as ONE ribbon. The offset at each vertex is taken
+    // along the average of the incoming and outgoing direction, so
+    // consecutive segments share an edge rather than each ending square —
+    // which is what left a wedge open on the outside of every bend and
+    // made a curve read as a row of slabs. Still draped: each vertex is
+    // projected at its own terrain height.
+    //
+    // Not round caps. Round caps on every short segment is what made
+    // these look like strings of cylinders before; the fix is to stop
+    // cutting the line into segments at all.
+    const drawWayPath = (pts, hw, fill) => {
+      const n = pts.length;
+      if (n < 2) return;
+      const lift = s * .1;
+      const off = [];
+      for (let i = 0; i < n; i++) {
+        const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)];
+        const dx = b[0] - a[0], dy = b[1] - a[1];
+        const L = Math.hypot(dx, dy) || 1;
+        off.push([-dy / L * hw, dx / L * hw]);
+      }
+      ctx.fillStyle = fill;
+      ctx.beginPath();
+      for (let i = 0; i < n; i++) {
+        const h = heightAtCell(pts[i][0], pts[i][1]);
+        const q = project(pts[i][0] + off[i][0], pts[i][1] + off[i][1], h);
+        if (i === 0) ctx.moveTo(q[0], q[1] - lift);
+        else ctx.lineTo(q[0], q[1] - lift);
+      }
+      for (let i = n - 1; i >= 0; i--) {
+        const h = heightAtCell(pts[i][0], pts[i][1]);
+        const q = project(pts[i][0] - off[i][0], pts[i][1] - off[i][1], h);
+        ctx.lineTo(q[0], q[1] - lift);
+      }
+      ctx.closePath();
+      ctx.fill();
+    };
+
     // A coarse column stands for st*st cells but used to take the height
     // of its anchor cell alone. That single sample is a lottery on rough
     // ground — the anchor may be a peak or a hollow — so the terrain did
@@ -2250,7 +2295,10 @@ const EveryParkIso = (() => {
         const sp = spriteAt && spriteAt.get(j);
         // Facility marks are drawn after the ways, so a court's icon is
         // never painted over by the road running past it.
-        if (sp) { deferred.push([dX, dY, sp]); continue; }
+        // Still `continue` when icons are hidden: this cell is a court or
+        // a facility, not forest, so it should not sprout a tree just
+        // because its mark is switched off.
+        if (sp) { if (S.showIcons !== false) deferred.push([dX, dY, sp]); continue; }
         if (dWater || dBuild || trailM[j] || roadM[j] || parkM[j]) continue;
         const cvr = coverM ? coverM[j] : 0;
 
@@ -2258,7 +2306,8 @@ const EveryParkIso = (() => {
         // the sprites are the forest standing on it. Without a canopy
         // mask, don't invent trees on ground NLCD calls treeless
         // (marsh, sand, crops, pavement).
-        if (!courtM[j] && !(holeM && holeM[j]) && hash(dgx, dgy) < density
+        if (S.showTrees !== false
+            && !courtM[j] && !(holeM && holeM[j]) && hash(dgx, dgy) < density
             && (!S.treeMask || S.treeMask[j])
             && (S.treeMask || !COVER_NO_TREES.has(cvr))) {
           const jx = (hash(dgx + 7, dgy) - .5) * s * .97;
@@ -2408,6 +2457,18 @@ const EveryParkIso = (() => {
     // ridge stands on the silhouette instead of vanishing; with
     // Connecticut relief that is rare, and it reads far better than
     // trees sinking into the hillside mid-rotation.
+    // Roads go UNDER the sprites. A road is ordinary ground you happen to
+    // be able to drive on, and painting it last put tarmac over the tops
+    // of trees standing beside it. Trails still go over everything below:
+    // a trail is the thing you are trying to trace, and a canopy hiding
+    // it defeats the point. That difference is the whole reason these are
+    // two passes and not one.
+    if (S.showRoads !== false)
+      for (const pts of S.roadPaths || []) {
+        drawWayPath(pts, 0.34, roadEdge);
+        drawWayPath(pts, 0.22, roadCol);
+      }
+
     decor.sort((a, b) => a.d - b.d);
     for (const D of decor) D.f();
 
@@ -2420,16 +2481,16 @@ const EveryParkIso = (() => {
       ctx.fillRect(0, Hh * .45, W, Hh * .55);
     }
 
-    // Ways in, drawn last so nothing hides them: trees, buildings and
-    // ridges can obscure a trail exactly when you need to trace it.
-    // Sorted by depth among themselves so crossings stack sensibly.
-    const ways = [];
-    for (const pc of S.roadPieces || []) ways.push([pc, "road"]);
-    for (const pc of S.trailPieces || []) ways.push([pc, "trail"]);
-    ways.sort((a, b) =>
-      (depth(a[0][0], a[0][1]) + depth(a[0][2], a[0][3]))
-      - (depth(b[0][0], b[0][1]) + depth(b[0][2], b[0][3])));
-    for (const [pc, kind] of ways) drawRibbon(pc, kind);
+    // Trails last, so nothing hides them: trees, buildings and ridges can
+    // obscure a trail exactly when you need to trace it. Roads were drawn
+    // before the sprite pass, above.
+    if (S.showTrails !== false) {
+      const ways = (S.trailPieces || []).slice();
+      ways.sort((a, b) =>
+        (depth(a[0], a[1]) + depth(a[2], a[3]))
+        - (depth(b[0], b[1]) + depth(b[2], b[3])));
+      for (const pc of ways) drawRibbon(pc, "trail");
+    }
 
     for (const [X, Y, sp] of deferred)
       facilitySprite(ctx, sp, X, Y - s * 1.5, Math.min(11, Math.max(4.5, s * 1.5)), tod);
@@ -2442,7 +2503,7 @@ const EveryParkIso = (() => {
     // Public buildings — where the library actually is. Drawn in the
     // always-visible pass with the landscape names, because the whole
     // point is that a roof or a ridge must never hide one.
-    if (S.publics && S.publics.length) {
+    if (S.showIcons !== false && S.publics && S.publics.length) {
       const fs = Math.max(8, Math.min(13, s * 1.7));
       const r = Math.max(5, Math.min(11, s * 1.5));
       const placedP = [];
@@ -2558,7 +2619,7 @@ const EveryParkIso = (() => {
     const shape = [GRID, S.smooth ? 1 : 0, S.useSat ? 1 : 0,
                    S.pixel === false ? 0 : 1,
                    S.trailPieces ? S.trailPieces.length : 0,
-                   S.roadPieces ? S.roadPieces.length : 0,
+                   S.roadPaths ? S.roadPaths.length : 0,
                    S.publics ? S.publics.length : 0].join(",");
     if (!S.moving || S._lodShape !== shape) {
       S._lodShape = shape;
@@ -2575,11 +2636,17 @@ const EveryParkIso = (() => {
                  S.smooth ? 1 : 0, S.useSat ? 1 : 0, GRID,
                  Math.round((S.zoom || 1) * 200), cw, ch,
                  S.trailPieces ? S.trailPieces.length : 0,
-                 S.roadPieces ? S.roadPieces.length : 0,
+                 S.roadPaths ? S.roadPaths.length : 0,
                  S.labels ? S.labels.length : 0,
                  S.coverM ? 1 : 0, S.treeMask ? 1 : 0,
                  S.publics ? S.publics.length : 0,
                  S.pixel === false ? 0 : 1,
+                 // The layer switches MUST be in this signature. The
+                 // renderer only repaints when the signature changes, so a
+                 // toggle left out of it flips the flag and shows nothing
+                 // until something unrelated happens to move.
+                 S.showTrees === false ? 0 : 1, S.showRoads === false ? 0 : 1,
+                 S.showTrails === false ? 0 : 1, S.showIcons === false ? 0 : 1,
                  Math.round(S.panX || 0), Math.round(S.panY || 0)].join(",");
     if (!S._cache || S._cache.width !== cw || S._cache.height !== ch) {
       S._cache = document.createElement("canvas");
@@ -2928,7 +2995,7 @@ const EveryParkIso = (() => {
     const S = { H, inside, dropM, edge, holeM, p,
                 trailM: empty(), waterM: empty(), roadM: empty(),
                 buildM: empty(), parkM: empty(), courtM: empty(),
-                trailLines: [], roadLines: [], trailPieces: [], roadPieces: [],
+                trailLines: [], roadLines: [], trailPieces: [], roadPaths: [],
                 spriteAt: new Map(), hikePath: null, hikeT: 0,
                 useSat: false, tex: null, tod: 0, zoom: 1, cellM: 10,
                 smooth: false, mPerBlock: 10, sides: 0, treeMask: null,
@@ -3145,9 +3212,9 @@ const EveryParkIso = (() => {
       for (const sp of d.sprites) S.spriteAt.set(sp.gy * GRID + sp.gx, sp.kind);
       const bits = [baseSub];
       if (d.trailM.some(v => v)) bits.push("trails");
-      if (last) bits.push((d.roadPieces && d.roadPieces.length) ? "roads"
+      if (last) bits.push((d.roadPaths && d.roadPaths.length) ? "roads"
                                                                 : "roads unavailable");
-      else if (d.roadPieces && d.roadPieces.length) bits.push("roads");
+      else if (d.roadPaths && d.roadPaths.length) bits.push("roads");
       if (d.waterM.some(v => v)) bits.push("water");
       if (d.buildM.some(v => v)) bits.push("buildings");
       if (d.sprites.length) bits.push(`${d.sprites.length} facilities`);
@@ -3388,6 +3455,35 @@ const EveryParkIso = (() => {
     menuRow("Sides", sidesBtn);
     menuRow("Drape", satBtn);
     menuRow("Sprites", pixBtn);
+
+    // Four independent layer switches. Separate rather than one "detail"
+    // dial because they answer different questions: trees off to read the
+    // ground, roads off to stop tarmac cutting the view, icons off for a
+    // clean picture to save. Each writes S.show* and the render signature
+    // carries them, so the next frame is the one you asked for.
+    const layerBtn = (label, key) => {
+      const btn = document.createElement("button");
+      btn.className = "iso-tool active";
+      btn.textContent = label;
+      btn.title = "Show or hide " + label.toLowerCase();
+      btn.addEventListener("click", () => {
+        S[key] = S[key] === false;
+        btn.classList.toggle("active", S[key] !== false);
+      });
+      return btn;
+    };
+    const layerRow = document.createElement("div");
+    layerRow.className = "iso-menu-row iso-layer-row";
+    const layerLab = document.createElement("span");
+    layerLab.className = "iso-menu-lab";
+    layerLab.textContent = "Layers";
+    layerRow.append(layerLab,
+                    layerBtn("Trees", "showTrees"),
+                    layerBtn("Roads", "showRoads"),
+                    layerBtn("Trails", "showTrails"),
+                    layerBtn("Icons", "showIcons"));
+    menu.appendChild(layerRow);
+
     menu.appendChild(sliderWrap);
 
     const terrainBtn = ov.querySelector("#isoTerrainBtn");

@@ -787,6 +787,11 @@ header > .search-wrap { display: flex; align-items: center; }
 }
 .iso-menu[hidden] { display: none; }
 .iso-menu-row { display: flex; align-items: center; gap: 8px; }
+/* Four switches will not sit on one line beside a label at the menu's
+   208px, so this row wraps and the label takes the whole first line. */
+.iso-layer-row { flex-wrap: wrap; row-gap: 6px; }
+.iso-layer-row .iso-menu-lab { flex: 1 0 100%; min-width: 0; }
+.iso-layer-row .iso-tool { padding: 3px 7px; font-size: .62rem; }
 .iso-menu-lab {
   font-family: var(--ep-mono); font-size: .62rem; letter-spacing: .12em;
   text-transform: uppercase; opacity: .68; flex: 1 0 auto; min-width: 58px;
