@@ -3,45 +3,7 @@
  "matched": 52,
  "unmatched": [],
  "rules": 16,
- "rule_hits": 3455,
+ "rule_hits": 4691,
  "dead_rules": [],
- "dormant_rules": [
-  {
-   "id": "ny-forest-preserve",
-   "states": [
-    "NY"
-   ]
-  },
-  {
-   "id": "ny-forest-preserve-detached",
-   "states": [
-    "NY"
-   ]
-  },
-  {
-   "id": "ny-state-forest",
-   "states": [
-    "NY"
-   ]
-  },
-  {
-   "id": "ny-wma",
-   "states": [
-    "NY"
-   ]
-  },
-  {
-   "id": "ny-unique-area",
-   "states": [
-    "NY"
-   ]
-  },
-  {
-   "id": "ny-multiple-use-area",
-   "states": [
-    "NY"
-   ]
-  }
- ],
- "researched_places": 3426
+ "researched_places": 4662
 }
