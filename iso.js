@@ -1368,6 +1368,9 @@ const EveryParkIso = (() => {
     terrain: '<path d="M2 19h20L14.6 7.2 11 12.6 8.6 9.4z"/><path d="M6.2 14.6l2.4-3.2 1.9 2.6" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>',
     rotate:  '<path d="M12 5V2.5L7.8 5.8 12 9.2V6.6a5.4 5.4 0 1 1-5.4 5.4H5a7 7 0 1 0 7-7z"/><ellipse cx="12" cy="12" rx="9.2" ry="3.4" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".55"/>',
     save:    '<path d="M12 3v10.2l3.4-3.4 1.5 1.5L11 17.2 5.1 11.3l1.5-1.5L10 13.2V3z"/><path d="M4 18.5h16V21H4z"/>',
+    expand:  '<path d="M3 3h7v2.4H5.4V10H3zM14 3h7v7h-2.4V5.4H14zM3 14h2.4v4.6H10V21H3zM18.6 14H21v7h-7v-2.4h4.6z"/>',
+    dice:    '<rect x="3.5" y="3.5" width="17" height="17" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="8.5" cy="8.5" r="1.6"/><circle cx="15.5" cy="8.5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="8.5" cy="15.5" r="1.6"/><circle cx="15.5" cy="15.5" r="1.6"/>',
+    shrink:  '<path d="M10 3h2.4v7H5.4V7.6H10zM11.6 3H14v4.6h4.6V10h-7zM3 14h7v7H7.6v-4.6H3zM14 14h7v2.4h-4.6V21H14z"/>',
     scroll:  '<path d="M5 3h11a2.5 2.5 0 0 1 2.5 2.5V19a2 2 0 0 0 2 2H7a2 2 0 0 1-2-2z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M8 7.5h7M8 11h7M8 14.5h4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/>'
   };
   const icon = name =>
@@ -2004,13 +2007,33 @@ const EveryParkIso = (() => {
       }
     };
 
+    // A coarse column stands for st*st cells but used to take the height
+    // of its anchor cell alone. That single sample is a lottery on rough
+    // ground — the anchor may be a peak or a hollow — so the terrain did
+    // not merely get blockier when the view moved, it changed shape and
+    // apparent relief, and snapped back on release. The block's mean is
+    // the same surface at a lower resolution, which is what coarsening is
+    // supposed to mean. At st === 1 this is exactly H[i], so resting
+    // frames are untouched.
+    const blockH = (gx, gy, i) => {
+      if (st === 1) return H[i];
+      let sum = 0, n = 0;
+      const gx1 = Math.min(GRID, gx + st), gy1 = Math.min(GRID, gy + st);
+      for (let by = Math.max(0, gy); by < gy1; by++)
+        for (let bx = Math.max(0, gx); bx < gx1; bx++) {
+          const j = by * GRID + bx;
+          if (inside[j]) { sum += H[j]; n++; }
+        }
+      return n ? sum / n : H[i];
+    };
+
     for (let gy = gyA; inY(gy); gy += stepY)
     for (let gx = gxA; inX(gx); gx += stepX) {
       const i = gy * GRID + gx;
       if (!inside[i]) continue;
       const rx = (gx - GRID / 2) * cos - (gy - GRID / 2) * sin;
       const ry = (gx - GRID / 2) * sin + (gy - GRID / 2) * cos;
-      let h = H[i];
+      let h = blockH(gx, gy, i);
       const isWater = waterM[i] && (h <= waterLevel + 4);
       const isBuild = buildM[i] && !isWater;
       if (isWater) h = waterLevel;
@@ -2020,7 +2043,13 @@ const EveryParkIso = (() => {
       const Y = cy + ry * s * .8 - t * zScale;
 
       let r, g, b;
-      const nb = H[gy * GRID + Math.max(0, gx - 1)];
+      // Slope shading has to compare this column with the NEXT column,
+      // not with the cell one to the left: at st > 1 that cell is inside
+      // this same block, so the shading washed out exactly when the
+      // blocks got bigger. That is most of what read as "the relief
+      // changes when it turns".
+      const gxn = Math.max(0, gx - st);
+      const nb = st === 1 ? H[gy * GRID + gxn] : blockH(gxn, gy, gy * GRID + gxn);
       const sh = Math.max(-14, Math.min(18, (h - nb) * 1.6));
       if (isBuild) {
         const v = 18 * hash(gx, gy);
@@ -2635,7 +2664,13 @@ const EveryParkIso = (() => {
                     title="Still fetching map data"></span>
             </div>
           </div>
-          <div class="iso-corner iso-corner-tr"><button id="isoSeason" title="Season"></button></div>
+          <div class="iso-corner iso-corner-tr">
+            <div class="iso-corner-row">
+              <button id="isoSeason" title="Season"></button>
+              <button id="isoFullBtn" title="Full screen"></button>
+              <button id="isoClose" class="iso-x" title="Close">&#215;</button>
+            </div>
+          </div>
           <div class="iso-corner iso-corner-bl">
             <div class="iso-menu" id="isoMenu" hidden></div>
             <div class="iso-corner-row">
@@ -2652,10 +2687,6 @@ const EveryParkIso = (() => {
               <button id="isoSaveBtn" title="Save a picture"></button>
             </div>
           </div>
-        </div>
-        <div class="iso-foot">
-          <span class="iso-tools"></span>
-          <button id="isoClose">Close</button>
         </div>
       </div>`;
     document.body.appendChild(ov);
@@ -2675,9 +2706,21 @@ const EveryParkIso = (() => {
     };
     if (window.ResizeObserver) new ResizeObserver(fit).observe(canvas);
     window.addEventListener("resize", fit);
+    // One rAF was not enough. The panel opens behind `ep-pop`, a 0.2s
+    // scale-in, so that first frame measures a box under the 40px floor,
+    // returns early, and nothing runs fit again — the ResizeObserver only
+    // speaks when the box CHANGES, and by the time it is observing, the
+    // box has already reached its final size. The canvas then kept its
+    // 840x540 markup buffer and CSS upscaled it, which was near enough to
+    // invisible while the stage was ~840 wide and is plainly soft now that
+    // it is 1128 and more. Re-fit across the animation instead.
+    [0, 60, 220, 500, 1000].forEach(ms => setTimeout(fit, ms));
     requestAnimationFrame(fit);
     const sub = ov.querySelector(".iso-sub");
-    const tools = ov.querySelector(".iso-tools");
+    // The footer is gone (2026-08-10): Close is an X in the top-right and
+    // Random sits beside it, so the stage keeps the height the footer was
+    // spending on two buttons.
+    const topRow = ov.querySelector(".iso-corner-tr .iso-corner-row");
 
     // A quiet "still fetching" mark beside the time-of-day button. The
     // viewer draws terrain first and streams everything else in behind
@@ -2715,6 +2758,36 @@ const EveryParkIso = (() => {
     };
     ov.querySelector("#isoClose").addEventListener("click", close);
     ov.addEventListener("click", e => { if (e.target === ov) close(); });
+
+    // Full screen. iso-full is the same class the phone layout already
+    // used, so the stage-fills-the-panel rules are shared rather than
+    // duplicated; on desktop it is a toggle instead of a media query.
+    // The canvas backing store follows via the existing ResizeObserver.
+    const fullBtn = ov.querySelector("#isoFullBtn");
+    const setFull = on => {
+      ov.classList.toggle("iso-full", on);
+      fullBtn.classList.toggle("active", on);
+      fullBtn.innerHTML = icon(on ? "shrink" : "expand");
+      fullBtn.title = on ? "Leave full screen" : "Full screen";
+      // Toggling the class resizes the stage, and the ResizeObserver above
+      // does not reliably speak for a box that changes by stylesheet
+      // rather than by layout reflow — so refit explicitly, after the
+      // browser has applied the new rules.
+      requestAnimationFrame(fit);
+      setTimeout(fit, 120);
+    };
+    setFull(ov.classList.contains("iso-full"));
+    fullBtn.addEventListener("click", e => {
+      e.stopPropagation();
+      setFull(!ov.classList.contains("iso-full"));
+    });
+    // Escape leaves full screen first and only closes the viewer on a
+    // second press — losing the whole panel when you meant to unmaximise
+    // is the kind of thing you only forgive once.
+    ov.addEventListener("keydown", e => {
+      if (e.key !== "Escape") return;
+      if (ov.classList.contains("iso-full")) { setFull(false); e.stopPropagation(); }
+    });
 
     let boundary = null;
     // Districts arrive WITH their boundary — it is the National Register
@@ -3267,8 +3340,10 @@ const EveryParkIso = (() => {
     // owns the pool and the filters, so it hands the picker over rather
     // than the viewer duplicating that logic.
     const randBtn = document.createElement("button");
-    randBtn.className = "iso-tool";
-    randBtn.textContent = "Random";
+    // A die, not the word: this button moved from the footer into the
+    // top-right corner row, and that row is 38px icons. "Random" was
+    // clipped to "RAND" at that width.
+    randBtn.innerHTML = icon("dice");
     randBtn.title = "Jump to another park";
     randBtn.addEventListener("click", () => {
       if (!window.EveryParkRandom) return;
@@ -3331,7 +3406,8 @@ const EveryParkIso = (() => {
     menu.addEventListener("click", e => e.stopPropagation());
     canvas.addEventListener("pointerdown", () => setMenu(false));
 
-    tools.append(randBtn);
+    // Random goes first in the top-right row, ahead of season/full/close.
+    topRow.insertBefore(randBtn, topRow.firstChild);
 
     // Zoom about the MIDDLE OF THE VIEWER, not the island's own origin.
     //

@@ -3,3 +3,6 @@ __pycache__/
 raw/
 _stage/
 .venv/
+# Playwright, for tools/isotest. Previously not ignored, which meant the
+# documented `git add -A` deploy would have committed the whole tree.
+node_modules/
