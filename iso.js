@@ -279,10 +279,15 @@ const EveryParkIso = (() => {
     const spanM = Math.max((e - w) * 111320 * Math.cos(s * Math.PI / 180),
                            (n - s) * 111320);
     const z = Math.max(13, Math.min(17, Math.round(17 - Math.log2(spanM / 700))));
+    // Clarity rather than World Imagery, for the same reason the map's
+    // satellite basemap switched: measured over twelve wooded Connecticut
+    // tiles, World Imagery's mean green varies with SD 13.9 across the
+    // state and Clarity's with 7.5. A drape assembled from tiles flown in
+    // different seasons puts a visible seam across one park.
     const t = await sampleTiles(bbox, (zz, tx, ty) =>
-      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/" +
+      "https://clarity.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/" +
       `MapServer/tile/${zz}/${ty}/${tx}`, 20, z);
-    t.mode = "tile"; t.label = "Esri imagery";
+    t.mode = "tile"; t.label = "Esri Clarity imagery";
     return t;
   }
 

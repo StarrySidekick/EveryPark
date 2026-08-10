@@ -225,6 +225,12 @@ const EveryParkTiles = (() => {
     const key = hit ? keyOf(hit.dataLayer, hit.f) : null;
     if (key === hoverKey) return;
     hoverKey = key;
+    // The mown weave drifts faster while you are over a park, so the
+    // shape you are pointing at feels alive under the cursor. Toggled
+    // here rather than on the polygon because the turf is one
+    // screen-space overlay, not a per-shape fill.
+    const turfEl = document.querySelector(".map-turf");
+    if (turfEl) turfEl.classList.toggle("turf-fast", !!hit);
     if (hoverLabelEl) {
       if (hit) {
         hoverLabelEl.textContent = nameOf(hit.f);

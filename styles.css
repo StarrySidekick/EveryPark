@@ -993,11 +993,35 @@ header > .search-wrap { display: flex; align-items: center; }
    the parchment alike. Blend mode rather than opacity, so every colour
    underneath stays itself. */
 .map-turf {
-  position: absolute; inset: 0; z-index: 450;
+  position: absolute; z-index: 450;
   pointer-events: none;
   mix-blend-mode: multiply;
   background-image: var(--ep-turf);
   background-size: var(--ep-turf-size) var(--ep-turf-size);
+  /* Oversized by two tiles on every side so the drift below never
+     exposes an edge as it slides. */
+  inset: calc(var(--ep-turf-size) * -2);
+  animation: ep-turf-drift 84s linear infinite;
+  will-change: transform;
+}
+/* The weave crawls diagonally, like a game background. Deliberately slow:
+   the point is that the ground is alive, not that anything is moving.
+   It reads hardest over the saturated park fills and almost not at all
+   over pale parchment, which is what makes the parks catch the eye.
+   Speeds up while you hover a park.
+
+   TRANSFORM, not background-position. This layer covers the viewport and
+   multiplies over everything under it, so animating background-position
+   would repaint and recomposite the whole map every frame — which is the
+   cost the marks canvas was rewritten to avoid. A transform of exactly
+   one tile in each axis is seamless and stays on the compositor. */
+@keyframes ep-turf-drift {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(var(--ep-turf-size), var(--ep-turf-size), 0); }
+}
+.map-turf.turf-fast { animation-duration: 22s; }
+@media (prefers-reduced-motion: reduce) {
+  .map-turf { animation: none; }
 }
 
 /* Chrome wears the same weave. */
@@ -1162,3 +1186,24 @@ header { flex-wrap: nowrap; }
 }
 #districtCount:empty { display: none; }
 @media (max-width: 760px) { #districtCount { display: none; } }
+
+/* ---------- "What kind of place is it?" -------------------------
+   Second legend in the Guide: the sub-label on a card is a
+   land-management term, and the verdict chip has to be readable at a
+   glance or the section may as well not be there. Three tones, because
+   "usually yes, by the owner's permission" is genuinely not the same
+   answer as "yes" and must not look like one. */
+.g-kind { margin: 0 0 12px; }
+.g-kind h4 {
+  margin: 0 0 3px; font-size: .82rem; display: flex;
+  align-items: baseline; gap: 8px; flex-wrap: wrap;
+}
+.g-kind p { margin: 0 0 3px; font-size: .78rem; line-height: 1.45; }
+.g-go {
+  font-family: var(--ep-mono); font-size: .6rem; letter-spacing: .06em;
+  text-transform: uppercase; padding: 2px 6px; border-radius: var(--ep-radius);
+  border: 1px solid currentColor; white-space: nowrap;
+}
+.g-go-yes   { color: #2e7d32; }
+.g-go-maybe { color: #a9722a; }
+.g-go-no    { color: #b03a30; }

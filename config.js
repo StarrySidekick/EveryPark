@@ -125,9 +125,25 @@ const CONFIG = {
       labelsUrl: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
     },
     {
-      label: "Satellite (Esri, sharper)",
-      url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-      attribution: "Imagery &copy; Esri, Maxar, Earthstar Geographics",
+      // Esri CLARITY, not Esri World Imagery. Both are Esri, both stay
+      // sharp to z19 where NAIP hard-404s above z16 — but World Imagery
+      // is a visibly seasonal patchwork and Clarity is not.
+      //
+      // Measured 2026-08-10, twelve wooded Connecticut tiles at z13,
+      // standard deviation of mean green across them (lower = one season
+      // everywhere rather than a quilt of acquisition dates):
+      //
+      //     USGS NAIP      mean green 142.1   SD  7.8    consistent
+      //     Esri World      mean green  84.7   SD 13.9    patchy
+      //     Esri Clarity    mean green 103.5   SD  7.5    consistent
+      //
+      // So Clarity is as seasonally even as NAIP and stays sharp three
+      // zoom levels further in. Clarity is often an older vintage; that
+      // is the trade, and it is the right one here (Timothy, 2026-08-10:
+      // "even if it's outdated by a year, i dont mind").
+      label: "Satellite (sharp, one season)",
+      url: "https://clarity.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      attribution: "Imagery &copy; Esri Clarity, Maxar, Earthstar Geographics",
       roadsUrl: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}",
       labelsUrl: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
     },
@@ -185,6 +201,69 @@ const CONFIG = {
   ],
 
   // What's deliberately left off the map, and why. Also shown in the Guide.
+  // ---- WHAT KIND OF PLACE IS IT --------------------------------------
+  // The other legend answers "who runs it". This one answers "what IS
+  // it, and can I usually go?", because the sub-label on a card is a
+  // land-management term and most of them do not mean what they sound
+  // like. A wildlife management area is open to walk in; a watershed
+  // protection area usually is not without a permit; a conservation
+  // easement is not a place at all. Ordered roughly by how many places
+  // carry each label.
+  //
+  // `go` is deliberately hedged where the honest answer is hedged. This
+  // panel explains a category; the card for an individual place is what
+  // states that place's rules, and only when they have been checked.
+  kinds: [
+    { label: "Nature Preserve / Wildlife Sanctuary", go: "Usually yes, on foot",
+      what: "Land held to protect habitat rather than to be used. Trails are often unsurfaced and unsigned, and there may be none at all.",
+      note: "Dogs, bikes and horses are restricted more often than in a park. Some preserves close areas seasonally for nesting or to protect a rare species." },
+    { label: "Land Trust Preserve", go: "Usually yes, by the owner's permission",
+      what: "Owned by a private non-profit land trust, not by the public. Most welcome visitors on foot and say so on their own website.",
+      note: "Access is by the owner's goodwill rather than by legal right, and can be withdrawn. This map only turns a land trust green where that trust publishes an open-to-the-public policy we can cite." },
+    { label: "Town Open Space / Local conservation area", go: "Usually yes",
+      what: "Municipal land kept undeveloped — woods, fields, river frontage. Rarely has facilities beyond a pull-off and a trail.",
+      note: "In Connecticut, municipal open space is open to residents and non-residents alike under Leydon v. Greenwich." },
+    { label: "Local park / Recreation area", go: "Yes",
+      what: "The developed municipal park: playing fields, playgrounds, courts, picnic tables, mown grass.",
+      note: "A few town beaches and pools charge non-residents. Paying is fine; belonging is not — anywhere that admits only members is off this map entirely." },
+    { label: "State Park", go: "Yes",
+      what: "Connecticut's developed state land: swimming, camping, picnicking, marked trails, staffed in season.",
+      note: "Entry is free. Some charge for PARKING rather than entry — Connecticut-registered vehicles park free under Passport to the Parks, out-of-state vehicles pay." },
+    { label: "State Forest", go: "Yes",
+      what: "Working forest owned by the state and managed for timber, water and wildlife as well as recreation. Big, quiet, lightly signed, and often crossed by unpaved forest roads.",
+      note: "Open to hunting in season, which is worth knowing before you walk one in autumn. Expect active logging in places." },
+    { label: "Wildlife Management Area", go: "Yes, but know what it is",
+      what: "Land bought and managed specifically for wildlife and for hunting, fishing and wildlife watching. It is not a developed park: usually no toilets, no marked loop, no mown grass.",
+      note: "Open to the public year-round, but hunting is the primary use on much of it. Wear blaze orange in season." },
+    { label: "Watershed protection area", go: "Often NOT without a permit",
+      what: "Land a water company owns around a reservoir to keep the drinking water clean. Aquarion, the MDC and the South Central Regional Water Authority hold most of it.",
+      note: "The most misread label on this map. Some of it is open, some is open only to permit holders, and some is closed outright — and the rule differs by company and by reservoir. Never assume; check the company's own page." },
+    { label: "Flood Control Area", go: "Usually yes",
+      what: "Army Corps of Engineers land behind a dam, kept empty so it can flood. Often doubles as informal open space with a trail or a boat ramp.",
+      note: "Can be closed without notice when water is high." },
+    { label: "Boat Launch / Water Access", go: "Yes, for getting to the water",
+      what: "A ramp, carry-in path or fishing access point rather than somewhere to spend an afternoon.",
+      note: "Some launches charge a seasonal or daily fee for trailered boats." },
+    { label: "Coastal Access Site", go: "Yes",
+      what: "A point on the Connecticut shoreline that DEEP records as publicly reachable — a beach, pier, walkway or overlook. Many are a single strip of walkway rather than an open space.",
+      note: "Facilities and parking are recorded per site and vary enormously; a few charge." },
+    { label: "Cemetery / Historic Burying Ground", go: "Yes, in daylight",
+      what: "Kept on the map because they are walkable public green space and often the oldest designed landscape in a town. Filterable off if you would rather not see them.",
+      note: "Daylight hours, quiet behaviour, and paths rather than plots." },
+    { label: "Town Green", go: "Yes",
+      what: "The historic common at the centre of a New England town. Small, mown, usually ringed by a road.",
+      note: "Public since the town was laid out." },
+    { label: "Scenic Reserve / Unique Area", go: "Usually yes",
+      what: "Land protected for a particular feature — a gorge, a ridge, a stand of old trees, a waterfall.",
+      note: "Often steep or fragile, with the trail kept deliberately narrow." },
+    { label: "University Land", go: "Sometimes",
+      what: "Forest and field owned by a college, often used for teaching and research.",
+      note: "Varies completely by institution. Some run open trail networks; others allow no public entry at all." },
+    { label: "Conservation easement", go: "No — this is not a place to visit",
+      what: "A legal restriction on what a private owner may build. The land underneath stays private.",
+      note: "Listed only so you understand why a name you recognise as a neighbour's farm appears in protected-land data. It confers no right of way." }
+  ],
+
   exclusions: [
     ["Members-only land", "Golf and country clubs, yacht clubs, sportsmen's and rod-and-gun associations, beach and lake associations, homeowners' associations, scout reservations. The test is whether anyone can get in — paying is fine, belonging is not."],
     ["Conservation easements on private land", "An easement restricts what an owner may build. It is not a right of way, and the land underneath stays private. These are recorded under the owner's name, which is why they arrive called things like '44 Sunny Ridge Road, LLC'."],
@@ -209,7 +288,7 @@ const CONFIG = {
   // Shown in the top-right corner. Bumped by hand on every code change,
   // so there's visible proof of which build is actually loaded rather
   // than guessing whether a cached copy is being served.
-  siteVersion: "v0.47.0",
+  siteVersion: "v0.48.0",
 
   // ---- VECTOR TILES --------------------------------------------------
   // Every boundary and trail, pre-cut into map tiles and packed into one

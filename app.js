@@ -3214,6 +3214,23 @@
         <p class="g-why"><strong>How a place lands here.</strong> ${c.why}</p>
         <p class="g-acc"><strong>Can you go?</strong> ${c.access}</p>
       </section>`).join("");
+    // What kind of place, as opposed to who runs it. The verdict chip
+    // carries a class so "often NOT without a permit" cannot be mistaken
+    // for a yes at a glance — that distinction is the whole reason this
+    // section exists.
+    const kinds = document.getElementById("guideKinds");
+    if (kinds && CONFIG.kinds) {
+      kinds.innerHTML = CONFIG.kinds.map(k => {
+        const g = String(k.go || "");
+        const tone = /^no\b|NOT\b/i.test(g) ? "g-go-no"
+                   : /sometimes|often|usually/i.test(g) ? "g-go-maybe" : "g-go-yes";
+        return `<section class="g-kind">
+          <h4>${k.label}<span class="g-go ${tone}">${g}</span></h4>
+          <p>${k.what}</p>
+          <p class="g-why">${k.note}</p>
+        </section>`;
+      }).join("");
+    }
     const ex = document.getElementById("guideExcl");
     if (ex && CONFIG.exclusions) {
       ex.innerHTML = CONFIG.exclusions.map(([t, d]) =>
