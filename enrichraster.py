@@ -329,8 +329,15 @@ def main():
                     A[k] = src[k]
             if A.get("elev") is not None:
                 reused += 1
+        # Missing EITHER sample, not just elevation. Keying only on elev
+        # meant the 728 places whose land-cover request failed were
+        # carried forward as "done" forever — elevation had succeeded for
+        # all of them, so they never re-entered the queue and the failure
+        # was permanent. coverTop is the right witness for land cover:
+        # `cover` is legitimately absent on an all-water sample.
         todo = [p for p in places
-                if (p.get("attrs") or {}).get("elev") is None]
+                if (p.get("attrs") or {}).get("elev") is None
+                or (p.get("attrs") or {}).get("coverTop") is None]
         print(f"  reused elevation/land cover for {reused:,}; "
               f"{len(todo):,} still to sample", flush=True)
 

@@ -41,11 +41,18 @@ from pmtiles.tile import Compression, TileType, zxy_to_tileid
 EXTENT = 4096          # MVT coordinate space per tile
 BUFFER = 128           # draw past the tile edge so lines don't seam
 
-# Connecticut, with a small margin. Everything is clipped to this before
-# tiling. Without it a single PAD-US record for the Appalachian Trail
-# corridor — which runs through fourteen states — claims a bounding box
-# spanning half the country and lands in thousands of tiles.
-CT_CLIP = box(-73.80, 40.90, -71.72, 42.11)
+# Connecticut AND New York, with a small margin. Everything is clipped to
+# this before tiling. The clip is not optional: without it a single PAD-US
+# record for the Appalachian Trail corridor — which runs through fourteen
+# states — claims a bounding box spanning half the country and lands in
+# thousands of tiles.
+#
+# This was still Connecticut's box on the first two-state tile build, and
+# it quietly threw away most of the map: 95% of the NY DEC parcels, 89% of
+# town parks, 79% of PAD-US, 77% of trails. The archive came back at
+# 15.4 MB and looked plausible precisely because so little survived. Keep
+# this in step with REGION_BBOX in fetchsources.py.
+REGION_CLIP = box(-79.85, 40.40, -71.70, 45.10)
 
 # OSM tags worth drawing. footway and cycleway are overwhelmingly town
 # sidewalks and road-side bike lanes: they quadruple the feature count
@@ -143,8 +150,8 @@ def load_layer(path):
                     continue
             # Clip to Connecticut. Cheap containment test first — most
             # features are entirely inside and need no clipping at all.
-            if not CT_CLIP.contains(geom):
-                geom = geom.intersection(CT_CLIP)
+            if not REGION_CLIP.contains(geom):
+                geom = geom.intersection(REGION_CLIP)
                 if geom.is_empty:
                     skipped += 1
                     continue
@@ -372,13 +379,13 @@ def pack(out_path, minzoom, maxzoom):
                 "tile_compression": Compression.GZIP,
                 "min_zoom": minzoom,
                 "max_zoom": maxzoom,
-                "min_lon_e7": int(-73.75 * 1e7),
-                "min_lat_e7": int(40.95 * 1e7),
+                "min_lon_e7": int(-79.77 * 1e7),
+                "min_lat_e7": int(40.47 * 1e7),
                 "max_lon_e7": int(-71.77 * 1e7),
-                "max_lat_e7": int(42.06 * 1e7),
+                "max_lat_e7": int(45.02 * 1e7),
                 "center_zoom": 9,
-                "center_lon_e7": int(-72.7 * 1e7),
-                "center_lat_e7": int(41.55 * 1e7),
+                "center_lon_e7": int(-75.5 * 1e7),
+                "center_lat_e7": int(42.6 * 1e7),
             },
             {
                 "attribution": "CT DEEP, USGS PAD-US, OpenStreetMap contributors",
