@@ -128,7 +128,7 @@ def _dedupe_key(f):
 
 
 def paged(url, where, out_fields, per_feature, geometry=False, page=1000,
-          centroid=True, offset=GEOM_OFFSET, workers=3):
+          centroid=True, offset=GEOM_OFFSET, workers=3, simplify=None):
     """
     Page through a layer, one region tile at a time. Polygon layers answer
     returnCentroid; point layers reject it outright and hand back a plain
@@ -147,8 +147,38 @@ def paged(url, where, out_fields, per_feature, geometry=False, page=1000,
         per_feature(f)
         got[0] += 1
 
-    for bbox in region_tiles():
-        total = count(url, where, bbox)
+    # A fixed grid was not enough. At 3x3 the mirror still refused the two
+    # biggest layers — preserves (12k features region-wide) and the trail
+    # grid (~139k) — while every smaller section started succeeding. The
+    # split has to follow the DATA, not the map: a tile is subdivided
+    # until it is small enough to be answered, and a tile whose count
+    # query itself errors is subdivided on that evidence alone.
+    TILE_MAX = 4000
+    DEPTH_MAX = 4
+
+    def leaves(bbox, depth=0):
+        try:
+            total = count(url, where, bbox)
+            small = total <= TILE_MAX
+        except Exception:                           # noqa: BLE001
+            total, small = None, False              # refused: too big, split
+        if small or depth >= DEPTH_MAX:
+            return [(bbox, total)] if total or total is None else []
+        w, s, e, n = [float(v) for v in bbox.split(",")]
+        mx, my = (w + e) / 2, (s + n) / 2
+        out = []
+        for q in (f"{w},{s},{mx},{my}", f"{mx},{s},{e},{my}",
+                  f"{w},{my},{mx},{n}", f"{mx},{my},{e},{n}"):
+            out.extend(leaves(q, depth + 1))
+        return out
+
+    plan = []
+    for tile in region_tiles():
+        plan.extend(leaves(tile))
+
+    for bbox, total in plan:
+        if total is None:
+            total = count(url, where, bbox)
         if not total:
             continue
 
@@ -166,6 +196,12 @@ def paged(url, where, out_fields, per_feature, geometry=False, page=1000,
                     p["returnCentroid"] = "true"
                 else:
                     p["returnGeometry"] = "true"
+            # Esri-format geometry can be simplified too. The trail grid
+            # only needs to know WHERE there is a trail, at a 0.0015-degree
+            # cell, so it asks for very coarse paths — without this it
+            # would pull full-precision geometry for ~139,000 ways.
+            if simplify:
+                p["maxAllowableOffset"], p["geometryPrecision"] = simplify
             j = post(url, p)
             return j.get("features") or []
 
@@ -631,23 +667,14 @@ def fetch_attributes(outdir, prev=None, only=None):
                     cells.add(math.floor(pt[1] / TRAIL_CELL) * 1000000
                               + (math.floor(pt[0] / TRAIL_CELL) + 500000))
 
-        total = count(OSM6 + "OSM_NA_Trails/FeatureServer/0/query",
-                      "highway IN ('path','track','bridleway')")
-        offsets = list(range(0, total, 2000))
-
-        def grab(off):
-            j = post(OSM6 + "OSM_NA_Trails/FeatureServer/0/query",
-                     {"where": "highway IN ('path','track','bridleway')",
-                      "geometry": REGION_BBOX, "geometryType": "esriGeometryEnvelope",
-                      "inSR": "4326", "outSR": "4326", "outFields": "",
-                      "returnGeometry": "true", "maxAllowableOffset": "0.004",
-                      "geometryPrecision": "4", "resultOffset": str(off),
-                      "resultRecordCount": "2000"})
-            for f in j.get("features") or []:
-                tf(f)
-
-        with ThreadPoolExecutor(max_workers=3) as ex:
-            list(ex.map(grab, offsets))
+        # Goes through paged() rather than paging the whole region itself.
+        # This section kept its own loop and so missed the adaptive tiling
+        # entirely — it was still asking one rectangle for ~139,000 ways
+        # and was the last section the OSM mirror refused after everything
+        # else started succeeding.
+        paged(OSM6 + "OSM_NA_Trails/FeatureServer/0/query",
+              "highway IN ('path','track','bridleway')", "", tf,
+              centroid=False, page=2000, simplify=("0.004", "4"))
 
         # The Blue-Blazed system is ~825 miles that OpenStreetMap often hasn't
         # tagged as paths. It was already being drawn on the map but wasn't
