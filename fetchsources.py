@@ -143,6 +143,7 @@ def paged(url, where, out_fields, per_feature, geometry=False, page=1000,
     """
     got = [0]
     seen = set()
+    failed = [0]
 
     def emit(f):
         k = _dedupe_key(f)
@@ -187,7 +188,7 @@ def paged(url, where, out_fields, per_feature, geometry=False, page=1000,
         if not total:
             continue
 
-        def grab(off, _bbox=bbox):
+        def grab(off, _bbox):
             p = {"where": where, "geometry": _bbox,
                  "geometryType": "esriGeometryEnvelope", "inSR": "4326",
                  "outSR": "4326", "outFields": out_fields,
@@ -210,10 +211,47 @@ def paged(url, where, out_fields, per_feature, geometry=False, page=1000,
             j = post(url, p)
             return j.get("features") or []
 
-        with ThreadPoolExecutor(max_workers=workers) as ex:
-            for feats in ex.map(grab, range(0, total, page)):
-                for f in feats:
-                    emit(f)
+        # One refused tile must not cost the whole layer. The geometry pass
+        # lost townparks, preserves, cemeteries and landuse outright this
+        # way — the mirror throttled, raised RuntimeError("") (its error
+        # object carries an EMPTY message, which is why the log read
+        # "query: )"), paged() propagated it, and fetch_geometry wrote no
+        # file at all for those layers. Rebuilding tiles from what
+        # survived would then have deleted every town park and preserve
+        # polygon from the map, in Connecticut as well as New York.
+        #
+        # A refusal is evidence the ask was too big, so the tile is split
+        # and retried before it is given up on.
+        def fetch_tile(bb, tot, depth=0):
+            try:
+                with ThreadPoolExecutor(max_workers=workers) as ex:
+                    for feats in ex.map(lambda o: grab(o, bb),
+                                        range(0, tot, page)):
+                        for f in feats:
+                            emit(f)
+                return 0
+            except Exception:                       # noqa: BLE001
+                if depth >= 2:
+                    return 1
+                w, s, e, n = [float(v) for v in bb.split(",")]
+                mx, my = (w + e) / 2, (s + n) / 2
+                lost = 0
+                for q in (f"{w},{s},{mx},{my}", f"{mx},{s},{e},{my}",
+                          f"{w},{my},{mx},{n}", f"{mx},{my},{e},{n}"):
+                    try:
+                        qt = count(url, where, q)
+                    except Exception:               # noqa: BLE001
+                        qt = page
+                    if qt:
+                        lost += fetch_tile(q, qt, depth + 1)
+                return lost
+
+        failed[0] += fetch_tile(bbox, total)
+    if failed[0]:
+        # Loud, because a partial layer that looks complete is exactly the
+        # silent-success trap. The caller decides whether to keep it.
+        print(f"::warning::{failed[0]} tile(s) unfetched after splitting — "
+              f"this layer is INCOMPLETE", flush=True)
     return got[0]
 
 
