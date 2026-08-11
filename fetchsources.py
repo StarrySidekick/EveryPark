@@ -114,7 +114,12 @@ def _dedupe_key(f):
     for k in ("OBJECTID", "objectid", "OID", "FID"):
         if a.get(k) is not None:
             return ("id", a[k])
-    g = f.get("geometry") or {}
+    # centroid, not just geometry. A returnCentroid query sends
+    # {"attributes": ..., "centroid": ...} with NO geometry key, so
+    # keying on geometry alone left every feature at pt=None and
+    # collapsed them by attributes: 1,000 preserves became 556. Position
+    # is the only thing that separates two parcels sharing a name.
+    g = f.get("geometry") or f.get("centroid") or {}
     pt = None
     if isinstance(g.get("x"), (int, float)):
         pt = (round(g["x"], 6), round(g["y"], 6))
