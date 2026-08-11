@@ -206,9 +206,34 @@ def fetch_landcover(places, workers=8, size=24):
                   "layers": NLCD_LAYER, "styles": "", "srs": "EPSG:4326",
                   "bbox": bbox, "width": size, "height": size,
                   "format": "image/png"}
+        # Short timeout, retried — NOT one long wait.
+        #
+        # This stage took 68 minutes on the first two-state refresh and
+        # the reason was not work, it was dead waiting. MRLC answers a
+        # 24x24 GetMap in about half a second (measured: 0.5s cold, 0.02s
+        # per place across 8 workers, and a 2,200 m bbox over the
+        # Adirondacks is no slower than a 200 m one). But it throttles
+        # under sustained load, and the timeout was 60s: 540 of 2,499
+        # requests failed that run — the log says 78.4% — and 540 dead
+        # minute-long waits across 8 workers is essentially the whole
+        # stage. Those 540 places also silently got no land cover.
+        #
+        # Three short attempts cost at most 21s instead of 60, usually
+        # succeed on the second when the first was throttled, and leave
+        # far fewer places unsampled.
+        r = None
+        for attempt in range(3):
+            try:
+                r = SESSION.get(NLCD, params=params, timeout=12)
+                r.raise_for_status()
+                break
+            except Exception:                       # noqa: BLE001
+                r = None
+                if attempt < 2:
+                    time.sleep(0.6 * (attempt + 1))
+        if r is None:
+            return
         try:
-            r = SESSION.get(NLCD, params=params, timeout=60)
-            r.raise_for_status()
             # Always work in RGB. A paletted PNG's indices are GeoServer's
             # own palette, not NLCD class codes — assuming otherwise matched
             # about a fifth of pixels and put every one of them in the same
