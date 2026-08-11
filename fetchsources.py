@@ -68,49 +68,111 @@ def post(url, params, tries=4):
     raise RuntimeError(f"{url}: {last}")
 
 
-def count(url, where):
-    j = post(url, {"where": where, "geometry": REGION_BBOX,
+# The region is asked for in tiles, not in one rectangle.
+#
+# Widening the envelope from Connecticut to Connecticut+New York made the
+# OSM mirror start answering "Cannot perform query. Invalid query
+# parameters." — and it did so for whole SECTIONS, four retries deep, so
+# the 2026-08-10 refresh degraded preserves, cemeteries, facilities,
+# named water and the trail grid to Connecticut-only copies and produced
+# a New York with no nature preserves in it at all.
+#
+# It is not a hard limit and not the geometry: re-run by hand the same
+# query on the same envelope succeeded. It is that mirror buckling on
+# large result sets, intermittently — the same endpoint named in the
+# run #5 note. Splitting the envelope into a grid made it reliable: 0
+# failed tiles at 2x2, 3x3 and 4x4, where the single rectangle failed
+# outright. Smaller questions get answered.
+#
+# Tiles overlap nothing, but a feature straddling a seam is returned by
+# both neighbours, so results are de-duplicated below.
+REGION_SPLIT = 3
+
+
+def region_tiles(n=REGION_SPLIT):
+    w, s, e, nn = [float(v) for v in REGION_BBOX.split(",")]
+    dx, dy = (e - w) / n, (nn - s) / n
+    return [f"{w + i * dx},{s + j * dy},{w + (i + 1) * dx},{s + (j + 1) * dy}"
+            for i in range(n) for j in range(n)]
+
+
+def count(url, where, bbox=None):
+    j = post(url, {"where": where, "geometry": bbox or REGION_BBOX,
                    "geometryType": "esriGeometryEnvelope", "inSR": "4326",
                    "returnCountOnly": "true"})
     return j.get("count", 0)
 
 
+def _dedupe_key(f):
+    """Identity for a feature seen in two overlapping tiles.
+
+    OBJECTID when the layer sends one; otherwise the first vertex plus
+    the attribute bag, which is stable enough to catch a genuine repeat
+    without collapsing two real neighbours.
+    """
+    a = f.get("attributes") or f.get("properties") or {}
+    for k in ("OBJECTID", "objectid", "OID", "FID"):
+        if a.get(k) is not None:
+            return ("id", a[k])
+    g = f.get("geometry") or {}
+    pt = None
+    if isinstance(g.get("x"), (int, float)):
+        pt = (round(g["x"], 6), round(g["y"], 6))
+    else:
+        c = g.get("coordinates") or g.get("rings") or g.get("paths")
+        while isinstance(c, list) and c and isinstance(c[0], list):
+            c = c[0]
+        if isinstance(c, list) and len(c) >= 2 and isinstance(c[0], (int, float)):
+            pt = (round(c[0], 6), round(c[1], 6))
+    return ("pt", pt, tuple(sorted((str(k), str(v)) for k, v in a.items())))
+
+
 def paged(url, where, out_fields, per_feature, geometry=False, page=1000,
           centroid=True, offset=GEOM_OFFSET, workers=3):
     """
-    Page through a layer. Polygon layers answer returnCentroid; point
-    layers reject it outright and hand back a plain geometry instead —
-    getting that wrong fails silently, returning features that are all
-    skipped, so callers pass centroid=False for point layers.
+    Page through a layer, one region tile at a time. Polygon layers answer
+    returnCentroid; point layers reject it outright and hand back a plain
+    geometry instead — getting that wrong fails silently, returning
+    features that are all skipped, so callers pass centroid=False for
+    point layers.
     """
-    total = count(url, where)
-    if not total:
-        return 0
-    offsets = list(range(0, total, page))
     got = [0]
+    seen = set()
 
-    def grab(off):
-        p = {"where": where, "geometry": REGION_BBOX,
-             "geometryType": "esriGeometryEnvelope", "inSR": "4326",
-             "outSR": "4326", "outFields": out_fields,
-             "resultOffset": str(off), "resultRecordCount": str(page)}
-        if geometry:
-            p.update({"returnGeometry": "true", "maxAllowableOffset": offset,
-                      "geometryPrecision": "6", "f": "geojson"})
-        else:
-            p["returnGeometry"] = "false"
-            if centroid:
-                p["returnCentroid"] = "true"
+    def emit(f):
+        k = _dedupe_key(f)
+        if k in seen:
+            return
+        seen.add(k)
+        per_feature(f)
+        got[0] += 1
+
+    for bbox in region_tiles():
+        total = count(url, where, bbox)
+        if not total:
+            continue
+
+        def grab(off, _bbox=bbox):
+            p = {"where": where, "geometry": _bbox,
+                 "geometryType": "esriGeometryEnvelope", "inSR": "4326",
+                 "outSR": "4326", "outFields": out_fields,
+                 "resultOffset": str(off), "resultRecordCount": str(page)}
+            if geometry:
+                p.update({"returnGeometry": "true", "maxAllowableOffset": offset,
+                          "geometryPrecision": "6", "f": "geojson"})
             else:
-                p["returnGeometry"] = "true"
-        j = post(url, p)
-        feats = j.get("features") or []
-        for f in feats:
-            per_feature(f)
-        got[0] += len(feats)
+                p["returnGeometry"] = "false"
+                if centroid:
+                    p["returnCentroid"] = "true"
+                else:
+                    p["returnGeometry"] = "true"
+            j = post(url, p)
+            return j.get("features") or []
 
-    with ThreadPoolExecutor(max_workers=workers) as ex:
-        list(ex.map(grab, offsets))
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            for feats in ex.map(grab, range(0, total, page)):
+                for f in feats:
+                    emit(f)
     return got[0]
 
 
