@@ -92,6 +92,37 @@ jobs:
           python3 maketiles.py stage raw/ep-*.geojson --zooms 14
           python3 maketiles.py pack -o data/everypark.pmtiles
 
+      # Tiles go to object storage rather than into git, because the cost
+      # here is not the file's size but its permanence. A regenerated,
+      # already-compressed binary deltas against nothing, so every refresh
+      # adds its whole size to history forever: three tile revisions
+      # (14.7 + 13.6 + 88.9 MiB) are most of why .git is 113 MB. Splitting
+      # the archive per state would duck GitHub's 100 MiB per-file block
+      # and leave that growth exactly where it is.
+      #
+      # Inert until the secrets exist, so a repo without them keeps
+      # committing tiles the old way and nothing breaks.
+      - name: Upload tiles to R2
+        if: ${{ !inputs.skip_tiles && env.R2_BUCKET != '' }}
+        env:
+          R2_BUCKET:            ${{ secrets.R2_BUCKET }}
+          R2_ACCOUNT_ID:        ${{ secrets.R2_ACCOUNT_ID }}
+          AWS_ACCESS_KEY_ID:     ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          # R2 rejected the CRC32 checksums newer AWS SDKs send by
+          # default; Cloudflare fixed that in Feb 2025, but this costs
+          # nothing and the failure mode is a five-hour run dying on its
+          # last step.
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+        run: |
+          set -euo pipefail
+          aws s3 cp data/everypark.pmtiles "s3://$R2_BUCKET/everypark.pmtiles" \
+            --endpoint-url "https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com" \
+            --content-type application/octet-stream \
+            --cache-control "public, max-age=300"
+          echo "uploaded $(du -h data/everypark.pmtiles | cut -f1) to R2"
+
       - name: Bump dataVersion so browsers pick up the new file
         run: |
           python3 - <<'PY'
@@ -126,11 +157,19 @@ jobs:
           PY
 
       - name: Commit
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
         run: |
           git config user.name  "everypark-bot"
           git config user.email "actions@github.com"
-          git add data/places.json data/everypark.pmtiles config.js \
+          git add data/places.json config.js \
                   data/research-audit.json data/baked.json README.md || true
+          # Only track the archive in git while R2 is not carrying it.
+          # Staging it in both places would keep the history growing and
+          # defeat the point of the upload.
+          if [ -z "${R2_BUCKET}" ]; then
+            git add data/everypark.pmtiles || true
+          fi
           if git diff --cached --quiet; then
             echo "nothing changed"
           else
