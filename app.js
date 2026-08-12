@@ -363,7 +363,17 @@
     if (p.aka && p.aka.length)
       out += `<div class="popup-fee">Also known locally as <strong>${p.aka[0]}</strong>${p.akaNote ? " — " + p.akaNote : ""}</div>`;
     if (p.note) out += `<div class="popup-fee">${p.note}</div>`;
-    if (p.type === "state")
+    // Passport to the Parks is a Connecticut scheme and says nothing about
+    // anywhere else, but this keyed on `type` alone — which doesn't carry
+    // state — so all 1,834 New York state-land cards told the reader to
+    // buy a CT parking pass. Same shape as the unscoped verified.json
+    // rules that put a portal.ct.gov citation on the Adirondacks.
+    //
+    // New York deliberately gets no replacement sentence: DEC land is
+    // free but OPRHP charges vehicle fees seasonally and per site, and
+    // we have not checked that per place. So it falls through to the
+    // record's own `fee` field — stating what we know, not what we assume.
+    if (p.type === "state" && (p.state || "CT") === "CT")
       out += `<div class="popup-fee">${FEAT_SVG.parking} CT-registered vehicles park free (Passport to the Parks); out-of-state $7–22. Camping/special facilities extra.</div>`;
     else if (p.fee)
       out += `<div class="popup-fee">${FEAT_SVG.ticket} ${p.fee}${p.agency ? " &middot; " + p.agency : ""}</div>`;

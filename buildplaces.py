@@ -327,9 +327,24 @@ def classify(p):
     else:
         p["access"] = "unknown"
 
+    # Somewhere with no trail, no parking and no facilities is a place we
+    # can't vouch for — unless a cited rule says it's reachable. That
+    # exception is not cosmetic: `reachable` is a claim about the LEGAL
+    # right to walk in ("state land is open to the public by regulation"),
+    # so letting it be overwritten here fails a place on the very test its
+    # citation settles. verify_all already accepts `reachable` for the
+    # physical test, so without this the two gates contradicted each other
+    # and a rule could never make a place green on its own — 740 places
+    # sat amber holding cited proof of public access, 135 NY State Forests
+    # and 120 Forest Preserve parcels among them.
+    #
+    # app.js classify() has spared `reachable` here since the card-demotion
+    # fix; this line is the missing half of that change. Keep the two in
+    # step, or the card reads "Open to all" while the pin renders amber.
     A["visitable"] = bool(A.get("trails") or A.get("parking") or A.get("sports")
                           or A.get("playground") or A.get("beach") or A.get("pool"))
-    if not A["visitable"] and p["access"] != "closed" and not official:
+    if (not A["visitable"] and not A.get("reachable")
+            and p["access"] != "closed" and not official):
         p["access"] = "unknown"
 
     p["accessLabel"] = ACCESS_LABEL[p["access"]]
