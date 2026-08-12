@@ -63,7 +63,16 @@ TRAIL_KEEP = {"path", "track", "bridleway"}
 # zooms entirely — that's most of the size saving, and at z9 a trail
 # network is an unreadable smudge anyway.
 LAYER_ZOOM = {
+    # stateland is CT DEEP's parcels and nydec is New York's DEC land.
+    # They are the same thing for their own state — the authoritative
+    # outline of the biggest public land there is — so they have to come
+    # in at the same zoom. nydec was inheriting DEFAULT_ZOOM's 10, four
+    # levels later than Connecticut, which is why the Adirondacks and
+    # Catskills were simply absent from a zoomed-out map while CT's
+    # state forests drew from z6. Verified against the built archive's
+    # own metadata: stateland minzoom 6, nydec minzoom 10.
     "stateland":  (6, 14),
+    "nydec":      (6, 14),
     "padus":      (8, 14),
     "preserves":  (9, 14),
     "blueblazed": (9, 14),
@@ -208,13 +217,23 @@ DUP_OVERLAP = 0.55
 # layer above it is a duplicate and gets dropped, so each piece of ground
 # is drawn exactly once, by whichever source describes it best.
 #
-#   stateland  DEEP's own parcels — definitive for state land
+#   stateland  DEEP's own parcels — definitive for CT state land
+#   nydec      NYS DEC's own parcels — the same, for New York
 #   townparks  OSM, the usual source for municipal parks
 #   cemeteries specific and rarely overlapping
 #   landuse    town greens and rec grounds
 #   preserves  OSM nature_reserve, which also tags state forests and parks
 #   padus      national coverage, so it restates almost everything above
-DEDUP_ORDER = ["stateland", "townparks", "cemeteries", "landuse", "preserves", "padus"]
+#
+# nydec was absent from this list entirely, which meant it never became
+# part of the kept set — so PAD-US was never deduped against it and drew
+# its own coarser outline over the same Adirondack and Catskill ground.
+# It belongs directly after stateland for the reason nydec is fetched at
+# all: DEC's parcels are the authoritative shape of New York state land,
+# and without them a Forest Preserve unit is drawn as somebody else's
+# polygon.
+DEDUP_ORDER = ["stateland", "nydec", "townparks", "cemeteries", "landuse",
+               "preserves", "padus"]
 
 
 def norm_name(props):

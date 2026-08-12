@@ -44,10 +44,46 @@ MEMBERS_ONLY = re.compile(
 # copies that OpenStreetMap and PAD-US also carry — it must NOT be applied
 # to the state and national layers themselves, or every state park
 # disappears from the map.
+#
+# CONNECTICUT ONLY, and that scope is the whole point. The rule is sound
+# where an authoritative layer actually exists to replace what it drops:
+# CT DEEP's Connecticut_DEEP_Property supplies every CT state park and
+# forest via data/state.json, so discarding the OSM and PAD-US copies
+# loses nothing.
+#
+# New York has no equivalent. NYS_DEC_Lands covers DEC land — Forest
+# Preserve, State Forests, WMAs — and OPRHP state parks appear in no
+# state-specific layer at all, only in PAD-US and OSM. Applied to New
+# York this deleted them outright with nothing left behind: 135 places
+# including Harriman (48,873 acres), Minnewaska (23,687), Hudson
+# Highlands State Park Preserve (10,062) and Bear Mountain (5,477).
+#
+# This is the third time a per-source rule has been applied globally in
+# this project — see "Every state park vanished" in the failure table.
+# The scope has to travel with the rule, exactly as verified.json rules
+# now carry `states`.
 DUPLICATE_LAYER = re.compile(
     r"state (park|forest)|scenic reserve|national (park|historical|scenic)", re.I)
 
-EXCLUDE = re.compile(MEMBERS_ONLY.pattern + "|" + DUPLICATE_LAYER.pattern, re.I)
+# Members-only is a claim about the place itself and holds in any state.
+# The duplicate-layer rule is a claim about our own sources, so it is
+# asked separately, per state, by excluded_name().
+EXCLUDE = MEMBERS_ONLY
+
+
+def excluded_name(name, state):
+    """
+    Should a record arriving from OSM or PAD-US be dropped on its name?
+
+    `state` is what scopes the duplicate-layer half. Callers that cannot
+    yet know the state must pass None, which keeps the members-only test
+    and skips the duplicate test rather than guessing.
+    """
+    if name.lower() in ALLOW:
+        return False
+    if MEMBERS_ONLY.search(name):
+        return True
+    return state == "CT" and bool(DUPLICATE_LAYER.search(name))
 
 # Some PAD-US name fields contain leaked XML from whatever produced the
 # export, e.g. '<ArcGIS Type="Editing"><ArrayOfPropertySet ...'.
@@ -832,10 +868,10 @@ def main():
 
     # --- 7. Town greens, rec grounds, forests --------------------------
     for m in baked.get("ctparks_landuse_v1") or []:
-        town = towns.find(m["lat"], m["lng"])
+        town, state = towns.locate(m["lat"], m["lng"])
         if not town:
             continue
-        if EXCLUDE.search(m["n"]) and m["n"].lower() not in ALLOW:
+        if excluded_name(m["n"], state):
             continue
         is_state = re.search(r"State Forest|State of Connecticut",
                              m["n"] + " " + (m.get("op") or ""), re.I)
@@ -865,10 +901,12 @@ def main():
                 continue
             name = ("Appalachian Trail Corridor" if kind == "national"
                     else re.sub(r",?\s*Inc\.?$", "", op) + " land")
-        if EXCLUDE.search(name) and name.lower() not in ALLOW:
-            continue
-        town = towns.find(r["lat"], r["lng"])
+        # Located before the name test, because the duplicate-layer half
+        # of that test only applies in Connecticut and needs the state.
+        town, state = towns.locate(r["lat"], r["lng"])
         if not town:
+            continue
+        if excluded_name(name, state):
             continue
         B.add(name=name, type=kind, subtype=label, lat=r["lat"], lng=r["lng"], town=town,
               url=r.get("w"), agency=op or None, fee="Free")
@@ -916,10 +954,10 @@ def main():
             continue
         if GENERIC_NAME.search(nm) or TRIBAL_EXCLUDE.search(nm):
             continue
-        if EXCLUDE.search(nm) and nm.lower() not in ALLOW:
-            continue
-        town = towns.find(m["lat"], m["lng"])
+        town, state = towns.locate(m["lat"], m["lng"])
         if not town:
+            continue
+        if excluded_name(nm, state):
             continue
         own, acc = m.get("own", "UNK"), m.get("acc", "UK")
         # Land owned by a private individual under an agricultural, ranch or
