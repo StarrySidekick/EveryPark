@@ -237,27 +237,84 @@ const EveryParkIso = (() => {
 
   // Height tiles are fetched once and kept as a sample; changing the
   // block-size slider just re-reads them at the new grid — no refetch.
+  // The ladder used to stop at z14, one level below what the archive
+  // actually holds: probed at this latitude, z15 returns tiles and z16
+  // is a 404. That left the finest terrain we ever drew at 7.16 m when
+  // 3.58 m was there for the asking. Resolutions per zoom here:
+  // z12 28.66 m, z13 14.33 m, z14 7.16 m, z15 3.58 m.
+  //
+  // maxTiles goes up with it because a level costs 4x the tiles, and the
+  // old 12 would have thrown "area too large" on mid-sized parks that
+  // used to fit — which degrades to procedural terrain, silently.
   async function fetchHeightSample(bbox) {
     const [w, s, e, n] = bbox;
     const spanM = Math.max((e - w) * 111320 * Math.cos(s * Math.PI / 180),
                            (n - s) * 111320);
-    const z = spanM > 3000 ? 12 : spanM > 1200 ? 13 : 14;
-    return sampleTiles(bbox, (zz, tx, ty) => `${TILE(zz)}${tx}/${ty}.png`, 12, z);
+    const z = spanM > 6000 ? 12 : spanM > 3000 ? 13 : spanM > 1200 ? 14 : 15;
+    return sampleTiles(bbox, (zz, tx, ty) => `${TILE(zz)}${tx}/${ty}.png`, 24, z);
   }
 
+  // Heights are AVERAGED over the cell's own footprint, not point-sampled
+  // at its centre.
+  //
+  // Point sampling was fine while the source was coarser than the cell —
+  // at 20 m blocks over 7 m tiles it read roughly one pixel in nine and
+  // the rest never influenced anything. That is aliasing: a cell whose
+  // ground rises 8 m across it took whichever single pixel happened to
+  // land under its centre, so ridge lines shifted by a cell depending on
+  // nothing, and the finer z15 source would have made it worse rather
+  // than better by offering more pixels to ignore.
+  //
+  // A block in this renderer represents the ground it covers, so the mean
+  // over that footprint is the honest value for it.
   function heightsFrom(t, bbox) {
     const H = new Float32Array(GRID * GRID);
+    const px = (gx, gy) => {
+      const [lng, lat] = gridToLL(bbox, gx, gy);
+      const tt = tileXY(lat, lng, t.zoom);
+      return [(tt.x - t.x0) * 256, (tt.y - t.y0) * 256];
+    };
+    // Half a cell in source pixels. Capped so a huge park over a coarse
+    // tile can't average a whole tile per cell for no gain.
+    const [ax, ay] = px(0, 0), [bx, by] = px(1, 1);
+    const hx = Math.min(8, Math.max(0, Math.abs(bx - ax) / 2));
+    const hy = Math.min(8, Math.max(0, Math.abs(by - ay) / 2));
     for (let gy = 0; gy < GRID; gy++)
       for (let gx = 0; gx < GRID; gx++) {
-        const [lng, lat] = gridToLL(bbox, gx, gy);
-        const tt = tileXY(lat, lng, t.zoom);
-        const ix = Math.min(t.w - 1, Math.max(0, Math.round((tt.x - t.x0) * 256)));
-        const iy = Math.min(t.h - 1, Math.max(0, Math.round((tt.y - t.y0) * 256)));
-        const k = (iy * t.w + ix) * 4;
-        H[gy * GRID + gx] = t.px[k] * 256 + t.px[k + 1] + t.px[k + 2] / 256 - 32768;
+        const [fx, fy] = px(gx, gy);
+        const x0 = Math.max(0, Math.round(fx - hx)), x1 = Math.min(t.w - 1, Math.round(fx + hx));
+        const y0 = Math.max(0, Math.round(fy - hy)), y1 = Math.min(t.h - 1, Math.round(fy + hy));
+        let sum = 0, n = 0;
+        for (let y = y0; y <= y1; y++)
+          for (let x = x0; x <= x1; x++) {
+            const k = (y * t.w + x) * 4;
+            sum += t.px[k] * 256 + t.px[k + 1] + t.px[k + 2] / 256 - 32768;
+            n++;
+          }
+        H[gy * GRID + gx] = n ? sum / n : 0;
       }
     return H;
   }
+
+  const spanOf = bbox => {
+    const [w, s, e, n] = bbox;
+    return Math.max((e - w) * 111320 * Math.cos(s * Math.PI / 180),
+                    (n - s) * 111320);
+  };
+  // About a metre per pixel, floored at the old 768 so small parks are
+  // unchanged and ceilinged at 2048. The service allows 4000, which is
+  // worth remembering if the grid ever goes past 176 a side — see the
+  // note on satTexFrom about where the real detail ceiling is.
+  const naipPx = bbox => Math.max(768, Math.min(2048, Math.round(spanOf(bbox))));
+  const NAIP = "https://imagery.nationalmap.gov/arcgis/rest/services/" +
+               "USGSNAIPImagery/ImageServer/exportImage";
+  // bands: omit for natural colour; "3,0,1" puts near-infrared in the red
+  // channel and visible red in the green channel, which is what makes an
+  // NDVI computable from an ordinary JPEG.
+  const naipUrl = (bbox, px, bands) =>
+    `${NAIP}?f=image&format=jpgpng&bbox=${bbox[0]},${bbox[1]},${bbox[2]},${bbox[3]}` +
+    `&bboxSR=4326&imageSR=4326&size=${px},${px}` +
+    (bands ? `&bandIds=${bands}` : "");
 
   // Imagery, in preference order:
   // 1. USGS NAIP — one consistent LEAF-ON summer survey across all of
@@ -267,10 +324,13 @@ const EveryParkIso = (() => {
   async function fetchSatSample(bbox) {
     const [w, s, e, n] = bbox;
     try {
-      const url = "https://imagery.nationalmap.gov/arcgis/rest/services/" +
-        "USGSNAIPImagery/ImageServer/exportImage?f=image&format=jpgpng" +
-        `&bbox=${w},${s},${e},${n}&bboxSR=4326&imageSR=4326&size=768,768`;
-      const im = await loadImage(url);
+      // The export was pinned at 768 px whatever the park, so resolution
+      // fell away as parks got bigger: a 2,000-acre forest came back at
+      // 3.7 m/px from a source that is 0.3 m native. NAIP's ImageServer
+      // accepts up to 4000; asking for about a metre per pixel and
+      // capping at 2048 keeps a big park sharp without pulling several
+      // megabytes for a view that is thrown away when the panel closes.
+      const im = await loadImage(naipUrl(bbox, naipPx(bbox)));
       const cv = document.createElement("canvas");
       cv.width = im.width; cv.height = im.height;
       const cx = cv.getContext("2d", { willReadFrequently: true });
@@ -329,8 +389,15 @@ const EveryParkIso = (() => {
     // Half a cell in source pixels, capped: a huge park over a small
     // image would otherwise average hundreds of pixels per cell for no
     // visible gain and a lot of time.
-    const hx = Math.min(6, Math.max(0, Math.abs(bx - ax) / 2));
-    const hy = Math.min(6, Math.max(0, Math.abs(by - ay) / 2));
+    //
+    // The cap was 6, which quietly became a subsample once the export
+    // started scaling with park size: a 2048 px image over a 104 grid is
+    // about 20 source pixels per cell, and a 13-wide window reads under
+    // half of it. That is not "averaging properly", which is the whole
+    // claim this function makes. 10 covers a 21-wide window — one-time
+    // work when the panel opens, not per frame.
+    const hx = Math.min(10, Math.max(0, Math.abs(bx - ax) / 2));
+    const hy = Math.min(10, Math.max(0, Math.abs(by - ay) / 2));
     for (let gy = 0; gy < GRID; gy++)
       for (let gx = 0; gx < GRID; gx++) {
         const [fx, fy] = srcAt(gx, gy);
@@ -482,6 +549,29 @@ const EveryParkIso = (() => {
             e => { if (e && e.ok) return e.ok; throw e; });
   }
 
+  // What an unlabelled building is extruded to, in metres — the flat
+  // value everything used to get, kept as the fallback so a building OSM
+  // says nothing about looks exactly as it did before.
+  const BUILD_DEFAULT_M = 7;
+
+  // Every building was extruded by a flat 7, so a pit privy and a stone
+  // lodge stood the same height. OSM often knows better and the tags are
+  // already in hand — `out geom` returns them, we were just throwing them
+  // away — so this costs no extra request.
+  //
+  // `height` is metres and may carry a unit suffix; `building:levels`
+  // is a storey count, at roughly 3.2 m each including the floor slab.
+  // Null means "not stated", which the renderer turns into the old
+  // default rather than inventing a number: a building we know nothing
+  // about should look like the ones we knew nothing about before.
+  function buildingHeightM(tags) {
+    const h = parseFloat(tags.height);
+    if (isFinite(h) && h > 0) return Math.min(120, h);
+    const lv = parseFloat(tags["building:levels"]);
+    if (isFinite(lv) && lv > 0) return Math.min(120, lv * 3.2);
+    return null;
+  }
+
   async function fetchOverpass(bbox) {
     const [w, s, e, n] = bbox;
     const amen = Object.keys(PUBLIC_AMENITY).join("|");
@@ -523,7 +613,7 @@ const EveryParkIso = (() => {
       }
       if (!el.geometry) continue;
       const pts = el.geometry.map(g => [g.lon, g.lat]);
-      if (tags.building) buildings.push([pts]);
+      if (tags.building) buildings.push({ rings: [pts], h: buildingHeightM(tags) });
       else if (tags.amenity === "parking") parking.push([pts]);
       else if (tags.highway) roads.push({ geometry: { paths: [pts] } });
     }
@@ -1259,10 +1349,15 @@ const EveryParkIso = (() => {
     rasterisePaths(raw.trailFeats, bbox, trailM);
     const roadM = new Uint8Array(GRID * GRID);
     rasterisePaths(raw.roads, bbox, roadM);
+    // buildM carries HEIGHT IN METRES per cell now, not a 0/1 flag.
+    // Zero still means "no building", so every truthiness test on it
+    // reads the same as before. Overlapping footprints take the taller,
+    // which is what you see standing there.
     const buildM = new Uint8Array(GRID * GRID);
-    for (const rings of raw.buildings) {
-      const m2 = maskFromRings(rings, bbox);
-      for (let i = 0; i < buildM.length; i++) if (m2[i]) buildM[i] = 1;
+    for (const b of raw.buildings) {
+      const m2 = maskFromRings(b.rings, bbox);
+      const h = Math.max(1, Math.min(255, Math.round(b.h == null ? BUILD_DEFAULT_M : b.h)));
+      for (let i = 0; i < buildM.length; i++) if (m2[i] && h > buildM[i]) buildM[i] = h;
     }
     const parkM = new Uint8Array(GRID * GRID);
     const sprites = [];
@@ -1841,11 +1936,84 @@ const EveryParkIso = (() => {
     return Math.min(1, (mPerBlock / spacing) ** 2);
   }
 
+  // Canopy from near-infrared, which is what actually measures whether
+  // something is growing.
+  //
+  // NAIP carries a fourth infrared band, and asking for bandIds=3,0,1
+  // returns an ordinary JPEG with NIR in the red channel and visible red
+  // in the green — so NDVI = (NIR - red) / (NIR + red) comes straight out
+  // of getImageData with no decoder and nothing new in index.html.
+  //
+  // Why bother, when treeMaskFrom already guesses canopy from RGB: that
+  // guess is "green leads, and darker than average", which a shadowed
+  // asphalt lot, dark water and a green metal roof all satisfy. NDVI
+  // separates living tissue from everything else physically rather than
+  // by appearance. Measured over Sleeping Giant: mean 0.235, range -0.30
+  // to 0.65, 72.5% of pixels above 0.2 — which is what near-continuous
+  // forest should read.
+  //
+  // Vegetation is NDVI > 0.2. The tree/lawn split stays adaptive and
+  // stays a brightness cut, for the same reason it always was: mown
+  // grass and canopy are both strongly vegetated, and it is shading that
+  // tells them apart.
+  const NDVI_VEG = 0.2;
+  async function fetchNdviSample(bbox) {
+    const im = await loadImage(naipUrl(bbox, naipPx(bbox), "3,0,1"));
+    const cv = document.createElement("canvas");
+    cv.width = im.width; cv.height = im.height;
+    const cx = cv.getContext("2d", { willReadFrequently: true });
+    cx.drawImage(im, 0, 0);
+    return { mode: "linear", px: cx.getImageData(0, 0, cv.width, cv.height).data,
+             w: cv.width, h: cv.height, bbox };
+  }
+
+  // Mean NDVI and mean brightness per cell, averaged over the cell's own
+  // footprint like the drape is.
+  function ndviMaskFrom(t, bbox, inside) {
+    const veg = [], bright = [];
+    const M = new Uint8Array(GRID * GRID);
+    const srcAt = (gx, gy) => {
+      const [lng, lat] = gridToLL(bbox, gx, gy);
+      const [w, s2, e2, n2] = t.bbox;
+      return [(lng - w) / (e2 - w) * (t.w - 1), (n2 - lat) / (n2 - s2) * (t.h - 1)];
+    };
+    const [ax, ay] = srcAt(0, 0), [bx, by] = srcAt(1, 1);
+    const hx = Math.min(10, Math.max(0, Math.abs(bx - ax) / 2));
+    const hy = Math.min(10, Math.max(0, Math.abs(by - ay) / 2));
+    for (let gy = 0; gy < GRID; gy++)
+      for (let gx = 0; gx < GRID; gx++) {
+        const i = gy * GRID + gx;
+        if (inside && !inside[i]) continue;
+        const [fx, fy] = srcAt(gx, gy);
+        const x0 = Math.max(0, Math.round(fx - hx)), x1 = Math.min(t.w - 1, Math.round(fx + hx));
+        const y0 = Math.max(0, Math.round(fy - hy)), y1 = Math.min(t.h - 1, Math.round(fy + hy));
+        let sv = 0, sb = 0, n = 0;
+        for (let y = y0; y <= y1; y++)
+          for (let x = x0; x <= x1; x++) {
+            const k = (y * t.w + x) * 4;
+            const nir = t.px[k], red = t.px[k + 1];
+            if (nir + red > 0) sv += (nir - red) / (nir + red);
+            sb += (nir + red) / 2;
+            n++;
+          }
+        if (!n) continue;
+        if (sv / n > NDVI_VEG) { veg.push(i); bright.push(sb / n); }
+      }
+    if (veg.length < 20) return null;            // not enough to judge
+    const sorted = [...bright].sort((a, b) => a - b);
+    const cut = sorted[Math.floor(sorted.length * 0.65)];
+    for (let k = 0; k < veg.length; k++) if (bright[k] <= cut) M[veg[k]] = 1;
+    return M;
+  }
+
   // Canopy from imagery, with ADAPTIVE thresholds: vegetation is any
   // pixel where green leads, and "tree" is the darker 65% of the
   // vegetated pixels on THIS island — canopy is darker than lawn in
   // any season's imagery, so the split survives exposure differences
   // that broke a fixed magic-number cut.
+  //
+  // Kept as the fallback for when the infrared fetch fails or the drape
+  // came from Esri Clarity, which has no NIR band.
   function treeMaskFrom(tex, inside) {
     const M = new Uint8Array(GRID * GRID);
     const veg = [], brightness = [];
@@ -1934,7 +2102,7 @@ const EveryParkIso = (() => {
           if (!inside[j]) continue;
           let hh = H[j];
           if (waterM[j] && hh <= waterLevel + 4) hh = waterLevel;
-          else if (buildM[j]) hh += 7;
+          else if (buildM[j]) hh += buildM[j];
           sum += hh; n++;
         }
       v = n ? sum / n : min;
@@ -2168,7 +2336,7 @@ const EveryParkIso = (() => {
           if (!inside[j]) return hFill(ax, ay);
           let hh = H[j];
           if (waterM[j] && hh <= waterLevel + 4) hh = waterLevel;
-          else if (buildM[j]) hh += 7;
+          else if (buildM[j]) hh += buildM[j];
           return hh;
         };
         // Quads must span the same stride the loop steps, or coarse
@@ -2227,7 +2395,7 @@ const EveryParkIso = (() => {
           if (!inside[j]) return null;
           let hh = H[j];
           if (waterM[j] && hh <= waterLevel + 4) hh = waterLevel;
-          else if (buildM[j]) hh += 7;
+          else if (buildM[j]) hh += buildM[j];
           return hh;
         };
         if (sides !== 3) {
@@ -3245,9 +3413,20 @@ const EveryParkIso = (() => {
     withTimeout(fetchSatSample(bbox), 25000).then(t => {
       satSample = t;
       S.tex = satTexFrom(t, bbox);
-      S.treeMask = treeMaskFrom(S.tex, S.inside);
+      setTreeMask();
     }).catch(() => { /* uniform cover fallback */ })
       .finally(() => loading("imagery", false));
+
+    // Near-infrared, in parallel and entirely optional: it only ever
+    // improves the canopy mask, never the drape, so a failure here is
+    // invisible rather than a missing layer. Keyed separately so the
+    // spinner tells the truth about what is still coming.
+    loading("canopy", true);
+    withTimeout(fetchNdviSample(bbox), 25000).then(t => {
+      ndviSample = t;
+      setTreeMask();
+    }).catch(() => { /* RGB guess stands */ })
+      .finally(() => loading("canopy", false));
 
     // NLCD ground classes: wetland, sand, meadow, scrub, crops,
     // pavement — per cell, so the ground can show what it is.
@@ -3294,7 +3473,7 @@ const EveryParkIso = (() => {
         try {
           satSample = await fetchSatSample(bbox);
           S.tex = satTexFrom(satSample, bbox);
-          S.treeMask = treeMaskFrom(S.tex, S.inside);
+          setTreeMask();
         }
         catch (e) { satBtn.textContent = "No imagery"; return; }
         satBtn.textContent = "Satellite";
@@ -3354,7 +3533,16 @@ const EveryParkIso = (() => {
     };
     labelBlocks();
 
-    let satSample = null, coverSample = null;
+    let satSample = null, coverSample = null, ndviSample = null;
+    // Infrared wins when it arrives; the RGB guess is the fallback. Kept
+    // in one place because the mask is rebuilt from three of them — on
+    // first load, when the satellite button is pressed, and on every
+    // block-size change — and they drifted apart otherwise.
+    const setTreeMask = () => {
+      S.treeMask = ndviSample ? ndviMaskFrom(ndviSample, bbox, S.inside)
+                 : S.tex ? treeMaskFrom(S.tex, S.inside)
+                 : null;
+    };
     const rebuild = () => {
       GRID = gridFor(S.cellM);
       const t2 = buildTerrain();
@@ -3366,7 +3554,7 @@ const EveryParkIso = (() => {
         for (const sp of d2.sprites) S.spriteAt.set(sp.gy * GRID + sp.gx, sp.kind);
       }
       S.tex = satSample ? satTexFrom(satSample, bbox) : null;
-      S.treeMask = S.tex ? treeMaskFrom(S.tex, S.inside) : null;
+      setTreeMask();
       if (!S.tex) S.useSat = false;
       S.coverM = coverSample ? coverGridFrom(coverSample, bbox) : null;
       buildLabels();          // re-pin names to the new grid
