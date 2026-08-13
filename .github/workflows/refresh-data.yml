@@ -186,7 +186,37 @@ jobs:
                 exit 0
               fi
               echo "push rejected — rebasing onto origin/main and retrying"
-              git pull --rebase --autostash origin main || exit 1
+              if ! git pull --rebase --autostash origin main; then
+                # The retry loop existed but could never survive the case
+                # it was written for. Everything this job commits is
+                # GENERATED, and a rebase of one whole regeneration onto
+                # another is a guaranteed conflict with nothing to merge:
+                # places.json is not an edit to reconcile, it is a
+                # different build of the same thing. Run #12 fetched for
+                # 51 minutes, built the data, committed it, and then threw
+                # it away on exactly this.
+                #
+                # The refresh's own output is the one to keep. verifyplaces
+                # applies verified.json during the build, so a refresh
+                # already contains everything a publish would have added,
+                # while the publish it collided with was working from the
+                # older dataset.
+                #
+                # During a rebase the sides are INVERTED: the commit being
+                # replayed is --theirs and the branch being landed on is
+                # --ours. Backwards here keeps the stale build and reports
+                # success, which is the silent-failure shape this project
+                # keeps getting bitten by.
+                for f in data/places.json data/research-audit.json \
+                         data/baked.json data/everypark.pmtiles \
+                         config.js README.md; do
+                  git checkout --theirs -- "$f" 2>/dev/null && git add "$f" || true
+                done
+                # Any conflict left is in something this job does not
+                # generate, which is a real disagreement — fail rather
+                # than guess.
+                git -c core.editor=true rebase --continue || { git rebase --abort; exit 1; }
+              fi
               sleep 5
             done
             echo "could not push after 3 attempts"
