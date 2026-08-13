@@ -1571,6 +1571,48 @@
    "checked": "2026-08-12",
    "why": "State recreation areas are the same agency and the same regulations, differing in development rather than in whether the public may walk in. New York state parks are administered by the Office of Parks, Recreation and Historic Preservation under 9 NYCRR Subtitle I. Section 375.1(h) prohibits entry only where a property 'has been designated as closed by a sign or by an employee of the office', and 375.1(i) refers to 'trails, overlooks, roads and other ways established and provided for public use by the office'. Closure is the regulated exception and public use the assumed condition, so an OPRHP park is walkable without anyone having mapped a trail inside it. This is a firmer footing than the DEC rules stand on, which rest on a rules page that only presupposes public use. Entry is not charged; where a vehicle use fee applies it is parking, which this project already treats separately from paid entry — so this rule asserts reachable only and leaves each record's own fee field to speak for cost.",
    "reachable": true
+  },
+  {
+   "id": "ny-oprhp-osm-name",
+   "match": {
+    "agency": "New York State Office of Parks, Recreation and Historic Preservation"
+   },
+   "states": [
+    "NY"
+   ],
+   "siteRules": [
+    "Entry is prohibited only where the property is posted closed (9 NYCRR 375.1[h])",
+    "Stay on trails, overlooks, roads and other ways provided for public use (9 NYCRR 375.1[i])",
+    "Where a facility charges a fee, it must be paid before use (9 NYCRR 375.1)"
+   ],
+   "source": [
+    "https://www.law.cornell.edu/regulations/new-york/9-NYCRR-375.1",
+    "https://parks.ny.gov/about/guidance-policy"
+   ],
+   "checked": "2026-08-13",
+   "why": "Matches OpenStreetMap's spelled-out operator string rather than PAD-US's 'State parks agency'. Same agency, same regulations — the two sources simply name it differently, and keying only on the PAD-US form left 30 places unsettled including Minnewaska State Park Preserve at 22,901 acres. These records also carry OSM's subtype 'Land Trust Preserve', which is wrong for state land, so this rule deliberately keys on the agency alone: the agency string names OPRHP explicitly and is the trustworthy half of the record. State parks proper — Harriman, Bear Mountain, Minnewaska, Hudson Highlands and the rest. New York state parks are administered by the Office of Parks, Recreation and Historic Preservation under 9 NYCRR Subtitle I. Section 375.1(h) prohibits entry only where a property 'has been designated as closed by a sign or by an employee of the office', and 375.1(i) refers to 'trails, overlooks, roads and other ways established and provided for public use by the office'. Closure is the regulated exception and public use the assumed condition, so an OPRHP park is walkable without anyone having mapped a trail inside it. This is a firmer footing than the DEC rules stand on, which rest on a rules page that only presupposes public use. Entry is not charged; where a vehicle use fee applies it is parking, which this project already treats separately from paid entry — so this rule asserts reachable only and leaves each record's own fee field to speak for cost.",
+   "reachable": true
+  },
+  {
+   "id": "ny-oprhp-osm-name-alt",
+   "match": {
+    "agency": "State of New York Department of Parks, Recreation and Historic Preservation"
+   },
+   "states": [
+    "NY"
+   ],
+   "siteRules": [
+    "Entry is prohibited only where the property is posted closed (9 NYCRR 375.1[h])",
+    "Stay on trails, overlooks, roads and other ways provided for public use (9 NYCRR 375.1[i])",
+    "Where a facility charges a fee, it must be paid before use (9 NYCRR 375.1)"
+   ],
+   "source": [
+    "https://www.law.cornell.edu/regulations/new-york/9-NYCRR-375.1",
+    "https://parks.ny.gov/about/guidance-policy"
+   ],
+   "checked": "2026-08-13",
+   "why": "Matches OpenStreetMap's spelled-out operator string rather than PAD-US's 'State parks agency'. Same agency, same regulations — the two sources simply name it differently, and keying only on the PAD-US form left 30 places unsettled including Minnewaska State Park Preserve at 22,901 acres. These records also carry OSM's subtype 'Land Trust Preserve', which is wrong for state land, so this rule deliberately keys on the agency alone: the agency string names OPRHP explicitly and is the trustworthy half of the record. State parks proper — Harriman, Bear Mountain, Minnewaska, Hudson Highlands and the rest. New York state parks are administered by the Office of Parks, Recreation and Historic Preservation under 9 NYCRR Subtitle I. Section 375.1(h) prohibits entry only where a property 'has been designated as closed by a sign or by an employee of the office', and 375.1(i) refers to 'trails, overlooks, roads and other ways established and provided for public use by the office'. Closure is the regulated exception and public use the assumed condition, so an OPRHP park is walkable without anyone having mapped a trail inside it. This is a firmer footing than the DEC rules stand on, which rest on a rules page that only presupposes public use. Entry is not charged; where a vehicle use fee applies it is parking, which this project already treats separately from paid entry — so this rule asserts reachable only and leaves each record's own fee field to speak for cost.",
+   "reachable": true
   }
  ]
 }
