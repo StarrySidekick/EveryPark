@@ -4,7 +4,7 @@ An interactive map of every publicly accessible outdoor place in Connecticut.
 Live at **[everypark.starrysidekick.com](http://everypark.starrysidekick.com)**.
 Repo `StarrySidekick/EveryPark`, hosted free on GitHub Pages.
 
-*24,965 places · updated August 13, 2026*
+*24,805 places · updated August 13, 2026*
 <!-- The line above is stamped automatically by publish.py and the
      refresh workflow. Don't edit it by hand. -->
 
