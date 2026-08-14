@@ -255,7 +255,24 @@ class Towns:
     points, zero returned more than one match.
     """
 
-    def __init__(self, geojson):
+    def __init__(self, geojson, states_geojson=None):
+        # State outlines, used only to answer in_foreign_state(). Absent
+        # is allowed and means the old behaviour: the build warns rather
+        # than silently going back to adopting Vermont.
+        self.states = []
+        for f in (states_geojson or {}).get("features") or []:
+            ab = (f.get("properties") or {}).get("state")
+            g = f.get("geometry") or {}
+            polys = ([g["coordinates"]] if g.get("type") == "Polygon"
+                     else g.get("coordinates") or [])
+            rings, xs, ys = [], [], []
+            for poly in polys:
+                rings.append(poly[0])
+                xs += [c[0] for c in poly[0]]
+                ys += [c[1] for c in poly[0]]
+            if rings:
+                self.states.append((ab, min(xs), min(ys), max(xs), max(ys), rings))
+
         self.items = []
         for f in geojson.get("features") or []:
             props = f.get("properties") or {}
@@ -284,9 +301,86 @@ class Towns:
     # and seven of the nine are verified parks. Rejecting on containment
     # alone would delete them and nothing would report it, so a miss
     # falls back to the nearest municipality within this distance.
-    # Kept tight because the same fallback, made generous, would claim
-    # New Jersey and Massachusetts land across a state line.
+    #
+    # The old note here said this was "kept tight because the same
+    # fallback, made generous, would claim New Jersey and Massachusetts
+    # land across a state line." That was the right worry and 3 km was
+    # not tight enough: measured against Census state outlines, 827
+    # places on the map sat physically inside another state, 579 of them
+    # coloured as verified parks. High Point State Park, which is New
+    # Jersey's highest point, appeared four times at about 40,500 acres
+    # each, listed in four different New York towns.
+    #
+    # Distance cannot fix this, because the two cases it has to separate
+    # are the same distance apart. An island 2 km offshore and a Vermont
+    # town forest 2 km over the line are both "outside every polygon,
+    # nearby". What separates them is not how far away they are but what
+    # they are standing on, so the gate now asks that instead -- see
+    # `states` below. This stays at 3 km because it is now only ever
+    # consulted for points over water.
     SNAP_M = 3000.0
+
+    # States whose land we actually map. Anything standing inside a state
+    # that is NOT in here is another state's park and is rejected outright,
+    # however close a municipality happens to be. Adding a state to the
+    # dataset means adding it here and to municipalities.geojson.
+    COVERED = ("CT", "NY")
+
+    def in_foreign_state(self, lat, lng):
+        """
+        Is this point standing on land belonging to a state we don't map?
+
+        This is the question the snap could never answer. A point outside
+        every municipality is either offshore -- an island or a boat
+        launch, which town lines exclude because they stop at the shore --
+        or it is over the line in Vermont. Both are "near a town and
+        inside none of them", so distance cannot tell them apart.
+
+        A point over water is inside no state outline at all, so it still
+        reaches the snap and behaves as it always did. A point in Vermont
+        is inside Vermont's, and stops here.
+        """
+        for (state, x0, y0, x1, y1, rings) in self.states:
+            if not (x0 <= lng <= x1 and y0 <= lat <= y1):
+                continue
+            for ring in rings:
+                inside = False
+                n = len(ring)
+                j = n - 1
+                for i in range(n):
+                    xi, yi = ring[i][0], ring[i][1]
+                    xj, yj = ring[j][0], ring[j][1]
+                    if ((yi > lat) != (yj > lat)) and \
+                       (lng < (xj - xi) * (lat - yi) / ((yj - yi) or 1e-12) + xi):
+                        inside = not inside
+                    j = i
+                if inside:
+                    return state
+        return None
+
+    # How far into a state we don't map a point may sit and still be
+    # treated as ours. Measured to the nearest vertex of a covered state's
+    # outline, the same nearest-vertex measure the snap uses, and for the
+    # same reason: distance to a bounding box is meaningless here.
+    BORDER_M = 250.0
+
+    def dist_to_covered(self, lat, lng):
+        best = float("inf")
+        for (state, x0, y0, x1, y1, rings) in self.states:
+            if state not in self.COVERED:
+                continue
+            # Cheap envelope reject, generous enough not to skip a ring
+            # whose nearest vertex is just outside the box.
+            dx = max(x0 - lng, 0.0, lng - x1)
+            dy = max(y0 - lat, 0.0, lat - y1)
+            if dist_m(lat, lng, lat + dy, lng + dx) > self.BORDER_M * 8:
+                continue
+            for ring in rings:
+                for pt in ring:
+                    d = dist_m(lat, lng, pt[1], pt[0])
+                    if d < best:
+                        best = d
+        return best
 
     def locate(self, lat, lng):
         """(town, state), or (None, None) if outside the region entirely."""
@@ -315,6 +409,26 @@ class Towns:
             dy = max(y0 - lat, 0.0, lat - y1)
             if dist_m(lat, lng, lat + dy, lng + dx) <= self.SNAP_M * 4:
                 near.append((name, state, ring))
+
+        # Containment failed, so this point is outside every municipality.
+        # Ask what it is standing on before adopting it into the nearest
+        # town: over water it is one of ours, over another state's land it
+        # is not, and the snap alone cannot tell the difference.
+        #
+        # BORDER_M exists because a centroid within a few metres of a
+        # state line cannot decide anything. Sterling Forest State Park is
+        # real New York land whose centroid computes 2 m inside New Jersey,
+        # and Taconic Ridge State Forest is New York DEC land 6 m inside
+        # Vermont; rejecting on containment alone deletes both. The
+        # separation is clean in practice rather than lucky: the places
+        # that must go are hundreds of metres in — High Point State Park,
+        # the nearest of New Jersey's, is 664 m — so a tolerance of a few
+        # hundred metres keeps every real straddler and still drops every
+        # large impostor.
+        foreign = self.in_foreign_state(lat, lng)
+        if foreign and foreign not in self.COVERED \
+                and self.dist_to_covered(lat, lng) > self.BORDER_M:
+            return None, None
 
         # Real distance, to the nearest vertex of the boundary itself.
         # Only the handful of envelope survivors reach here.
@@ -755,7 +869,13 @@ def main():
         muni = os.path.join(args.data, "towns.geojson")
         print("  WARNING: municipalities.geojson absent, "
               "falling back to CT-only towns.geojson", flush=True)
-    towns = Towns(load(muni))
+    states_path = os.path.join(args.data, "states.geojson")
+    if not os.path.exists(states_path):
+        print("  WARNING: states.geojson absent — the municipality snap can "
+              "adopt land in neighbouring states", flush=True)
+    towns = Towns(load(muni), load(states_path) if os.path.exists(states_path) else None)
+    print(f"  state outlines: {len(towns.states)} "
+          f"(covering {', '.join(Towns.COVERED)})", flush=True)
     print(f"  municipalities: {len(towns.items):,} rings from "
           f"{os.path.basename(muni)}", flush=True)
     B = Builder(towns)
