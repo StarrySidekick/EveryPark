@@ -61,7 +61,7 @@ def merge_additions(places, data_dir):
         if (norm(a["n"]), a.get("town")) in have:
             continue
         attrs = {"trails": bool(a.get("trails")), "parking": bool(a.get("parking")),
-                 "manual": True}
+                 "manual": True, "src": ["manual"]}
         if a.get("source"):
             attrs["researched"] = True
             attrs["sources"] = a["source"]

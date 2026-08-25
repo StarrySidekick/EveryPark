@@ -173,7 +173,15 @@ def merge_into(keep, drop):
     property the other source has whole.
     """
     A, B = keep.setdefault("attrs", {}), drop.get("attrs") or {}
+    # Provenance is a union, not a fill-in-if-missing: both sides usually
+    # have it, and the whole point of the field is to say a place was
+    # seen by more than one source.
+    for t in B.get("src") or []:
+        if t not in A.setdefault("src", []):
+            A["src"].append(t)
     for k, v in B.items():
+        if k == "src":
+            continue
         if k not in A or A[k] in (None, False, "", 0):
             A[k] = v
     for k in ("agency", "url", "town", "subtype", "fee", "note"):

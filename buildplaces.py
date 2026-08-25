@@ -544,6 +544,7 @@ class Builder:
         return f"{str(name).lower()}|{round(lat * scale)}|{round(lng * scale)}"
 
     def add(self, **p):
+        src = p.pop("src", None)
         name = (p.get("name") or "").strip()
         if not name or p.get("lat") is None:
             return False
@@ -572,6 +573,13 @@ class Builder:
             return False
         self.seen.add(k)
         p.setdefault("attrs", {})
+        # Provenance: which fetcher produced this record. Until this
+        # existed there was no way to ask, of a wrong place, WHICH of the
+        # eight sources made it wrong, and no way to measure a source's
+        # error rate. A short token, not a URL -- attrs.sources already
+        # means citations. Merges union it (see both dedupe passes).
+        if src:
+            p["attrs"].setdefault("src", [src])
         self.places.append(p)
         return True
 
@@ -589,6 +597,16 @@ class Builder:
 
         drop = set()
 
+        def absorb(keep, b):
+            # The dropped record's provenance survives on the keeper --
+            # losing it here would make every merged place look
+            # single-sourced when it is exactly the multi-source ones
+            # that dedupe touches.
+            ks = keep.setdefault("attrs", {}).setdefault("src", [])
+            for t in (b.get("attrs") or {}).get("src") or []:
+                if t not in ks:
+                    ks.append(t)
+
         # Same name in the same town is one place, however far apart the
         # parcels sit. Big properties arrive as many parcels — the
         # Quinebaug Fish Hatchery and the flood-control sites each came
@@ -600,7 +618,9 @@ class Builder:
         for group in by_town.values():
             if len(group) < 2:
                 continue
-            for b in sorted(group, key=richness, reverse=True)[1:]:
+            ordered = sorted(group, key=richness, reverse=True)
+            for b in ordered[1:]:
+                absorb(ordered[0], b)
                 drop.add(id(b))
 
         # Across town lines, fall back to proximity: the same park mapped
@@ -620,6 +640,7 @@ class Builder:
                     if id(b) in drop:
                         continue
                     if dist_m(a["lat"], a["lng"], b["lat"], b["lng"]) < 800:
+                        absorb(a, b)
                         drop.add(id(b))
 
         before = len(self.places)
@@ -883,7 +904,7 @@ def main():
 
     # --- 1. CT DEEP state parks and forests ---------------------------
     for s in load(os.path.join(args.data, "state.json"))["parks"]:
-        B.add(name=s["n"], type="state", subtype=s.get("t"), lat=s["lat"], lng=s["lng"],
+        B.add(src="curated", name=s["n"], type="state", subtype=s.get("t"), lat=s["lat"], lng=s["lng"],
               acres=s.get("a"), town=towns.find(s["lat"], s["lng"]))
 
     # --- 2. Hand-added places OSM is missing --------------------------
@@ -901,7 +922,7 @@ def main():
                 attrs["sources"] = a["source"]
             if a.get("checked"):
                 attrs["checked"] = a["checked"]
-            B.add(name=a["n"], type=a.get("type", "preserve"), subtype=a.get("t"),
+            B.add(src="manual", name=a["n"], type=a.get("type", "preserve"), subtype=a.get("t"),
                   lat=a["lat"], lng=a["lng"], town=a.get("town") or towns.find(a["lat"], a["lng"]),
                   acres=a.get("a"), url=a.get("url"), fee=a.get("fee"),
                   agency=a.get("agency"), note=a.get("note"),
@@ -909,13 +930,13 @@ def main():
 
     # --- 3. Federal land ----------------------------------------------
     for n in load(os.path.join(args.data, "national.json"))["parks"]:
-        B.add(name=n["n"], type="national", subtype=n.get("t"), lat=n["lat"], lng=n["lng"],
+        B.add(src="curated", name=n["n"], type="national", subtype=n.get("t"), lat=n["lat"], lng=n["lng"],
               town=n.get("town"), url=n.get("url"), acres=n.get("a"), fee=n.get("fee"),
               agency=n.get("agency"), note=n.get("note"))
 
     # --- 4. Other DEEP land: wildlife areas, hatcheries ---------------
     for s in baked.get("ctparks_stateextra_v1") or []:
-        B.add(name=s["n"], type="state", subtype=LEGEND_LABEL.get(s["t"], s["t"]),
+        B.add(src="deep", name=s["n"], type="state", subtype=LEGEND_LABEL.get(s["t"], s["t"]),
               lat=s["lat"], lng=s["lng"], acres=s.get("a"),
               town=towns.find(s["lat"], s["lng"]), agency="CT DEEP")
 
@@ -933,7 +954,7 @@ def main():
             kinds.append("car-top / carry-in")
         if kinds:
             bits.append("Suitable for " + " and ".join(kinds) + ".")
-        B.add(name=b["n"], type="state", subtype="Boat Launch / Water Access",
+        B.add(src="deep", name=b["n"], type="state", subtype="Boat Launch / Water Access",
               lat=b["lat"], lng=b["lng"], town=b.get("town") or towns.find(b["lat"], b["lng"]),
               url=b.get("url"), agency="CT DEEP", note=" ".join(bits) or None,
               attrs={"water": True, "waterName": b.get("w") or "Water access", "parking": True})
@@ -970,7 +991,7 @@ def main():
             attrs["sources"] = ["NYS DEC Lands"]
         else:
             attrs = {"sources": ["NYS DEC Lands"]}
-        if B.add(name=d["n"], type="state",
+        if B.add(src="declands", name=d["n"], type="state",
                  subtype=NYDEC_LABEL.get(d.get("cat"), "State Land"),
                  lat=d["lat"], lng=d["lng"], acres=d.get("a"),
                  url=d.get("url"), agency="NYS DEC", attrs=attrs):
@@ -983,7 +1004,7 @@ def main():
         town = towns.find(m["lat"], m["lng"])
         if not town:
             continue
-        B.add(name=m["n"], type="town", lat=m["lat"], lng=m["lng"], town=town,
+        B.add(src="osm", name=m["n"], type="town", lat=m["lat"], lng=m["lng"], town=town,
               acres=m.get("a"), url=m.get("w"))
 
     # --- 7. Town greens, rec grounds, forests --------------------------
@@ -995,7 +1016,7 @@ def main():
             continue
         is_state = re.search(r"State Forest|State of Connecticut",
                              m["n"] + " " + (m.get("op") or ""), re.I)
-        B.add(name=m["n"], type="state" if is_state else "town",
+        B.add(src="osm", name=m["n"], type="state" if is_state else "town",
               subtype=LANDUSE_LABEL.get(m.get("k"), "Open Space"),
               lat=m["lat"], lng=m["lng"], town=town, acres=m.get("a"),
               agency=m.get("op") or None)
@@ -1028,7 +1049,7 @@ def main():
             continue
         if excluded_name(name, state):
             continue
-        B.add(name=name, type=kind, subtype=label, lat=r["lat"], lng=r["lng"], town=town,
+        B.add(src="osm", name=name, type=kind, subtype=label, lat=r["lat"], lng=r["lng"], town=town,
               url=r.get("w"), agency=op or None, fee="Free")
 
     # --- 9. Cemeteries --------------------------------------------------
@@ -1039,7 +1060,7 @@ def main():
         if not town:
             continue
         historic = bool(BURYING_RE.search(m["n"]))
-        B.add(name=m["n"], type="cemetery", lat=m["lat"], lng=m["lng"], town=town,
+        B.add(src="osm", name=m["n"], type="cemetery", lat=m["lat"], lng=m["lng"], town=town,
               acres=m.get("a"), url=m.get("w"),
               subtype="Historic Burying Ground" if historic else "Cemetery",
               attrs={"historic": historic})
@@ -1049,7 +1070,7 @@ def main():
         town = towns.find(m["lat"], m["lng"])
         if not town:
             continue
-        B.add(name=m["n"], type="town", subtype="Historic Site Grounds",
+        B.add(src="osm", name=m["n"], type="town", subtype="Historic Site Grounds",
               lat=m["lat"], lng=m["lng"], town=town, url=m.get("w"),
               agency=m.get("op") or None,
               note="Grounds are usually open and free to walk; admission to the "
@@ -1094,7 +1115,7 @@ def main():
         if len(nm) < 3 or PARCEL_NAME.search(nm):
             continue                                   # a parcel, not a place
         by_permission = re.search(r"NGO|UNK", own) and acc in ("RA", "UK")
-        if B.add(name=nm, type=PADUS_TYPE.get(own, "preserve"),
+        if B.add(src="padus", name=nm, type=PADUS_TYPE.get(own, "preserve"),
                  subtype=DESIG_WORD.get(m.get("des"), "Protected land"),
                  lat=m["lat"], lng=m["lng"], town=town, acres=m.get("a") or None,
                  agency=OWNER_WORD.get(own), fee="Open access" if acc == "OA" else None,
@@ -1175,7 +1196,7 @@ def main():
                 bits.append("Recorded here: " + ", ".join(c["has"]) + ".")
             if c.get("parking"):
                 bits.append("Parking: " + c["parking"] + ".")
-            if B.add(name=c["n"], type=kind, subtype="Coastal Access Site",
+            if B.add(src="deep", name=c["n"], type=kind, subtype="Coastal Access Site",
                      lat=c["lat"], lng=c["lng"],
                      town=c.get("town") or towns.find(c["lat"], c["lng"]),
                      url=c.get("url"), agency=c.get("ownerName") or None,
