@@ -358,6 +358,19 @@
     return html;
   }
 
+  // A green pin that nobody cited still says WHY it is green. "Checked by
+  // hand" already covers cited research; these two sentences cover the
+  // other 70% of green, which used to render indistinguishably from it.
+  function basisHtml(p) {
+    const A = p.attrs || {};
+    if (p.evidence === "official")
+      return `<div class="pchecked ev-official">${VERDICT_SVG.open} Rated open to the public in USGS PAD-US · not independently checked</div>`;
+    const what = A.trails ? "trails" : A.beach ? "a beach" : A.pool ? "a pool"
+               : A.sports ? "sports fields" : A.playground ? "a playground"
+               : A.parking ? "parking" : "facilities";
+    return `<div class="pchecked ev-inferred">${VERDICT_SVG.unknown} Presumed public — ${what} mapped here, but access itself is unconfirmed</div>`;
+  }
+
   function feeHtml(p) {
     let out = "";
     if (p.aka && p.aka.length)
@@ -498,7 +511,8 @@
         ? `<div class="pnote">${statusReason(p)}</div>` : ""}
       ${(p.attrs && p.attrs.researched)
         ? `<div class="pchecked">${VERDICT_SVG.open} Checked by hand${p.attrs.checked
-             ? ` · ${p.attrs.checked}` : ""}</div>` : ""}
+             ? ` · ${p.attrs.checked}` : ""}</div>`
+        : p.status === "park" ? basisHtml(p) : ""}
 
       <div class="popup-links">
         <a class="primary" href="${dir}" target="_blank" rel="noopener">${FEAT_SVG.arrow} Directions</a>
@@ -581,12 +595,17 @@
   let ALIASES = [];
 
   const activeAccess = new Set(["open", "permission"]);   // can I go there?
+  const activeEvidence = new Set(["cited", "official", "inferred"]);  // how do we know?
 
   function visible(p) {
     if (!p.access) classify(p);
     if (p.access === "closed") return false;              // never show closed land
     if (!activeAccess.has(p.access)) return false;
     if (!activeTypes.has(p.type)) return false;
+    // Evidence chips subdivide the CONFIRMED pins only. An amber place is
+    // already "we can't say"; letting these chips also hide amber would
+    // make "Presumed off" quietly empty the unverified layer too.
+    if (p.status === "park" && !activeEvidence.has(p.evidence)) return false;
     for (const a of activeAttrs) if (!p.attrs || !p.attrs[a]) return false;
     if (!searchTerm) return true;
     // Match on everything a person might reasonably type: the name, the
@@ -595,6 +614,16 @@
       .filter(Boolean).join(" ").toLowerCase();
     return p._hay.includes(searchTerm);
   }
+
+  // Test seams, same spirit as __lodBudgetMs in iso.js: the marks draw on
+  // one canvas, so a harness can't count visible pins from the DOM.
+  window.__epVisible = () => allParks.filter(visible).length;
+  window.__epEvidence = () => {
+    const t = {};
+    for (const p of allParks) if (p.status === "park")
+      t[p.evidence] = (t[p.evidence] || 0) + 1;
+    return t;
+  };
 
   // Open a place's card without needing a marker to hang it on.
   function openPlace(p) {
@@ -1968,6 +1997,19 @@
     p.kind = p.subtype || { state: "State Park", national: "Federal Land",
                             town: "Town Park", preserve: "Preserve",
                             cemetery: "Cemetery" }[p.type] || "Public land";
+
+    // --- 4. What the verdict rests on ---
+    // Three different kinds of green were rendering identically: a cited
+    // regulation, a PAD-US Open Access rating nobody on this project has
+    // audited, and a pure inference from a mapped ballfield. Measured
+    // 2026-08-24: 30% / 44% / 26% of the 15,897 green pins (and lopsided
+    // by state -- CT green is 61% research, NY green is 63% PAD-US), so
+    // the colour alone was overstating what we know. The colour stays one
+    // green; the card states the basis and the chips make each tier
+    // countable. Derived here, not stored: same convention as access.
+    p.evidence = A.researched ? "cited"
+               : A.officialAccess === "Open" ? "official"
+               : "inferred";
   }
 
   // Kept for the trail pass, which re-scores then re-classifies.
@@ -2566,6 +2608,15 @@
       const a = chip.dataset.access;
       if (activeAccess.has(a)) { activeAccess.delete(a); chip.classList.remove("active"); }
       else { activeAccess.add(a); chip.classList.add("active"); }
+      refresh();
+    });
+  });
+
+  document.querySelectorAll(".chip[data-evidence]").forEach(chip => {
+    chip.addEventListener("click", () => {
+      const ev = chip.dataset.evidence;
+      if (activeEvidence.has(ev)) { activeEvidence.delete(ev); chip.classList.remove("active"); }
+      else { activeEvidence.add(ev); chip.classList.add("active"); }
       refresh();
     });
   });

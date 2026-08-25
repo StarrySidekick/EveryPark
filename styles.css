@@ -96,6 +96,10 @@ header .tagline { font-size: .78rem; opacity: .85; display: block; font-weight: 
 .chip.acc.active[data-access="open"]       { background:#e6f6ec; color:#1d6b3f; border-color:#e6f6ec; }
 .chip.acc.active[data-access="permission"] { background:#fdf3e3; color:#8a5a1b; border-color:#fdf3e3; }
 .chip.acc.active[data-access="unknown"]    { background:#eef0ef; color:#4a544f; border-color:#eef0ef; }
+.chip.ev { border-width: 2px; }
+.chip.ev.active[data-evidence="cited"]    { background:#e6f6ec; color:#1d6b3f; border-color:#e6f6ec; }
+.chip.ev.active[data-evidence="official"] { background:#e9f0f5; color:#274a63; border-color:#e9f0f5; }
+.chip.ev.active[data-evidence="inferred"] { background:#f6f0e2; color:#7a5a20; border-color:#f6f0e2; }
 
 #layersBtn {
   background: rgba(255,255,255,.15);
@@ -458,6 +462,12 @@ a.badge:hover { filter: brightness(1.15); text-decoration: underline; }
 /* Research provenance — this fact was confirmed by a person, not inferred */
 .pchecked { font-size: .7rem; color: #1d6b3f; background: #e8f4ec;
             border-radius: 3px; padding: 4px 8px; margin-top: 6px; }
+/* The other two evidence tiers. Deliberately NOT a new pin colour — the
+   basis is card-level honesty, and three greens on the map would just be
+   noise. Official keeps a cool neutral; inferred leans amber-ish text on
+   the same quiet ground so "presumed" reads as softer than "checked". */
+.pchecked.ev-official { color: #274a63; background: #e9f0f5; }
+.pchecked.ev-inferred { color: #7a5a20; background: #f6f0e2; }
 
 /* Build badge — visible proof of which code and data are loaded. */
 /* Pinned to the actual top-right corner of the header. Sitting inline
