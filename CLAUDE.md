@@ -53,8 +53,10 @@ green space, purple-coded, filterable off. Settled — don't re-litigate.
 
 New York was added 2026-08-07. Connecticut behaviour is unchanged and was
 held to that by measurement at every step: 0 CT places changed town, 0 CT
-places lost, CT still settles at 45%, and the research audit still matches
-52 of 52.
+places lost, CT settled at 45% at merge time, and the research audit still
+matched 52 of 52. (After the 2026-08-13 refresh the dataset is 24,805 places —
+CT 8,016 at 72% verified, NY 16,789 at 60% — see `docs/SCOPE-AND-DATA.md`
+for what those percentages actually rest on.)
 
 **`data/municipalities.geojson` is the region.** 1,164 polygons — CT's 169
 towns plus NY's 995 towns and cities. It replaces `towns.geojson` on the
@@ -111,10 +113,11 @@ being present*; otherwise it is recorded in `dormant_rules` and the build
 passes. A genuinely dead CT rule still exits 1 — that was re-tested by
 injecting one.
 
-Six NY rules exist, added 2026-08-07: Forest Preserve, its detached
-parcels, State Forest, Wildlife Management Area, Unique Area and Multiple
-Use Area. They settle **1,155 of 2,085 NY places (55%)** and cite DEC's
-rules-for-use page plus 6 NYCRR Part 190.
+Ten NY rules exist: six DEC rules added 2026-08-07 (Forest Preserve, its
+detached parcels, State Forest, Wildlife Management Area, Unique Area and
+Multiple Use Area, citing DEC's rules-for-use page plus 6 NYCRR Part 190)
+and four OPRHP rules added 2026-08-12/13 citing 9 NYCRR 375.1. Together
+the NY rules settle ~1,220 places directly.
 
 **What those citations actually carry.** DEC publishes no blanket "open to
 the public, free" statement of the kind CT DEEP does. Its rules page says
@@ -290,7 +293,7 @@ Timothy says a fact; write it into `verified.json`; publish. Two entry types:
 change upstream, locations don't.
 
 **`rules`** — match on `type` / `subtype` / `agency`, so one cited regulation
-settles hundreds of places at once. Ten rules currently cover ~3,400 places
+settles hundreds of places at once. Twenty rules currently cover ~4,800 places
 (CT state land, WMAs, cemeteries, municipal open space under
 *Leydon v. Greenwich*, and named land trusts).
 
@@ -342,8 +345,10 @@ logging — a log nobody reads is the same as no check.
 
 - **Parking coverage ~6%.** OSM has only 687 public parking points statewide;
   that source is exhausted. Would need an NLCD-adjacency heuristic.
-- **~2,900 places still unverified**, mostly 641 with no recorded steward and
-  246 generic land trusts. The steward tail is flat — no org covers >22.
+- **8,908 places still unverified**, 5,627 with no recorded steward and 492
+  generic land trusts. The steward tail is flat — the top 100 towns cover
+  only 34% of the stewardless bucket. Measured 2026-08-24 in
+  `docs/SCOPE-AND-DATA.md`, along with what the green pins rest on.
 
 ---
 
@@ -414,9 +419,9 @@ letter. Three sources, merged in this order:
    tag is an editor's assertion rather than our guess.
 2. **Wikipedia** REST summary — history, trimmed to three sentences.
 3. **The record we already hold** — always available, so the panel is
-   never empty. Most of the 7,727 places will only ever get this one.
+   never empty. Most of the 24,805 places will only ever get this one.
 
-Nothing is baked; baking 7,727 summaries by hand does not finish.
+Nothing is baked; baking 24,805 summaries by hand does not finish.
 
 **The gates exist because a wrong article is worse than none.** "Memorial
 Park" matches a hundred articles nationwide. A match that did NOT come

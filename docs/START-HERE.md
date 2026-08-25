@@ -16,15 +16,17 @@ Connecticut. Static site, no server, no database, free to host.
 
 - **Live:** https://everypark.starrysidekick.com
 - **Repo:** `StarrySidekick/EveryPark`, GitHub Pages from `main`
-- **Now:** `v0.43.0` · deployed dataset still 7,727 places (CT only) until
-  the next refresh; the pipeline currently builds CT 9,266 + NY 2,172
-- **~2,900 CT places unverified; New York is 100% unverified by design**
+- **Now:** `v0.50.0` · dataset 24,805 places (CT 8,016 + NY 16,789) since
+  the 2026-08-13 refresh
+- **8,908 places unverified — CT is 72% verified, NY 60%.** Those two
+  percentages do not rest on the same kind of evidence: see
+  `docs/SCOPE-AND-DATA.md` (2026-08-24) before trusting either.
 
 **The goal, in Timothy's words:** *find a park near me, verified that it's
 a good park, go there and get all the info, a usable map for hiking and
 doing various activities there.*
 
-Read against that sentence: **find** works, **trust** is at 63%, **get
+Read against that sentence: **find** works, **trust** is at 64%, **get
 there** has just started, **use it there** is beginning. That ordering
 decides priority.
 
@@ -225,14 +227,16 @@ picks up the 13,903 PAD-US NY units and ~8,200 NY OSM parks on top.
    `www.dec.ny.gov/outdoor/NNNNN.html` links, most of which 302 three
    times into the new `/places/` scheme and some of which 404. They are
    fine as a place's own link, useless as the evidence a rule rests on.
-2. **`app.js` knows nothing about states.** It still fetches the CT-only
-   `towns.geojson`, has no state filter, and no NY town boundaries.
+2. **`app.js` is partly state-aware.** It fetches `municipalities.geojson`
+   (both states) and branches on `p.state` in a few places, but there is
+   still no state filter chip.
 3. **Progressive load.** Not the download — `places.json` is 3.97 MB on
    disk but **442 KB over the wire**, so brotli already solved that. The
    cost is *parse*: 42 ms today, **1,406 ms** at 4x, blocking the main
    thread. Render CT immediately and stream NY in after, the same shape as
    the v0.38.0 dressing work.
-4. **A real refresh.** Every NY number above is from a partial build.
+4. ~~**A real refresh.**~~ Ran 2026-08-13; the dataset numbers above are
+   from it.
 
 ---
 
@@ -296,7 +300,7 @@ report-a-problem link, and freshness ageing.
 
 Each decides real work, and none is hard:
 
-- **How many of the 7,727 get a HISTORY page**, and **rules coverage from
+- **How many of the 24,805 get a HISTORY page**, and **rules coverage from
   OSM tags.** Together they decide whether the composed fallback text
   deserves more effort.
 - **How many places are multi-piece, and how many pieces.** Cockaponset
