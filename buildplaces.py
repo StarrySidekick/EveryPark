@@ -653,6 +653,50 @@ def load(path):
         return json.load(fh)
 
 
+def write_shards(built, places, data_dir):
+    """
+    One places-XX.json per state, plus places-index.json naming them.
+
+    The browser parses places.json on the main thread, and parse cost is
+    the real ceiling on adding states -- 42 ms for Connecticut alone,
+    measured at 1,406 ms for a 4x file. Shards let the app render the
+    state on screen first and stream the rest, and they are the unit a
+    fifty-state dataset would have to be served in anyway. The canonical
+    places.json still exists for the pipeline (enrichraster --reuse-from
+    reads it) and as the fallback for a client without the index.
+
+    Stale shards are pruned: a state removed from the dataset would
+    otherwise leave its old file behind, and the index would say one
+    thing while the directory said another.
+    """
+    import glob as _glob
+    by = {}
+    for p in places:
+        by.setdefault(p.get("state") or "CT", []).append(p)
+    index = {"built": built, "shards": []}
+    for st in sorted(by):
+        rows = by[st]
+        fname = f"places-{st}.json"
+        with open(os.path.join(data_dir, fname), "w") as fh:
+            json.dump({"built": built, "state": st, "places": rows}, fh,
+                      separators=(",", ":"))
+        lats = [p["lat"] for p in rows]
+        lngs = [p["lng"] for p in rows]
+        index["shards"].append({
+            "state": st, "file": fname, "count": len(rows),
+            "bbox": [round(min(lngs), 3), round(min(lats), 3),
+                     round(max(lngs), 3), round(max(lats), 3)]})
+    with open(os.path.join(data_dir, "places-index.json"), "w") as fh:
+        json.dump(index, fh, indent=1)
+    expected = {s["file"] for s in index["shards"]} | {"places-index.json"}
+    for path in _glob.glob(os.path.join(data_dir, "places-*.json")):
+        if os.path.basename(path) not in expected:
+            os.remove(path)
+            print(f"  pruned stale shard {os.path.basename(path)}", flush=True)
+    print(f"  shards: " + ", ".join(
+        f"{s['state']} {s['count']:,}" for s in index["shards"]), flush=True)
+
+
 # --------------------------------------------------------- boundaries
 def attach_geometry(places, raw_dir):
     """

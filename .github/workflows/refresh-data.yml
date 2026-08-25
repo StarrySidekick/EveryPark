@@ -82,6 +82,17 @@ jobs:
           python3 enrichraster.py --in data/places.json \
                   --reuse-from raw/places-prev.json -o data/places.json
 
+      # After the LAST writer of places.json, or the shards would miss
+      # the elevation that stage just attached.
+      - name: Shard the dataset per state
+        run: |
+          python3 - <<'PY'
+          import json
+          from buildplaces import write_shards
+          d = json.load(open("data/places.json"))
+          write_shards(d.get("built"), d["places"], "data")
+          PY
+
       - name: Build the tile archive
         if: ${{ !inputs.skip_tiles }}
         run: |
@@ -162,7 +173,7 @@ jobs:
         run: |
           git config user.name  "everypark-bot"
           git config user.email "actions@github.com"
-          git add data/places.json config.js \
+          git add data/places.json data/places-*.json config.js \
                   data/research-audit.json data/baked.json README.md || true
           # Only track the archive in git while R2 is not carrying it.
           # Staging it in both places would keep the history growing and

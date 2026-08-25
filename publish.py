@@ -135,6 +135,12 @@ def main():
                   separators=(",", ":"))
     print(f"  -> {out} ({os.path.getsize(out)/1024/1024:.2f} MB)", flush=True)
 
+    # Per-state shards beside the canonical file, so the browser can
+    # render the first state before parsing the rest. Written next to
+    # `out`, so a scratch run shards its scratch copy, not data/.
+    from buildplaces import write_shards
+    write_shards(doc.get("built"), places, os.path.dirname(out) or ".")
+
     # Bump dataVersion, or browsers keep serving the copy they already
     # have and the publish is invisible. The badge reads this too, so a
     # stale date in the corner is the tell that this step didn't run.

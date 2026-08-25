@@ -3390,6 +3390,22 @@
   }
 
   async function loadPrecomputedInner() {
+    // Per-state shards, if the dataset publishes them: places-index.json
+    // names one places-XX.json per state. The whole file parses on the
+    // main thread, and parse cost is the real ceiling on adding states
+    // (42 ms for CT alone; 1,406 ms measured for a 4x file) -- so the
+    // shard covering the ground on screen renders first and the rest
+    // stream in behind it, the same shape as the v0.38.0 dressing work.
+    // An older dataset without the index takes the single-file path
+    // below, unchanged.
+    let index = null;
+    try {
+      const ri = await fetch("data/places-index.json?v=" + (CONFIG.dataVersion || "1"));
+      if (ri.ok) index = await ri.json();
+    } catch (e) { /* no index -> single file */ }
+    if (index && Array.isArray(index.shards) && index.shards.length)
+      return loadShardedPlaces(index);
+
     let data;
     try {
       // Plain fetch, not force-cache: force-cache happily returns a stale
@@ -3401,9 +3417,18 @@
     } catch (e) { return false; }
     if (!data || !Array.isArray(data.places) || !data.places.length) return false;
 
-    // CT's 169 towns plus NY's 995 towns and cities. towns.geojson is the
-    // CT-only predecessor, still in the repo; this is what draws New York
-    // boundaries and what findTown answers from.
+    await loadMunicipalBoundaries();
+    const ingest = makePlaceIngest();
+    ingest(data.places);
+    console.info(`Loaded ${data.places.length.toLocaleString()} precomputed places ` +
+                 `(built ${data.built}). No live fetching.`);
+    return true;
+  }
+
+  // CT's 169 towns plus NY's 995 towns and cities. towns.geojson is the
+  // CT-only predecessor, still in the repo; this is what draws New York
+  // boundaries and what findTown answers from.
+  async function loadMunicipalBoundaries() {
     const towns = await fetch("data/municipalities.geojson").then(r => r.json());
     buildTownIndex(towns);
     if (CONFIG.townBorders.show) {
@@ -3412,7 +3437,14 @@
                  opacity: CONFIG.townBorders.opacity, fill: false, interactive: false }
       }).addTo(map);
     }
+  }
 
+  // One ingest closure shared by the single-file and sharded paths, so a
+  // batch arriving late goes through exactly the pipeline the first batch
+  // did. statusLookup and byName grow in place: the tile resolver holds a
+  // reference to byName, so later shards extend what polygon clicks can
+  // resolve without re-registering anything.
+  function makePlaceIngest() {
     // The file stores source facts only. Access, its label and wording,
     // steward and kind are derived here by the same rules the build uses,
     // which keeps ~2.9 MB out of the download and means the wording can
@@ -3421,8 +3453,11 @@
       "private conservation land usually means open by the owner's permission " +
       "rather than by legal right. Check the owner's website or posted signs.";
     const statusLookup = new Map();
+    const byName = new Map();
     const normNm = t => String(t).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-    for (const p of data.places) {
+    let resolverSet = false;
+    return function ingest(placesArr) {
+      for (const p of placesArr) {
       if (p.attrs && p.attrs.byPermission && !p.note) p.note = PADUS_NOTE;
       scoreAccess(p);          // sets visitable + accessNote, then classifies
       // Verdict tier for the fill colour (Timothy's system, 2026-08-03):
@@ -3453,19 +3488,17 @@
       else if (A.cover === "mostly open") A.openland = true;
       p._pre = true;           // so addPark doesn't classify a second time
       addPark(p);
+      const bk = normNm(p.name);
+      if (!byName.has(bk)) byName.set(bk, []);
+      byName.get(bk).push(p);
     }
     if (tilesActive) {
       EveryParkTiles.setStatus(statusLookup);
 
       // Clicking a polygon should say exactly what clicking its pin says.
       // Match on name, and where a name repeats across the state take the
-      // one nearest the click.
-      const byName = new Map();
-      for (const p of allParks) {
-        const k = normNm(p.name);
-        if (!byName.has(k)) byName.set(k, []);
-        byName.get(k).push(p);
-      }
+      // one nearest the click. Registered once; byName grows in place.
+      if (!resolverSet) { resolverSet = true;
       EveryParkTiles.setPlaceResolver((name, latlng) => {
         const cands = byName.get(normNm(name));
         if (!cands || !cands.length) return null;
@@ -3479,10 +3512,54 @@
         }
         return popupHtml(best);
       });
+      }
     }
-    refresh();
-    console.info(`Loaded ${data.places.length.toLocaleString()} precomputed places ` +
-                 `(built ${data.built}). No live fetching.`);
+      refresh();
+    };
+  }
+
+  async function loadShardedPlaces(index) {
+    await loadMunicipalBoundaries();
+    const ingest = makePlaceIngest();
+    const c = map.getCenter();
+    const inBox = sh => sh.bbox && c.lng >= sh.bbox[0] && c.lat >= sh.bbox[1]
+                     && c.lng <= sh.bbox[2] && c.lat <= sh.bbox[3];
+    // The shard under the map's starting centre first -- that is the land
+    // actually on screen. Among shards whose envelope contains the
+    // centre, the SMALLEST box wins: New York's envelope spans the whole
+    // of Connecticut's (a state envelope cannot follow a state line --
+    // the Southold snap lesson), so "contains the centre" alone would
+    // start a CT view with the NY shard. Misses fall back to count.
+    const area = sh => sh.bbox ? (sh.bbox[2] - sh.bbox[0]) * (sh.bbox[3] - sh.bbox[1]) : Infinity;
+    const shards = [...index.shards]
+      .sort((a, b) => (inBox(b) - inBox(a)) || (area(a) - area(b))
+                   || (b.count || 0) - (a.count || 0));
+    const fetchShard = async sh => {
+      const r = await fetch("data/" + sh.file + "?v=" + (CONFIG.dataVersion || "1"));
+      if (!r.ok) throw new Error(sh.file + " -> HTTP " + r.status);
+      return r.json();
+    };
+    const first = await fetchShard(shards[0]);
+    if (!first || !Array.isArray(first.places) || !first.places.length) return false;
+    ingest(first.places);
+    console.info(`Loaded ${first.places.length.toLocaleString()} ${shards[0].state} places ` +
+                 `(built ${index.built}); ${shards.length - 1} shard(s) streaming behind.`);
+    // The rest stream behind the first paint. A late shard failing must
+    // be loud -- a quietly smaller map is the silent-success failure mode
+    // this project keeps meeting -- so it surfaces on the status line,
+    // not only in the console.
+    (async () => {
+      for (const sh of shards.slice(1)) {
+        try {
+          const d = await fetchShard(sh);
+          ingest(d.places || []);
+          console.info(`+ ${(d.places || []).length.toLocaleString()} ${sh.state} places streamed in.`);
+        } catch (e) {
+          console.error("Shard failed:", sh.file, e);
+          showStatus(`Could not load ${sh.state} places — refresh to retry.`);
+        }
+      }
+    })();
     return true;
   }
 
