@@ -1217,6 +1217,153 @@
     "Field-verified in person by the site maintainer (Sherman resident), 2026-08-03"
    ],
    "checked": "2026-08-03"
+  },
+  {
+   "match": {
+    "name": "Bailey Arboretum",
+    "town": "Oyster Bay",
+    "at": [
+     40.88763,
+     -73.58399
+    ]
+   },
+   "fee": "Admission $5 per vehicle, $2 walk-in; closed Mon-Tue",
+   "url": "https://www.nassaucountyny.gov/2818/Bailey-Arboretum",
+   "note": "Nassau County arboretum administered by the Friends of Nassau County Bailey Arboretum. Open Wed-Sun 9-5.",
+   "source": [
+    "https://www.nassaucountyny.gov/2818/Bailey-Arboretum"
+   ],
+   "checked": "2026-08-25"
+  },
+  {
+   "match": {
+    "name": "Trapps Gateway - Benanti",
+    "town": "Gardiner",
+    "at": [
+     41.73446,
+     -74.18535
+    ]
+   },
+   "agency": "Mohonk Preserve",
+   "fee": "Mohonk Preserve day pass $15",
+   "url": "https://www.mohonkpreserve.org/plan-your-visit/",
+   "note": "West Trapps trailhead land of the Mohonk Preserve. A day pass is required to hike or climb.",
+   "source": [
+    "https://www.mohonkpreserve.org/plan-your-visit/"
+   ],
+   "checked": "2026-08-25"
+  },
+  {
+   "match": {
+    "name": "Jasper-Troupsburg CSD Athletic Fields",
+    "town": "Jasper",
+    "at": [
+     42.12676,
+     -77.51154
+    ]
+   },
+   "private": true,
+   "note": "School district athletic fields, not a public park. Community use is at the district's discretion.",
+   "source": [
+    "https://www.jtcsd.org/"
+   ],
+   "checked": "2026-08-25"
+  },
+  {
+   "match": {
+    "name": "Avon Old Farms School",
+    "town": "Avon",
+    "at": [
+     41.76566,
+     -72.842
+    ]
+   },
+   "private": true,
+   "note": "Private boarding school campus. The trails and fields are the school's, not public.",
+   "source": [
+    "https://www.avonoldfarms.com/"
+   ],
+   "checked": "2026-08-25"
+  },
+  {
+   "match": {
+    "name": "YMCA Camp Mountain Laurel",
+    "town": "Hamden",
+    "at": [
+     41.45206,
+     -72.9477
+    ]
+   },
+   "private": true,
+   "note": "YMCA day-camp property, open to camp enrollees rather than the public.",
+   "source": [
+    "https://cccymca.org/locations/hamden/camp/"
+   ],
+   "checked": "2026-08-25"
+  },
+  {
+   "match": {
+    "name": "Knolls Atomic Power Laboratory Kenneth A Kesselri*",
+    "town": "Galway",
+    "at": [
+     43.04181,
+     -73.96087
+    ]
+   },
+   "private": true,
+   "note": "Kesselring site of the Knolls Atomic Power Laboratory - a federal naval nuclear research facility with a fenced safety buffer. Closed to the public.",
+   "source": [
+    "https://en.wikipedia.org/wiki/Knolls_Atomic_Power_Laboratory"
+   ],
+   "checked": "2026-08-25"
+  },
+  {
+   "match": {
+    "name": "Gananda Central School Dist Land",
+    "town": "Walworth",
+    "at": [
+     43.12597,
+     -77.30505
+    ]
+   },
+   "private": true,
+   "note": "School district land, not a public park. Community use is at the district's discretion.",
+   "source": [
+    "https://www.gananda.org/"
+   ],
+   "checked": "2026-08-25"
+  },
+  {
+   "match": {
+    "name": "Sullivan West Central School Land",
+    "town": "Callicoon",
+    "at": [
+     41.78268,
+     -74.9321
+    ]
+   },
+   "private": true,
+   "note": "School district land, not a public park. Community use is at the district's discretion.",
+   "source": [
+    "https://swcsd.org/"
+   ],
+   "checked": "2026-08-25"
+  },
+  {
+   "match": {
+    "name": "Boonville Oneida Country Fairgrounds",
+    "town": "Boonville",
+    "at": [
+     43.48153,
+     -75.34505
+    ]
+   },
+   "fee": "Admission charged during fair and events; grounds are an event venue, not a walk-in park",
+   "url": "https://boonvillefair.com/",
+   "source": [
+    "https://boonvillefair.com/"
+   ],
+   "checked": "2026-08-25"
   }
  ],
  "rules": [

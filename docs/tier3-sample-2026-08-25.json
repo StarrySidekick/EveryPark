@@ -1,0 +1,1863 @@
+{
+ "drawn": "2026-08-25",
+ "seed": 20260825,
+ "population": 3649,
+ "protocol": "Each place web-checked: open = public may enter free; restricted = school/club/HOA/fee/resident-only/closed; undetermined = no usable source found. Verdicts recorded with a citation.",
+ "places": [
+  {
+   "id": "645811ec29",
+   "name": "Middletown Reservoir Trails",
+   "town": "Wallkill",
+   "state": "NY",
+   "type": "town",
+   "subtype": null,
+   "agency": null,
+   "acres": 1226,
+   "lat": 41.45374,
+   "lng": -74.45228,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "open",
+   "basis": "City opened its 1,250-acre watershed to public hiking/biking with TPL",
+   "source": "https://www.middletownny.gov/297/Middletown-Reservoir-Trail"
+  },
+  {
+   "id": "fe8abf3628",
+   "name": "Grant Avery Park",
+   "town": "Olive",
+   "state": "NY",
+   "type": "town",
+   "subtype": null,
+   "agency": null,
+   "acres": 6.4,
+   "lat": 41.97364,
+   "lng": -74.23161,
+   "greenBecause": [
+    "sports"
+   ],
+   "verdict": "open",
+   "basis": "Town of Olive park, free",
+   "source": "https://townofoliveny.gov/recreation/"
+  },
+  {
+   "id": "8a96b2564e",
+   "name": "Town of West Hartford land",
+   "town": "West Hartford",
+   "state": "CT",
+   "type": "town",
+   "subtype": "Town Open Space",
+   "agency": "Town of West Hartford",
+   "acres": 0.3,
+   "lat": 41.79738,
+   "lng": -72.77618,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "undetermined",
+   "basis": "0.3-acre unnamed town parcel; no source found describing it as a usable public space",
+   "source": null
+  },
+  {
+   "id": "964a50146f",
+   "name": "Lauren A Lieberman Preserve",
+   "town": "Litchfield",
+   "state": "CT",
+   "type": "preserve",
+   "subtype": "Private conservation",
+   "agency": "Non-profit / land trust",
+   "acres": 121,
+   "lat": 41.77044,
+   "lng": -73.13543,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "open",
+   "basis": "Litchfield Land Trust preserve; LLT trails free and open to all",
+   "source": "https://litchfieldlandtrust.org/our-preserves/"
+  },
+  {
+   "id": "67d12e6b0e",
+   "name": "Bailey Arboretum",
+   "town": "Oyster Bay",
+   "state": "NY",
+   "type": "town",
+   "subtype": null,
+   "agency": null,
+   "acres": 43,
+   "lat": 40.88763,
+   "lng": -73.58399,
+   "greenBecause": [
+    "trails",
+    "playground"
+   ],
+   "verdict": "restricted-fee",
+   "basis": "County arboretum charging admission: $5/vehicle, $2 walk-in, closed Mon-Tue",
+   "source": "https://www.nassaucountyny.gov/2818/Bailey-Arboretum"
+  },
+  {
+   "id": "ce8697d472",
+   "name": "Farley Field",
+   "town": "Marlborough",
+   "state": "CT",
+   "type": "town",
+   "subtype": null,
+   "agency": null,
+   "acres": 5.3,
+   "lat": 41.61971,
+   "lng": -72.45022,
+   "greenBecause": [
+    "sports"
+   ],
+   "verdict": "open",
+   "basis": "Marlborough Parks & Recreation field",
+   "source": "https://www.marlboroughct.net/parks___recreation.php"
+  },
+  {
+   "id": "9927d71437",
+   "name": "Kingsland Farms",
+   "town": "Sharon",
+   "state": "CT",
+   "type": "preserve",
+   "subtype": "Protected land",
+   "agency": "Unknown owner",
+   "acres": 86,
+   "lat": 41.89906,
+   "lng": -73.48344,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "undetermined",
+   "basis": "Sharon LT preserves are open to public but Kingsland Farms not confirmed as one of them",
+   "source": "https://sharonlandtrust.org/"
+  },
+  {
+   "id": "bf5d9e26c9",
+   "name": "Woodbridge Athletic Fields",
+   "town": "Woodbridge",
+   "state": "CT",
+   "type": "town",
+   "subtype": "Recreation Area",
+   "agency": "Town of Woodbridge",
+   "acres": 44,
+   "lat": 41.35053,
+   "lng": -73.0006,
+   "greenBecause": [
+    "sports",
+    "playground"
+   ],
+   "verdict": "open",
+   "basis": "On the Town of Woodbridge parks & fields list",
+   "source": "https://www.woodbridgect.org/255/List-of-Town-Parks-Fields"
+  },
+  {
+   "id": "a5cb8b864e",
+   "name": "Trapps Gateway - Benanti",
+   "town": "Gardiner",
+   "state": "NY",
+   "type": "preserve",
+   "subtype": "Recreation easement",
+   "agency": "Non-profit / land trust",
+   "acres": 24,
+   "lat": 41.73446,
+   "lng": -74.18535,
+   "greenBecause": [
+    "parking"
+   ],
+   "verdict": "restricted-fee",
+   "basis": "Mohonk Preserve trailhead land; $15 day pass required",
+   "source": "https://www.mohonkpreserve.org/plan-your-visit/"
+  },
+  {
+   "id": "4cc81e4514",
+   "name": "The Village Of Fort Plain Land",
+   "town": "Minden",
+   "state": "NY",
+   "type": "town",
+   "subtype": "Local park",
+   "agency": "City or town",
+   "acres": 1.3,
+   "lat": 42.9378,
+   "lng": -74.62491,
+   "greenBecause": [
+    "sports"
+   ],
+   "verdict": "open",
+   "basis": "Village of Fort Plain public parks (Wiles/Haslett)",
+   "source": "https://www.villageoffortplain.org/info/parks"
+  },
+  {
+   "id": "b9f518b027",
+   "name": "Jennie Notch",
+   "town": "Windham",
+   "state": "NY",
+   "type": "town",
+   "subtype": "Recreation easement",
+   "agency": "City or town",
+   "acres": 247,
+   "lat": 42.33345,
+   "lng": -74.19083,
+   "greenBecause": [
+    "trails",
+    "parking"
+   ],
+   "verdict": "undetermined",
+   "basis": "Trail crosses NYC-DEP watershed land; DEP access-permit system, footing unclear",
+   "source": "https://www.nynjtc.org/lp-section-26/"
+  },
+  {
+   "id": "e294816788",
+   "name": "Jasper-Troupsburg CSD Athletic Fields",
+   "town": "Jasper",
+   "state": "NY",
+   "type": "town",
+   "subtype": null,
+   "agency": null,
+   "acres": 14,
+   "lat": 42.12676,
+   "lng": -77.51154,
+   "greenBecause": [
+    "sports"
+   ],
+   "verdict": "restricted-school",
+   "basis": "School district athletic fields; no public-use grant found",
+   "source": "https://www.jtcsd.org/"
+  },
+  {
+   "id": "838f563b2e",
+   "name": "Fitch Playground",
+   "town": "Norwalk",
+   "state": "CT",
+   "type": "town",
+   "subtype": null,
+   "agency": null,
+   "acres": 1.7,
+   "lat": 41.11018,
+   "lng": -73.39931,
+   "greenBecause": [
+    "sports",
+    "playground"
+   ],
+   "verdict": "open",
+   "basis": "Listed in Norwalk public recreation amenities",
+   "source": "https://www.norwalkct.gov/3318/Recreation-Amenities"
+  },
+  {
+   "id": "67ef8ce116",
+   "name": "Perkins Green",
+   "town": "New London",
+   "state": "CT",
+   "type": "town",
+   "subtype": null,
+   "agency": null,
+   "acres": null,
+   "lat": 41.35113,
+   "lng": -72.09819,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "open",
+   "basis": "New London public park",
+   "source": "https://www.topozone.com/connecticut/new-london-ct/park/perkins-green/"
+  },
+  {
+   "id": "448f1c12a4",
+   "name": "Bafflin Sanctuary",
+   "town": "Pomfret",
+   "state": "CT",
+   "type": "preserve",
+   "subtype": "Land Trust Preserve",
+   "agency": "Connecticut Audubon Society Inc",
+   "acres": 697,
+   "lat": 41.86865,
+   "lng": -71.95045,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "open",
+   "basis": "CT Audubon sanctuary, trails open dawn-dusk, no fee",
+   "source": "https://ctaudubon.org/locations/the-center-at-pomfret-and-bafflin-sanctuary/"
+  },
+  {
+   "id": "5a262139b5",
+   "name": "River Road Park",
+   "town": "Willington",
+   "state": "CT",
+   "type": "town",
+   "subtype": null,
+   "agency": null,
+   "acres": 71,
+   "lat": 41.90162,
+   "lng": -72.28865,
+   "greenBecause": [
+    "sports"
+   ],
+   "verdict": "open",
+   "basis": "Willington Parks & Recreation park",
+   "source": "https://www.willingtonct.gov/1273/Town-Parks-and-Amenities"
+  },
+  {
+   "id": "2781eb3335",
+   "name": "Elmwood Park",
+   "town": "Syracuse",
+   "state": "NY",
+   "type": "town",
+   "subtype": null,
+   "agency": null,
+   "acres": 49,
+   "lat": 43.01753,
+   "lng": -76.16748,
+   "greenBecause": [
+    "trails",
+    "playground"
+   ],
+   "verdict": "open",
+   "basis": "City of Syracuse park",
+   "source": "https://www.syr.gov/Living/Our-Community/Parks-Recreation-Youth-Services/Visit-Our-Parks/Elmwood-Park"
+  },
+  {
+   "id": "f3b1cf7b72",
+   "name": "Cambria Town Park",
+   "town": "Cambria",
+   "state": "NY",
+   "type": "town",
+   "subtype": null,
+   "agency": null,
+   "acres": 42,
+   "lat": 43.16067,
+   "lng": -78.82804,
+   "greenBecause": [
+    "trails",
+    "sports"
+   ],
+   "verdict": "open",
+   "basis": "Town of Cambria park, open daily 9-7, public rules posted",
+   "source": "https://townofcambria.gov/"
+  },
+  {
+   "id": "9bcc03d4d2",
+   "name": "Nassau Village Of Land",
+   "town": "Nassau",
+   "state": "NY",
+   "type": "town",
+   "subtype": "Local park",
+   "agency": "City or town",
+   "acres": 1.1,
+   "lat": 42.51285,
+   "lng": -73.60944,
+   "greenBecause": [
+    "trails",
+    "sports"
+   ],
+   "verdict": "undetermined",
+   "basis": "Village of Nassau (Rensselaer Co); no page found for the parcel",
+   "source": null
+  },
+  {
+   "id": "28d54b2451",
+   "name": "UConn Forest North Eagleville Tract",
+   "town": "Mansfield",
+   "state": "CT",
+   "type": "preserve",
+   "subtype": "University Land",
+   "agency": "University of Connecticut",
+   "acres": 136,
+   "lat": 41.80577,
+   "lng": -72.27861,
+   "greenBecause": [
+    "trails",
+    "parking"
+   ],
+   "verdict": "open",
+   "basis": "UConn Forest recreation page invites public hiking/biking on the tract",
+   "source": "https://forest.uconn.edu/recreation/"
+  },
+  {
+   "id": "5bff7e51f4",
+   "name": "North Sea Fire Department Memorial Athletic Field",
+   "town": "Southampton",
+   "state": "NY",
+   "type": "town",
+   "subtype": null,
+   "agency": null,
+   "acres": 12,
+   "lat": 40.93118,
+   "lng": -72.41268,
+   "greenBecause": [
+    "trails",
+    "sports",
+    "playground"
+   ],
+   "verdict": "undetermined",
+   "basis": "Name says fire-department memorial fields; town facility page describes a Town-owned park nearby; cannot confirm which the polygon is",
+   "source": "https://www.southamptontownny.gov/Facilities/Facility/Details/North-Sea-Community-Park-53"
+  },
+  {
+   "id": "50dbe86ed3",
+   "name": "Avon Old Farms School",
+   "town": "Avon",
+   "state": "CT",
+   "type": "preserve",
+   "subtype": "Protected land",
+   "agency": "Non-profit / land trust",
+   "acres": 516,
+   "lat": 41.76566,
+   "lng": -72.842,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "restricted-school",
+   "basis": "Private boarding school campus (860 ac); no public-access grant found",
+   "source": "https://www.avonoldfarms.com/"
+  },
+  {
+   "id": "ba789b8036",
+   "name": "Glen Park Village of Land",
+   "town": "Brownville",
+   "state": "NY",
+   "type": "town",
+   "subtype": "Local park",
+   "agency": "City or town",
+   "acres": 3.6,
+   "lat": 44.00052,
+   "lng": -75.95227,
+   "greenBecause": [
+    "sports"
+   ],
+   "verdict": "undetermined",
+   "basis": "No source found for village-owned parcel",
+   "source": null
+  },
+  {
+   "id": "0936c9ca0c",
+   "name": "Finch, Pruyn",
+   "town": "Indian Lake",
+   "state": "NY",
+   "type": "state",
+   "subtype": "State conservation area",
+   "agency": "State conservation agency",
+   "acres": 113069,
+   "lat": 43.79943,
+   "lng": -74.12078,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "undetermined",
+   "basis": "Former Finch Pruyn timberland; state fee land is open but easement tracts vary and the parcel class is unconfirmed",
+   "source": "https://www.adirondackexplorer.org/environment/a-plan-for-69000-acres/"
+  },
+  {
+   "id": "b60b4d853d",
+   "name": "Roundtree Park P-29",
+   "town": "Oyster Bay",
+   "state": "NY",
+   "type": "town",
+   "subtype": null,
+   "agency": null,
+   "acres": 1.3,
+   "lat": 40.77817,
+   "lng": -73.46133,
+   "greenBecause": [
+    "sports",
+    "playground"
+   ],
+   "verdict": "open",
+   "basis": "Town of Oyster Bay park with town-built playgrounds",
+   "source": "https://oysterbaytown.com/departments/parks/parks/"
+  },
+  {
+   "id": "05a2da308b",
+   "name": "Knowalot Lane Open Space",
+   "town": "Norwalk",
+   "state": "CT",
+   "type": "preserve",
+   "subtype": "Nature Preserve",
+   "agency": null,
+   "acres": 30,
+   "lat": 41.15662,
+   "lng": -73.40011,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "undetermined",
+   "basis": "Norwalk Land Trust stewards 33 parcels but plans trails; this parcel unconfirmed as open",
+   "source": "https://norwalklandtrust.org/"
+  },
+  {
+   "id": "4344880d6c",
+   "name": "Downing Park",
+   "town": "Yorktown",
+   "state": "NY",
+   "type": "town",
+   "subtype": null,
+   "agency": null,
+   "acres": 43,
+   "lat": 41.29304,
+   "lng": -73.80838,
+   "greenBecause": [
+    "sports",
+    "playground"
+   ],
+   "verdict": "open",
+   "basis": "Town of Yorktown park",
+   "source": "https://www.yorktownny.gov/recreation-community/parks-preserves-trailways/town-parks-preserves/downing-park/"
+  },
+  {
+   "id": "0ded4a13ed",
+   "name": "9/11 Memorial: We Shall Never Forget",
+   "town": "Smithtown",
+   "state": "NY",
+   "type": "town",
+   "subtype": null,
+   "agency": null,
+   "acres": 0.7,
+   "lat": 40.84392,
+   "lng": -73.16911,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "open",
+   "basis": "Town of Smithtown memorial park",
+   "source": "https://www.smithtownny.gov/485/911-Responders-Remembered-Park"
+  },
+  {
+   "id": "4e6fe30afa",
+   "name": "Town & Village Of Canton Land",
+   "town": "Canton",
+   "state": "NY",
+   "type": "town",
+   "subtype": "Local park",
+   "agency": "City or town",
+   "acres": 2.0,
+   "lat": 44.59702,
+   "lng": -75.16733,
+   "greenBecause": [
+    "sports"
+   ],
+   "verdict": "open",
+   "basis": "Town/Village of Canton shared recreation facilities",
+   "source": "https://cantonny.gov/services/parks_recreation/green_space.php"
+  },
+  {
+   "id": "8c2e7686dc",
+   "name": "Wagner Woods",
+   "town": "Simsbury",
+   "state": "CT",
+   "type": "preserve",
+   "subtype": "Nature Preserve",
+   "agency": null,
+   "acres": 66,
+   "lat": 41.89104,
+   "lng": -72.84028,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "open",
+   "basis": "Simsbury Land Trust public open space with maintained trails",
+   "source": "https://simsburylandtrust.org/slt/wagner-woods/"
+  },
+  {
+   "id": "ea23722b17",
+   "name": "Twin Valleys Outdoor Education Center",
+   "town": "Lewis",
+   "state": "NY",
+   "type": "preserve",
+   "subtype": "University Land",
+   "agency": "College Auxiliary Services (SUNY Plattsburgh)",
+   "acres": 680,
+   "lat": 44.27051,
+   "lng": -73.47879,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "open",
+   "basis": "Champlain Area Trails land trust; officially open to the public (2026)",
+   "source": "https://champlainareatrails.com/news/detail/champlain-area-trails-announces-acquisition-of-twin-valleys-outdoor-education-center-to-enhance-community-access-to-nature"
+  },
+  {
+   "id": "cecc4ce395",
+   "name": "Luce's Park",
+   "town": "Fayette",
+   "state": "NY",
+   "type": "town",
+   "subtype": null,
+   "agency": null,
+   "acres": 0.9,
+   "lat": 42.89992,
+   "lng": -76.84781,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "undetermined",
+   "basis": "No source found",
+   "source": null
+  },
+  {
+   "id": "444bb16af3",
+   "name": "High Acres Nature Area",
+   "town": "Perinton",
+   "state": "NY",
+   "type": "preserve",
+   "subtype": "Nature Preserve",
+   "agency": "Waste Management",
+   "acres": 218,
+   "lat": 43.09173,
+   "lng": -77.37914,
+   "greenBecause": [
+    "trails",
+    "parking"
+   ],
+   "verdict": "open",
+   "basis": "Corporate (WM) conservation land with public trails - open by permission",
+   "source": "https://www.wm.com/us/en/high-acres-landfill/environmental-stewardship"
+  },
+  {
+   "id": "18f30c068f",
+   "name": "Howlett Hill Park",
+   "town": "Onondaga",
+   "state": "NY",
+   "type": "town",
+   "subtype": null,
+   "agency": null,
+   "acres": 8.0,
+   "lat": 43.01873,
+   "lng": -76.2789,
+   "greenBecause": [
+    "sports"
+   ],
+   "verdict": "open",
+   "basis": "Town of Onondaga park, open May-Oct 8am-dusk",
+   "source": "https://parks.townofonondaga.gov/"
+  },
+  {
+   "id": "b8579a4ae1",
+   "name": "Daniel Civitillo Ash Swamp",
+   "town": "Glastonbury",
+   "state": "CT",
+   "type": "preserve",
+   "subtype": "Land Trust Preserve",
+   "agency": "Kongscut Land Trust Inc",
+   "acres": 8.6,
+   "lat": 41.70238,
+   "lng": -72.5015,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "undetermined",
+   "basis": "Glastonbury open-space parcel; no page found confirming public use",
+   "source": null
+  },
+  {
+   "id": "0e2becb9e7",
+   "name": "YMCA Camp Mountain Laurel",
+   "town": "Hamden",
+   "state": "CT",
+   "type": "preserve",
+   "subtype": "Nature Preserve",
+   "agency": null,
+   "acres": 33,
+   "lat": 41.45206,
+   "lng": -72.9477,
+   "greenBecause": [
+    "trails",
+    "sports"
+   ],
+   "verdict": "restricted-private",
+   "basis": "YMCA day-camp property; no public-access statement",
+   "source": "https://cccymca.org/locations/hamden/camp/"
+  },
+  {
+   "id": "ec3b1345ad",
+   "name": "Pine Mountain",
+   "town": "Ridgefield",
+   "state": "CT",
+   "type": "preserve",
+   "subtype": "Nature Preserve",
+   "agency": null,
+   "acres": 299,
+   "lat": 41.35031,
+   "lng": -73.48867,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "open",
+   "basis": "Ridgefield town open space with official trail maps",
+   "source": "https://www.ridgefieldct.org/conservation-commission/pages/trail-maps-and-information"
+  },
+  {
+   "id": "002b02aa82",
+   "name": "Trout Creek",
+   "town": "Wawarsing",
+   "state": "NY",
+   "type": "town",
+   "subtype": "Protected land",
+   "agency": null,
+   "acres": 2862,
+   "lat": 41.82568,
+   "lng": -74.43448,
+   "greenBecause": [
+    "parking"
+   ],
+   "verdict": "undetermined",
+   "basis": "Reads as a DEC public-fishing-rights spot; PFR easements grant angling access, not general walking",
+   "source": "https://dec.ny.gov/things-to-do/freshwater-fishing/places-to-fish/public-fishing-rights-streams"
+  },
+  {
+   "id": "219f7e303b",
+   "name": "Pomfret Recreation Park",
+   "town": "Pomfret",
+   "state": "CT",
+   "type": "town",
+   "subtype": null,
+   "agency": null,
+   "acres": 24,
+   "lat": 41.85153,
+   "lng": -72.00609,
+   "greenBecause": [
+    "trails",
+    "parking",
+    "sports"
+   ],
+   "verdict": "open",
+   "basis": "Pomfret municipal recreation park; Air Line Trail crosses it",
+   "source": "https://www.pomfretct.gov/recreation/faq/where-is-the-recreation-park"
+  },
+  {
+   "id": "0e673fd3b7",
+   "name": "Delta Park",
+   "town": "Islip",
+   "state": "NY",
+   "type": "town",
+   "subtype": null,
+   "agency": null,
+   "acres": 5.0,
+   "lat": 40.74543,
+   "lng": -73.24672,
+   "greenBecause": [
+    "trails",
+    "playground"
+   ],
+   "verdict": "open",
+   "basis": "Town of Islip pocket park with posted hours",
+   "source": "http://islipny.gov/images/parkspdf/Delta%20Park.pdf"
+  },
+  {
+   "id": "4aa9f73351",
+   "name": "Silver Beech Preserve",
+   "town": "East Hampton",
+   "state": "NY",
+   "type": "preserve",
+   "subtype": "Land Trust Preserve",
+   "agency": "Peconic Land Trust",
+   "acres": 191,
+   "lat": 40.99703,
+   "lng": -72.1465,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "undetermined",
+   "basis": "Peconic Land Trust preserve; access policy not stated on project page",
+   "source": "https://www.peconiclandtrust.org/our-work/projects/silver-beech-preserve"
+  },
+  {
+   "id": "1b80cb62e8",
+   "name": "Center Field",
+   "town": "Woodbridge",
+   "state": "CT",
+   "type": "town",
+   "subtype": "Recreation Area",
+   "agency": "Town of Woodbridge",
+   "acres": 5.7,
+   "lat": 41.35389,
+   "lng": -73.01682,
+   "greenBecause": [
+    "trails",
+    "sports",
+    "playground"
+   ],
+   "verdict": "open",
+   "basis": "On the Woodbridge town parks & fields list (Center Road complex)",
+   "source": "https://www.woodbridgect.org/255/List-of-Town-Parks-Fields"
+  },
+  {
+   "id": "b4f77cb566",
+   "name": "Wilfred Road Park",
+   "town": "Manchester",
+   "state": "CT",
+   "type": "town",
+   "subtype": null,
+   "agency": null,
+   "acres": 0.4,
+   "lat": 41.76601,
+   "lng": -72.55825,
+   "greenBecause": [
+    "sports",
+    "playground"
+   ],
+   "verdict": "open",
+   "basis": "Manchester neighborhood town park with playground",
+   "source": "https://connecticutexplorer.com/parks-in-manchester-ct/"
+  },
+  {
+   "id": "bc0080e325",
+   "name": "Stone Mill Road Open Space",
+   "town": "Mansfield",
+   "state": "CT",
+   "type": "town",
+   "subtype": "Town Open Space",
+   "agency": "Town of Mansfield",
+   "acres": 2.9,
+   "lat": 41.80904,
+   "lng": -72.21839,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "open",
+   "basis": "Town of Mansfield open-space system, blanket public hiking statement; parcel-level page not found",
+   "source": "https://nectchamber.com/mansfield/"
+  },
+  {
+   "id": "0be70e89d6",
+   "name": "Long Pond Woods",
+   "town": "North Stonington",
+   "state": "CT",
+   "type": "preserve",
+   "subtype": "Private conservation",
+   "agency": "Non-profit / land trust",
+   "acres": 191,
+   "lat": 41.50394,
+   "lng": -71.77368,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "undetermined",
+   "basis": "Near Narragansett Trail/Long Pond but owning org and access unconfirmed",
+   "source": null
+  },
+  {
+   "id": "6fdcfc8388",
+   "name": "Sunshine Park",
+   "town": "West Seneca",
+   "state": "NY",
+   "type": "town",
+   "subtype": null,
+   "agency": null,
+   "acres": 22,
+   "lat": 42.82154,
+   "lng": -78.71248,
+   "greenBecause": [
+    "sports"
+   ],
+   "verdict": "open",
+   "basis": "Town of West Seneca park, dawn to dusk",
+   "source": "https://www.westseneca.gov/Facilities/Facility/Details/Sunshine-Park-19"
+  },
+  {
+   "id": "d7e1bfffea",
+   "name": "Winnapaug Pond",
+   "town": "Stonington",
+   "state": "CT",
+   "type": "preserve",
+   "subtype": "State conservation area",
+   "agency": "Non-profit / land trust",
+   "acres": 212,
+   "lat": 41.33853,
+   "lng": -71.80266,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "open",
+   "basis": "Westerly Land Trust Winnapaug Farm Preserve with public trails - NOTE: preserve is in Westerly RI; record claims Stonington CT, likely an out-of-state scope error",
+   "source": "https://westerlylandtrust.org/portfolio/winnapaug-farm-preserve/"
+  },
+  {
+   "id": "f5b92f4db1",
+   "name": "Moose Hill Triangle",
+   "town": "Guilford",
+   "state": "CT",
+   "type": "preserve",
+   "subtype": "Land Trust Preserve",
+   "agency": "Guilford Land Conservation Trust",
+   "acres": 0.7,
+   "lat": 41.26462,
+   "lng": -72.71836,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "open",
+   "basis": "Guilford Land Conservation Trust open space with trail",
+   "source": "https://guilfordlandtrust.org/category/hikes/"
+  },
+  {
+   "id": "47d95661b9",
+   "name": "Mary Edwards Mountain Property",
+   "town": "Granby",
+   "state": "CT",
+   "type": "preserve",
+   "subtype": "Land Trust Preserve",
+   "agency": "Granby Land Trust",
+   "acres": 203,
+   "lat": 41.99906,
+   "lng": -72.86768,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "open",
+   "basis": "Granby Land Trust property with public trails and trailhead parking",
+   "source": "https://granbylandtrust.org/mary-edwards-mountain-property/"
+  },
+  {
+   "id": "930811963c",
+   "name": "COUNTY OF ROCKLAND Land",
+   "town": "Clarkstown",
+   "state": "NY",
+   "type": "town",
+   "subtype": "Local park",
+   "agency": "County",
+   "acres": 1061,
+   "lat": 41.09996,
+   "lng": -73.94431,
+   "greenBecause": [
+    "trails",
+    "sports",
+    "pool"
+   ],
+   "verdict": "open",
+   "basis": "Rockland County park land (county parks open free); pool likely a merged town facility",
+   "source": "https://www.rocklandcountyny.gov/Home/Components/FacilityDirectory/FacilityDirectory/24/169"
+  },
+  {
+   "id": "584aaf6b1c",
+   "name": "Finch Pruyn",
+   "town": "Newcomb",
+   "state": "NY",
+   "type": "state",
+   "subtype": "State conservation area",
+   "agency": "State conservation agency",
+   "acres": 112597,
+   "lat": 44.04829,
+   "lng": -74.01505,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "undetermined",
+   "basis": "Former Finch Pruyn timberland; fee vs easement class of this parcel unconfirmed",
+   "source": "https://www.adirondackexplorer.org/environment/a-plan-for-69000-acres/"
+  },
+  {
+   "id": "d7fcdb93c8",
+   "name": "Crittenden Road Ball Diamonds",
+   "town": "Rochester",
+   "state": "NY",
+   "type": "town",
+   "subtype": null,
+   "agency": null,
+   "acres": 19,
+   "lat": 43.10514,
+   "lng": -77.64892,
+   "greenBecause": [
+    "parking",
+    "sports"
+   ],
+   "verdict": "open",
+   "basis": "Ball diamonds inside Genesee Valley Park (Olmsted county/city park)",
+   "source": "https://www.monroecounty.gov/parks-geneseevalley"
+  },
+  {
+   "id": "00a8f9ca30",
+   "name": "Vedder Preserve",
+   "town": "Branford",
+   "state": "CT",
+   "type": "preserve",
+   "subtype": "Nature Preserve",
+   "agency": null,
+   "acres": 22,
+   "lat": 41.27033,
+   "lng": -72.76007,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "open",
+   "basis": "Branford Land Trust preserve with established loop trail",
+   "source": "https://branfordlandtrust.org/explore/trail-maps/"
+  },
+  {
+   "id": "6626ac966e",
+   "name": "Sagtikos Manor",
+   "town": "Islip",
+   "state": "NY",
+   "type": "town",
+   "subtype": null,
+   "agency": null,
+   "acres": 10,
+   "lat": 40.70286,
+   "lng": -73.27628,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "undetermined",
+   "basis": "Suffolk County historic site; house shown by paid guided tour, grounds policy unstated",
+   "source": "https://suffolkcountyny.gov/Departments/Parks/Historic-Sites/Sagtikos-Manor"
+  },
+  {
+   "id": "0fd0288bf7",
+   "name": "Subdivision Open Space (Southwood Rd) 2 Parcels",
+   "town": "Cheshire",
+   "state": "CT",
+   "type": "preserve",
+   "subtype": "Nature Preserve",
+   "agency": null,
+   "acres": 18,
+   "lat": 41.4635,
+   "lng": -72.90198,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "undetermined",
+   "basis": "Subdivision set-aside open space; no public page exists for the parcel",
+   "source": null
+  },
+  {
+   "id": "f563b9a005",
+   "name": "Fritz Reiner Open Space",
+   "town": "Weston",
+   "state": "CT",
+   "type": "preserve",
+   "subtype": "Private conservation",
+   "agency": "Non-profit / land trust",
+   "acres": 3.7,
+   "lat": 41.23072,
+   "lng": -73.34906,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "undetermined",
+   "basis": "No source found",
+   "source": null
+  },
+  {
+   "id": "76d5edfacd",
+   "name": "Moriello Park and Pool",
+   "town": "New Paltz",
+   "state": "NY",
+   "type": "town",
+   "subtype": null,
+   "agency": null,
+   "acres": 5.8,
+   "lat": 41.75458,
+   "lng": -74.08218,
+   "greenBecause": [
+    "trails",
+    "sports",
+    "pool"
+   ],
+   "verdict": "open",
+   "basis": "Town of New Paltz park; pool inside is membership-fee but park entry free",
+   "source": "https://www.townofnewpaltzny.gov/pool"
+  },
+  {
+   "id": "d1d52f106e",
+   "name": "Liberty Green",
+   "town": "Clinton",
+   "state": "CT",
+   "type": "preserve",
+   "subtype": "Land Trust Preserve",
+   "agency": "Clinton Land Conservation Trust, Inc.",
+   "acres": 1.0,
+   "lat": 41.27713,
+   "lng": -72.51735,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "open",
+   "basis": "Clinton town green, public park since the 1840s",
+   "source": "https://clintonct.org/674/Liberty-Green-Historic-District"
+  },
+  {
+   "id": "9c0704fbf7",
+   "name": "Hunter Hill Road",
+   "town": "North Branford",
+   "state": "CT",
+   "type": "preserve",
+   "subtype": "Private conservation",
+   "agency": "Non-profit / land trust",
+   "acres": 17,
+   "lat": 41.3217,
+   "lng": -72.74795,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "undetermined",
+   "basis": "North Branford LCT trails exist but Hunter Hill parcel unconfirmed",
+   "source": "https://nblandtrust.org/trails/"
+  },
+  {
+   "id": "2b450c7782",
+   "name": "Erie Canal Nature Preserve",
+   "town": "Pittsford",
+   "state": "NY",
+   "type": "town",
+   "subtype": "Town Open Space",
+   "agency": "Town of Pittsford",
+   "acres": 19,
+   "lat": 43.09586,
+   "lng": -77.52132,
+   "greenBecause": [
+    "trails",
+    "parking"
+   ],
+   "verdict": "open",
+   "basis": "Town of Pittsford nature preserve, publicly dedicated 2021",
+   "source": "https://www.townofpittsfordny.gov/news/erie-canal-nature-preserve-ribbon-cutting-04-22-21"
+  },
+  {
+   "id": "7904ad0cf1",
+   "name": "Knolls Atomic Power Laboratory Kenneth A Kesselri*",
+   "town": "Galway",
+   "state": "NY",
+   "type": "preserve",
+   "subtype": "Protected land",
+   "agency": "Unknown owner",
+   "acres": 3918,
+   "lat": 43.04181,
+   "lng": -73.96087,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "restricted-closed",
+   "basis": "DOE naval nuclear laboratory site with safety buffer; no public access",
+   "source": "https://en.wikipedia.org/wiki/Knolls_Atomic_Power_Laboratory"
+  },
+  {
+   "id": "3b16ba0e58",
+   "name": "Pleasant Valley Homes Open Space (6 Parcels)",
+   "town": "South Windsor",
+   "state": "CT",
+   "type": "preserve",
+   "subtype": "Nature Preserve",
+   "agency": null,
+   "acres": 26,
+   "lat": 41.80382,
+   "lng": -72.58071,
+   "greenBecause": [
+    "sports"
+   ],
+   "verdict": "undetermined",
+   "basis": "Subdivision set-aside open space; no public page exists for the parcel",
+   "source": null
+  },
+  {
+   "id": "2bcd91584a",
+   "name": "Rand Tract Park",
+   "town": "Syracuse",
+   "state": "NY",
+   "type": "town",
+   "subtype": null,
+   "agency": null,
+   "acres": 78,
+   "lat": 42.99463,
+   "lng": -76.15803,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "open",
+   "basis": "City of Syracuse forever-wild parkland with loop trails",
+   "source": "https://cnyhiking.com/RandTract.htm"
+  },
+  {
+   "id": "d3e21c7248",
+   "name": "Col. Robert R. Craner Veterans Park",
+   "town": "Cohoes",
+   "state": "NY",
+   "type": "town",
+   "subtype": null,
+   "agency": null,
+   "acres": 3.0,
+   "lat": 42.7831,
+   "lng": -73.70797,
+   "greenBecause": [
+    "trails",
+    "sports",
+    "playground"
+   ],
+   "verdict": "open",
+   "basis": "City of Cohoes park facility",
+   "source": "https://www.ci.cohoes.ny.us/Facilities/Facility/Details/Craner-Park-9"
+  },
+  {
+   "id": "0ac6c9f853",
+   "name": "Michael Street Park",
+   "town": "East Haven",
+   "state": "CT",
+   "type": "town",
+   "subtype": null,
+   "agency": null,
+   "acres": 1.8,
+   "lat": 41.32317,
+   "lng": -72.86425,
+   "greenBecause": [
+    "sports",
+    "playground"
+   ],
+   "verdict": "open",
+   "basis": "On the East Haven town parks list",
+   "source": "https://www.easthaven-ct.gov/330/Parks-in-East-Haven"
+  },
+  {
+   "id": "29bfaecbf9",
+   "name": "Gananda Central School Dist Land",
+   "town": "Walworth",
+   "state": "NY",
+   "type": "town",
+   "subtype": "Protected land",
+   "agency": "Regional agency",
+   "acres": 11,
+   "lat": 43.12597,
+   "lng": -77.30505,
+   "greenBecause": [
+    "sports"
+   ],
+   "verdict": "restricted-school",
+   "basis": "School district land; no public-use grant found",
+   "source": "https://www.gananda.org/"
+  },
+  {
+   "id": "597ecbd301",
+   "name": "Stewart B. McKinney National Wildlife Refuge-Great Meadows Unit",
+   "town": "Stratford",
+   "state": "CT",
+   "type": "national",
+   "subtype": "Coastal Access Site",
+   "agency": "U.S. Fish and Wildlife Service",
+   "acres": 1009,
+   "lat": 41.16288,
+   "lng": -73.15104,
+   "greenBecause": [
+    "parking"
+   ],
+   "verdict": "open",
+   "basis": "USFWS refuge unit open year-round, trails and parking",
+   "source": "https://www.fws.gov/refuge/stewart-b-mckinney/visit-us"
+  },
+  {
+   "id": "f00edefb1f",
+   "name": "Dutchman's Landing Park",
+   "town": "Catskill",
+   "state": "NY",
+   "type": "town",
+   "subtype": null,
+   "agency": null,
+   "acres": 3.5,
+   "lat": 42.21398,
+   "lng": -73.85601,
+   "greenBecause": [
+    "sports",
+    "playground"
+   ],
+   "verdict": "open",
+   "basis": "Village of Catskill public riverfront park",
+   "source": "https://villageofcatskillny.gov/parks-recreation"
+  },
+  {
+   "id": "a125941190",
+   "name": "Estelle Cohn Memorial Dog Park",
+   "town": "Norwich",
+   "state": "CT",
+   "type": "town",
+   "subtype": null,
+   "agency": null,
+   "acres": 5.1,
+   "lat": 41.53105,
+   "lng": -72.09105,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "open",
+   "basis": "City of Norwich dog park, posted hours",
+   "source": "https://www.norwichct.gov/facilities/facility/details/Estelle-Cohn-Memorial-Dog-Park-126"
+  },
+  {
+   "id": "3a46d6c9e3",
+   "name": "Mt. Pleasant Fields",
+   "town": "Schenectady",
+   "state": "NY",
+   "type": "town",
+   "subtype": null,
+   "agency": null,
+   "acres": 14,
+   "lat": 42.7979,
+   "lng": -73.93741,
+   "greenBecause": [
+    "sports",
+    "pool"
+   ],
+   "verdict": "open",
+   "basis": "City of Schenectady park",
+   "source": "https://www.cityofschenectady.gov/395/City-Parks"
+  },
+  {
+   "id": "d8ea3c970f",
+   "name": "Camp Dogwood",
+   "town": "Huntington",
+   "state": "NY",
+   "type": "town",
+   "subtype": "Town Open Space",
+   "agency": "Town of Huntington",
+   "acres": 11,
+   "lat": 40.85789,
+   "lng": -73.43255,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "undetermined",
+   "basis": "Camp property; owner and access policy not found",
+   "source": null
+  },
+  {
+   "id": "82f7b1545e",
+   "name": "East Greenbush Town Park",
+   "town": "East Greenbush",
+   "state": "NY",
+   "type": "town",
+   "subtype": null,
+   "agency": null,
+   "acres": 85,
+   "lat": 42.59772,
+   "lng": -73.66524,
+   "greenBecause": [
+    "trails",
+    "sports",
+    "playground"
+   ],
+   "verdict": "open",
+   "basis": "Town park, 8am to dusk year-round",
+   "source": "https://eastgreenbush.recdesk.com/Community/Page?pageId=23316"
+  },
+  {
+   "id": "e83a173df9",
+   "name": "Binney Park Nature Trails",
+   "town": "Greenwich",
+   "state": "CT",
+   "type": "town",
+   "subtype": "Nature Preserve",
+   "agency": null,
+   "acres": 11,
+   "lat": 41.03849,
+   "lng": -73.567,
+   "greenBecause": [
+    "sports"
+   ],
+   "verdict": "open",
+   "basis": "Town of Greenwich public park since 1933",
+   "source": "https://www.greenwichct.gov/2142/Binney-Park"
+  },
+  {
+   "id": "f27ff84b89",
+   "name": "River Walk",
+   "town": "Wellsville",
+   "state": "NY",
+   "type": "town",
+   "subtype": null,
+   "agency": null,
+   "acres": 4.8,
+   "lat": 42.1255,
+   "lng": -77.96136,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "open",
+   "basis": "Village riverwalk trail, public",
+   "source": "https://www.alltrails.com/trail/us/new-york/wellsville-river-walk-trail"
+  },
+  {
+   "id": "05fb9b8a6d",
+   "name": "FOSL",
+   "town": "Pine Plains",
+   "state": "NY",
+   "type": "preserve",
+   "subtype": "Nature Preserve",
+   "agency": "FOSL",
+   "acres": 38,
+   "lat": 41.96929,
+   "lng": -73.67945,
+   "greenBecause": [
+    "trails",
+    "parking"
+   ],
+   "verdict": "open",
+   "basis": "Friends of Stissing Landmarks; hikers welcome at no cost",
+   "source": "https://stissinglandmarks.org/the-fire-tower/"
+  },
+  {
+   "id": "8eef2d860f",
+   "name": "Robinson Preserve",
+   "town": "Cornwall",
+   "state": "CT",
+   "type": "preserve",
+   "subtype": "Private conservation",
+   "agency": "Non-profit / land trust",
+   "acres": 65,
+   "lat": 41.86884,
+   "lng": -73.30396,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "undetermined",
+   "basis": "Not on the Cornwall Conservation Trust preserve list",
+   "source": "https://cornwallconservationtrust.org/"
+  },
+  {
+   "id": "888ae47ae8",
+   "name": "New York State Land",
+   "town": "Huntington",
+   "state": "NY",
+   "type": "preserve",
+   "subtype": "Nature Preserve",
+   "agency": null,
+   "acres": 153,
+   "lat": 40.89915,
+   "lng": -73.47132,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "undetermined",
+   "basis": "Unnamed state land parcel; could not identify the unit",
+   "source": null
+  },
+  {
+   "id": "27600b6c1e",
+   "name": "Selden Creek Preserve",
+   "town": "Lyme",
+   "state": "CT",
+   "type": "preserve",
+   "subtype": "Private conservation",
+   "agency": "Non-profit / land trust",
+   "acres": 163,
+   "lat": 41.40653,
+   "lng": -72.40372,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "open",
+   "basis": "TNC preserve; visitors welcome for passive recreation on two trails",
+   "source": "https://www.nature.org/en-us/get-involved/how-to-help/places-we-protect/selden-creek-preserve/"
+  },
+  {
+   "id": "9417f06ff2",
+   "name": "George Yovan Setaside",
+   "town": "Redding",
+   "state": "CT",
+   "type": "preserve",
+   "subtype": "Private conservation",
+   "agency": "Non-profit / land trust",
+   "acres": 15,
+   "lat": 41.3202,
+   "lng": -73.40161,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "open",
+   "basis": "Yovan Tract, town open space in the Gallows Hill Natural Area, in the Book of Trails",
+   "source": "https://reddingctlandtrust.org/bookoftrails"
+  },
+  {
+   "id": "2851c73bdd",
+   "name": "Kingsbridge Park",
+   "town": "Grand Island",
+   "state": "NY",
+   "type": "town",
+   "subtype": null,
+   "agency": null,
+   "acres": 29,
+   "lat": 43.06411,
+   "lng": -79.04986,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "undetermined",
+   "basis": "No park by this name found in Grand Island",
+   "source": null
+  },
+  {
+   "id": "a3cac049be",
+   "name": "Bloomfield Village Of Land",
+   "town": "East Bloomfield",
+   "state": "NY",
+   "type": "town",
+   "subtype": "Local park",
+   "agency": "City or town",
+   "acres": 16,
+   "lat": 42.89517,
+   "lng": -77.4245,
+   "greenBecause": [
+    "parking",
+    "sports"
+   ],
+   "verdict": "open",
+   "basis": "Village public parks (Elton/Veterans); NOTE nearby Boughton Park is resident-permit-only - live example of the NY residents-only doctrine",
+   "source": "https://www.visitfingerlakes.com/plan-your-trip/ontario-county-ny/bloomfield-and-west-bloomfield/"
+  },
+  {
+   "id": "ccf23a0676",
+   "name": "Union Springs Village Of Land",
+   "town": "Springport",
+   "state": "NY",
+   "type": "town",
+   "subtype": "Local park",
+   "agency": "City or town",
+   "acres": 28,
+   "lat": 42.84921,
+   "lng": -76.68911,
+   "greenBecause": [
+    "sports"
+   ],
+   "verdict": "open",
+   "basis": "Frontenac Park, village municipal park with athletic fields",
+   "source": "https://unionspringsny.gov/park/"
+  },
+  {
+   "id": "d698d76b82",
+   "name": "Elderslie Preserve",
+   "town": "Woodbridge",
+   "state": "CT",
+   "type": "town",
+   "subtype": "Town Open Space",
+   "agency": "Town of Woodbridge",
+   "acres": 271,
+   "lat": 41.37729,
+   "lng": -73.0293,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "open",
+   "basis": "Town of Woodbridge preserve (TPL-assisted purchase), trail system mapped",
+   "source": "https://www.cttrailfinder.com/trails/trail/elderslie-preserve-trail-system"
+  },
+  {
+   "id": "cfd49c387a",
+   "name": "Whitehouse Family Nature Preserve",
+   "town": "Glastonbury",
+   "state": "CT",
+   "type": "preserve",
+   "subtype": "Land Trust Preserve",
+   "agency": "Kongscut Land Trust, Inc.",
+   "acres": 33,
+   "lat": 41.68978,
+   "lng": -72.57363,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "open",
+   "basis": "Kongscut Land Trust preserve on the Glastonbury town facility directory, marked trail system",
+   "source": "https://www.glastonburyct.gov/Home/Components/FacilityDirectory/FacilityDirectory/84/1050"
+  },
+  {
+   "id": "7ce466e4b1",
+   "name": "Whalen Park",
+   "town": "Louisville",
+   "state": "NY",
+   "type": "town",
+   "subtype": null,
+   "agency": null,
+   "acres": 7.8,
+   "lat": 44.93722,
+   "lng": -74.99226,
+   "greenBecause": [
+    "sports",
+    "playground"
+   ],
+   "verdict": "open",
+   "basis": "Town of Louisville park with public shoreline trail",
+   "source": "https://www.louisvilleny.gov/recreation"
+  },
+  {
+   "id": "7076e3d3b4",
+   "name": "Kellogg/Eddy Open Space",
+   "town": "Newington",
+   "state": "CT",
+   "type": "town",
+   "subtype": "Recreation Area",
+   "agency": null,
+   "acres": 11,
+   "lat": 41.69785,
+   "lng": -72.73638,
+   "greenBecause": [
+    "sports"
+   ],
+   "verdict": "open",
+   "basis": "On the Newington Open Space & Hiking page",
+   "source": "https://www.newingtonct.gov/2363/Open-Space-Hiking"
+  },
+  {
+   "id": "e46596725c",
+   "name": "Whitaker Park",
+   "town": "Waddington",
+   "state": "NY",
+   "type": "town",
+   "subtype": null,
+   "agency": null,
+   "acres": 11,
+   "lat": 44.86755,
+   "lng": -75.19675,
+   "greenBecause": [
+    "sports"
+   ],
+   "verdict": "open",
+   "basis": "NYPA/village public recreation facility",
+   "source": "https://www.waddingtonnewyork.com/whitakerpark"
+  },
+  {
+   "id": "6c8b65c75b",
+   "name": "Sullivan West Central School Land",
+   "town": "Callicoon",
+   "state": "NY",
+   "type": "town",
+   "subtype": "Protected land",
+   "agency": "Regional agency",
+   "acres": 2.9,
+   "lat": 41.78268,
+   "lng": -74.9321,
+   "greenBecause": [
+    "trails",
+    "sports"
+   ],
+   "verdict": "restricted-school",
+   "basis": "School district land; no public-use grant found",
+   "source": null
+  },
+  {
+   "id": "893eb2b7d2",
+   "name": "Sandy Hollow Drive Park",
+   "town": "Waterford",
+   "state": "CT",
+   "type": "preserve",
+   "subtype": "Nature Preserve",
+   "agency": null,
+   "acres": 3.4,
+   "lat": 41.34909,
+   "lng": -72.14004,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "undetermined",
+   "basis": "No park found; Sandy Hollow Drive is residential, likely a subdivision green",
+   "source": null
+  },
+  {
+   "id": "b1f317f995",
+   "name": "Heartt Avenue Park",
+   "town": "Cohoes",
+   "state": "NY",
+   "type": "town",
+   "subtype": null,
+   "agency": null,
+   "acres": 0.7,
+   "lat": 42.77485,
+   "lng": -73.68825,
+   "greenBecause": [
+    "trails",
+    "sports"
+   ],
+   "verdict": "open",
+   "basis": "City of Cohoes neighborhood park, posted hours 7am-9pm",
+   "source": "https://www.albany.org/listing/heartt-ave-park/2437/"
+  },
+  {
+   "id": "2def4d3cd6",
+   "name": "Pioneer Park",
+   "town": "Erwin",
+   "state": "NY",
+   "type": "town",
+   "subtype": null,
+   "agency": null,
+   "acres": 32,
+   "lat": 42.17166,
+   "lng": -77.11237,
+   "greenBecause": [
+    "playground"
+   ],
+   "verdict": "open",
+   "basis": "Town of Erwin park (renamed David B Erwin Park)",
+   "source": "https://www.erwinny.gov/1209/Parks-Rec"
+  },
+  {
+   "id": "90fe87b6cb",
+   "name": "Barbour Woods",
+   "town": "Norfolk",
+   "state": "CT",
+   "type": "preserve",
+   "subtype": "Local conservation area",
+   "agency": "Non-profit / land trust",
+   "acres": 287,
+   "lat": 42.00156,
+   "lng": -73.1931,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "open",
+   "basis": "Norfolk Land Trust, ten mapped public trails",
+   "source": "https://www.norfolklandtrust.org/"
+  },
+  {
+   "id": "280efdd563",
+   "name": "David Hale Fanning Park",
+   "town": "Griswold",
+   "state": "CT",
+   "type": "town",
+   "subtype": null,
+   "agency": null,
+   "acres": 0.5,
+   "lat": 41.60756,
+   "lng": -71.98062,
+   "greenBecause": [
+    "sports"
+   ],
+   "verdict": "open",
+   "basis": "Griswold Parks & Recreation park",
+   "source": "https://griswoldyfs.com/public-parks-trails-fishing"
+  },
+  {
+   "id": "7a8493867a",
+   "name": "County Of Erie  Dept Of Land",
+   "town": "Concord",
+   "state": "NY",
+   "type": "town",
+   "subtype": "Local park",
+   "agency": "County",
+   "acres": 27,
+   "lat": 42.47794,
+   "lng": -78.6995,
+   "greenBecause": [
+    "parking"
+   ],
+   "verdict": "open",
+   "basis": "Erie County forest land (Bureau of Forestry), open county land",
+   "source": "https://www3.erie.gov/parks/bureau-forestry"
+  },
+  {
+   "id": "7ae910dee8",
+   "name": "Boonville Oneida Country Fairgrounds",
+   "town": "Boonville",
+   "state": "NY",
+   "type": "town",
+   "subtype": "Recreation Area",
+   "agency": null,
+   "acres": 34,
+   "lat": 43.48153,
+   "lng": -75.34505,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "restricted-fee",
+   "basis": "Fairgrounds: gated event venue with paid admission, not a walk-in park",
+   "source": "https://boonvillefair.com/"
+  },
+  {
+   "id": "3b029ee995",
+   "name": "Little Ausable Park",
+   "town": "Peru",
+   "state": "NY",
+   "type": "town",
+   "subtype": null,
+   "agency": null,
+   "acres": 1.7,
+   "lat": 44.57762,
+   "lng": -73.52724,
+   "greenBecause": [
+    "trails",
+    "playground"
+   ],
+   "verdict": "open",
+   "basis": "Town of Peru park and paved public trail",
+   "source": "http://www.perutown.com/walking-trail-brochure.pdf"
+  },
+  {
+   "id": "087d32f41c",
+   "name": "Essex Land Trust",
+   "town": "Essex",
+   "state": "CT",
+   "type": "preserve",
+   "subtype": "Nature Preserve",
+   "agency": null,
+   "acres": 11,
+   "lat": 41.34635,
+   "lng": -72.44249,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "open",
+   "basis": "Essex Land Trust preserves open to the public dawn to dusk",
+   "source": "https://essexlandtrust.org/preserves/"
+  },
+  {
+   "id": "a8a70847d3",
+   "name": "Bobby's Court (2 Parcels)",
+   "town": "Ridgefield",
+   "state": "CT",
+   "type": "preserve",
+   "subtype": "Nature Preserve",
+   "agency": null,
+   "acres": 19,
+   "lat": 41.30231,
+   "lng": -73.4576,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "undetermined",
+   "basis": "Subdivision set-aside open space; no public page exists for the parcel",
+   "source": null
+  },
+  {
+   "id": "330094eefe",
+   "name": "Sperry Easement",
+   "town": "Middlebury",
+   "state": "CT",
+   "type": "preserve",
+   "subtype": "Land Trust Preserve",
+   "agency": "Middlebury Land Trust",
+   "acres": 8.4,
+   "lat": 41.55768,
+   "lng": -73.09999,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "undetermined",
+   "basis": "Named an easement: MLT holds 1,220 ac under easement on private land; the adjacent Sperry Pond preserve is open but this parcel is unconfirmed",
+   "source": "https://www.middleburylandtrust.org/holdings/Middlebury%20Land%20Trust%20Holdings.pdf"
+  },
+  {
+   "id": "780297aebd",
+   "name": "Arthur and Dorothy Kinne Preserve",
+   "town": "Canterbury",
+   "state": "CT",
+   "type": "town",
+   "subtype": "Town Open Space",
+   "agency": "Town of Canterbury",
+   "acres": 28,
+   "lat": 41.67908,
+   "lng": -72.00684,
+   "greenBecause": [
+    "trails"
+   ],
+   "verdict": "open",
+   "basis": "Town of Canterbury preserve for passive recreation",
+   "source": "https://www.canterburyct.org/bc-kp"
+  }
+ ],
+ "tally": {
+  "open": 65,
+  "undetermined": 26,
+  "restricted-fee": 3,
+  "restricted-school": 4,
+  "restricted-private": 1,
+  "restricted-closed": 1
+ },
+ "summary": {
+  "open": 65,
+  "restricted": 9,
+  "undetermined": 26,
+  "falsePositiveRate_confirmed": "9%",
+  "falsePositiveRate_worstCase": "35%",
+  "note": "restricted = confirmed wrong green (fee, school, private, closed federal). undetermined = no usable source either way; the truth for these is unknown, not necessarily wrong."
+ }
+}

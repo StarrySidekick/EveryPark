@@ -688,11 +688,16 @@ def write_shards(built, places, data_dir):
                      round(max(lngs), 3), round(max(lats), 3)]})
     with open(os.path.join(data_dir, "places-index.json"), "w") as fh:
         json.dump(index, fh, indent=1)
-    expected = {s["file"] for s in index["shards"]} | {"places-index.json"}
+    # Prune ONLY files shaped like a state shard (places-XX.json). The
+    # first version globbed places-*.json and deleted publish.py's own
+    # scratch output (places-scratch2.json) seconds after writing it --
+    # a filename is not a file type.
+    expected = {s["file"] for s in index["shards"]}
     for path in _glob.glob(os.path.join(data_dir, "places-*.json")):
-        if os.path.basename(path) not in expected:
+        base = os.path.basename(path)
+        if re.fullmatch(r"places-[A-Z]{2}\.json", base) and base not in expected:
             os.remove(path)
-            print(f"  pruned stale shard {os.path.basename(path)}", flush=True)
+            print(f"  pruned stale shard {base}", flush=True)
     print(f"  shards: " + ", ".join(
         f"{s['state']} {s['count']:,}" for s in index["shards"]), flush=True)
 

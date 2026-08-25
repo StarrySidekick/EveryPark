@@ -252,9 +252,20 @@ needs mechanisms that scale with something other than Timothy's hours:
    colour — a stated basis on the card: cited regulation / official
    access rating / inferred from mapped features. Cheap, honest, and it
    converts an invisible 26% into a filterable, countable set.
-3. **Hand-check a random sample of 100 tier-3 greens.** The false-positive
-   rate of the largest unmeasured claim in the project is a half-day of
-   work and currently a guess. A claim without a number is not a result.
+3. ~~**Hand-check a random sample of 100 tier-3 greens.**~~ Done
+   2026-08-25 — `docs/tier3-sample-2026-08-25.json`, seeded and
+   reproducible, drawn from the post-NY-rules tier-3 population of 3,649.
+   **9% confirmed wrong** (95% CI roughly 3–15%): three fee-charging
+   (Bailey Arboretum, Mohonk's Trapps Gateway, a fairground), four school
+   district properties, one YMCA camp, and one **federal naval nuclear
+   laboratory** rendered green off a mapped trail. 65% confirmed open,
+   26% undetermined — mostly unnamed subdivision set-asides and generic
+   "Village of X land" parcels no source describes. New York holds 7 of
+   the 9 errors. All nine are now cited entries in `verified.json`
+   (fee-charging → the paid bucket; the rest `private: true`). Two
+   watch-items surfaced: Winnapaug Farm Preserve is in Westerly RI but
+   carries town "Stonington", and Boughton Park (E. Bloomfield) is a live
+   example of a lawful residents-only NY park.
 4. **Write the two NY rules** — municipal parkland and cemeteries. 5,966
    places, 89% of New York's unverified, from two citations.
 5. **Add per-record provenance** before adding any state.
