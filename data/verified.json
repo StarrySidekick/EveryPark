@@ -31,7 +31,19 @@
   "Every run writes data/research-audit.json, and the workflow fails if any",
   "entry or rule matched nothing. That failure is deliberate: research going",
   "quietly missing is invisible in the output, because the output still looks",
-  "perfectly fine without it."
+  "perfectly fine without it.",
+  "",
+  "Researched and deliberately NOT written (2026-08-25): a blanket New York",
+  "municipal-parkland rule. Connecticut has one because Leydon v. Greenwich",
+  "(2001) forbids a CT town closing its parks to non-residents. New York law",
+  "is the opposite: Town Law 198(4) lets a town restrict park-district",
+  "facilities to district residents, and Comptroller opinions 88-22 and",
+  "91-10 (osc.ny.gov/legal-opinions) treat resident-only use as lawful",
+  "within equal-protection limits. Friends of Van Cortlandt Park v. City of",
+  "NY (96 N.Y.2d 623) protects parkland from alienation but grants no",
+  "non-resident right of entry. So NY municipal land outside NYC stays",
+  "amber until researched per city; Buffalo, Rochester, Yonkers and",
+  "Syracuse are the next candidates by unverified count."
  ],
  "places": [
   {
@@ -1612,6 +1624,47 @@
    ],
    "checked": "2026-08-13",
    "why": "Matches OpenStreetMap's spelled-out operator string rather than PAD-US's 'State parks agency'. Same agency, same regulations — the two sources simply name it differently, and keying only on the PAD-US form left 30 places unsettled including Minnewaska State Park Preserve at 22,901 acres. These records also carry OSM's subtype 'Land Trust Preserve', which is wrong for state land, so this rule deliberately keys on the agency alone: the agency string names OPRHP explicitly and is the trustworthy half of the record. State parks proper — Harriman, Bear Mountain, Minnewaska, Hudson Highlands and the rest. New York state parks are administered by the Office of Parks, Recreation and Historic Preservation under 9 NYCRR Subtitle I. Section 375.1(h) prohibits entry only where a property 'has been designated as closed by a sign or by an employee of the office', and 375.1(i) refers to 'trails, overlooks, roads and other ways established and provided for public use by the office'. Closure is the regulated exception and public use the assumed condition, so an OPRHP park is walkable without anyone having mapped a trail inside it. This is a firmer footing than the DEC rules stand on, which rest on a rules page that only presupposes public use. Entry is not charged; where a vehicle use fee applies it is parking, which this project already treats separately from paid entry — so this rule asserts reachable only and leaves each record's own fee field to speak for cost.",
+   "reachable": true
+  },
+  {
+   "id": "ny-nyc-parks",
+   "match": {
+    "type": "town",
+    "town": "New York"
+   },
+   "states": [
+    "NY"
+   ],
+   "siteRules": [
+    "Open 6am to 1am unless other hours are posted (56 RCNY 1-03[a][1])",
+    "Do not enter or remain in a park that is posted or announced as closed (56 RCNY 1-03[a])"
+   ],
+   "source": [
+    "https://www.nycgovparks.org/rules/section-1-03",
+    "https://codelibrary.amlegal.com/codes/newyorkcity/latest/NYCrules/0-0-0-87731"
+   ],
+   "checked": "2026-08-25",
+   "why": "Municipal land inside New York City. The five boroughs are one city and one municipality polygon, so town reads 'New York' on all of it. NYC parks are governed by 56 RCNY chapter 1; section 1-03(a)(1) states 'Persons may enter and use the parks from 6:00 a.m. until 1:00 a.m. unless other open hours are posted at any park' - an affirmative entry grant, the same footing shape as OPRHP's 9 NYCRR 375.1, and firmer than the DEC rules page that only presupposes use. Closure is the posted exception (1-03[a]). This rule asserts reachable only and deliberately does not touch fee: no rule text was found stating parks are free, even though entry is not in practice charged, so each record's own fee field keeps speaking for cost. Scoped to town='New York' precisely because the residents-only research above means no NY-wide municipal rule can exist - the city's own rules are what grant entry here, not any state doctrine.",
+   "reachable": true
+  },
+  {
+   "id": "ny-cemetery-daylight",
+   "match": {
+    "type": "cemetery"
+   },
+   "states": [
+    "NY"
+   ],
+   "siteRules": [
+    "Open during daylight hours unless posted otherwise",
+    "Quiet enjoyment; respect burials"
+   ],
+   "source": [
+    "https://codes.findlaw.com/ny/notforprofit-corporation-law/npc-sect-1510/",
+    "https://newyork.public.law/laws/n.y._not-for-profit_corporation_law_section_1510"
+   ],
+   "checked": "2026-08-25",
+   "why": "New York's parallel to cemetery-daylight. Regulated cemetery corporations sit under N-PCL article 15 and the NYS Division of Cemeteries; section 1510(b) requires every cemetery corporation to 'provide reasonable access to every lot, plot and grave', with no limit on who, and the walk-in daylight custom is the same one the Connecticut rule rests on. Honest footing note: 1510(b) is an access duty inside a survey-and-maps subsection, not a blanket public-entry grant, and the statute reaches only regulated cemetery corporations - municipal and religious grounds ride on custom alone. That is still one citation more than the CT rule carries. A cemetery posting its own hours or gating entry overrides this; the type already renders by-permission, not open-by-right.",
    "reachable": true
   }
  ]
