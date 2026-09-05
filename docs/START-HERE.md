@@ -101,6 +101,15 @@ correct.
 | `parts.mjs` | Multi-piece split loses no rings; holes drawn, not bitten out |
 | `gestures.mjs` | Zoom anchoring, twist, and drag buttons — arithmetically |
 | `shotui.mjs` | Chrome layout, by screenshot |
+| `deepclip.mjs` | The DEEP trail clip, arithmetically — a name in a list looks plausible whether or not it belongs |
+
+**`parts.mjs` is RED on `main`** as of 2026-09-05, and was red before the
+clip work — verified by stashing. It reports `rings lost in the split: 6
+of 5 survive` and cannot find the piece arrows (`got ""`). `splitParts()`
+itself conserves rings by inspection, so the likely single cause is that
+the arrows are not being found and the ring tally is therefore counting
+one piece twice. Not diagnosed. It guards real land loss, so it wants
+fixing before the next change to the multi-piece view.
 
 Setup, which the sandbox needed and a real machine mostly won't:
 
@@ -171,17 +180,40 @@ confident nonsense:
    them *with scope* — "on every marked trail here" vs "on some trails
    here". That difference is the one that gets someone in trouble.
 
-### Known limitation to fix first
+### ~~Known limitation to fix first~~ — done (v0.53.0)
 
-**The DEEP trail query is by bounding box, so it over-captures.** At
-Sleeping Giant it also pulls in the Farmington Canal Trail passing
-nearby, and that name appears under WHAT'S HERE. The activities page is
-*not* affected — it joins on `PROPERTY` name match, which is why that one
-is trustworthy.
+**The DEEP trail query was by bounding box, so it over-captured.** At
+Sleeping Giant it also pulled in the Farmington Canal Trail passing
+nearby, and that name appeared under WHAT'S HERE — with its dog, bike and
+horse rules aggregated into the park's as though they belonged to it.
 
-Fix: test each returned segment against the boundary rings rather than
-the envelope. **Do this before drawing blazed trail lines**, or the new
-feature inherits the same error visually.
+The envelope query stays, because a rectangle is the only thing the
+service can index on. What changed is that the trails now come back
+**with geometry** and are tested against the boundary rings of the piece
+on screen before anything is said about them. `pathTouchesRings()` in
+`iso.js` is the test and `clipTrails()` applies it.
+
+Three things about it that are not obvious:
+
+- **Vertices alone are not enough.** A straight segment can cross a
+  narrow park with both endpoints outside and no vertex in between, so
+  each edge is walked at a step of a four-hundredth of the box.
+  `deepclip.mjs` asserts that case specifically.
+- **Geometry is generalised to a thousandth of the box** and thrown away
+  after the clip. It is fetched only to answer "is this line in this
+  park", which is far coarser than drawing needs, and it keeps a state
+  forest's paths from arriving as megabytes.
+- **Access points are deliberately NOT clipped.** A trailhead or a boat
+  launch is very often just outside the parcel line — that is what a way
+  in is — and they are already joined to the place by DEEP's own
+  `PROPERTY` name, which is a stronger claim than geometry.
+
+No boundary means no clip, and the seam says `clipped: false` rather than
+silently keeping everything: a place whose outline could not be found is
+exactly the one where the envelope is all there is.
+
+**This was the prerequisite for drawing blazed trail lines**, which can
+now be built without inheriting the error visually.
 
 ---
 

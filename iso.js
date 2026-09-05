@@ -442,6 +442,35 @@ const EveryParkIso = (() => {
     return inside;
   }
 
+  // Does a polyline touch this place, as opposed to merely sharing a
+  // rectangle with it?
+  //
+  // A bounding box is the only thing an ArcGIS envelope query can filter
+  // on, and a park's envelope contains a great deal that is not the park.
+  // At Sleeping Giant it contains the Farmington Canal Trail, which then
+  // appeared under WHAT'S HERE as if it were a path in the park. Every
+  // rule the trail layer carries — dogs, bikes, horses — was being
+  // aggregated across those strangers too.
+  //
+  // Sampling, not vertices alone: a straight segment can cross a narrow
+  // park with both of its endpoints outside and no vertex in between, so
+  // each edge is walked at a step fine enough to land inside anything
+  // worth calling a park. `step` is in degrees and comes from the
+  // caller, which knows how big this place is.
+  function pathTouchesRings(path, rings, step) {
+    for (let i = 0; i < path.length; i++) {
+      const [x, y] = path[i];
+      if (insideRings(rings, x, y)) return true;
+      if (i + 1 >= path.length) break;
+      const [x2, y2] = path[i + 1];
+      const dx = x2 - x, dy = y2 - y;
+      const n = Math.min(64, Math.ceil(Math.hypot(dx, dy) / step));
+      for (let k = 1; k < n; k++)
+        if (insideRings(rings, x + dx * k / n, y + dy * k / n)) return true;
+    }
+    return false;
+  }
+
   // Scanline fill: O(rows × vertices) instead of testing every cell
   // against every edge — the per-cell version froze the tab for many
   // seconds on big multi-thousand-vertex boundaries like state forests.
@@ -1002,19 +1031,32 @@ const EveryParkIso = (() => {
     ["ED_CTR_MSM", "a nature centre or museum"], ["CONCESSION", "a concession"]
   ];
 
-  async function fetchDeepRules(p, bbox) {
+  // `rings` is the boundary of the piece on screen. The envelope query is
+  // what the service can index on; the rings are what the answer is
+  // actually about, and the two are not the same question.
+  async function fetchDeepRules(p, bbox, rings) {
     const [w, s, e, n] = bbox;
     const env = JSON.stringify({ xmin: w, ymin: s, xmax: e, ymax: n,
                                  spatialReference: { wkid: 4326 } });
     const base = { geometry: env, geometryType: "esriGeometryEnvelope",
                    inSR: "4326", spatialRel: "esriSpatialRelIntersects",
                    returnGeometry: "false", resultRecordCount: "400" };
+    // Trail geometry is fetched only to be thrown away after the clip, so
+    // it is generalised hard: a thousandth of the box is metres at park
+    // scale, far finer than "is this line in this park" needs, and it
+    // keeps a state forest's paths from arriving as megabytes.
+    const span = Math.max(e - w, n - s);
+    const trailGeom = rings && rings.length
+      ? { returnGeometry: "true", outSR: "4326",
+          maxAllowableOffset: String(span / 1000) }
+      : {};
     const [trails, access] = await Promise.allSettled([
       arc(DEEP_ORG + "DEEP_Trails_Set/FeatureServer/3/query",
           // Constructed only. 31 segments statewide are "Potential" —
           // trails that do not exist yet, and promising someone a path
           // that was never built is worse than saying nothing.
-          { ...base, outFields: TRAIL_FIELDS, where: "TRAILSTAT = 'Constructed'" }),
+          { ...base, ...trailGeom, outFields: TRAIL_FIELDS,
+            where: "TRAILSTAT = 'Constructed'" }),
       // Geometry, because these are also drawn on the terrain: where you
       // enter a park is half of using it, and the viewer had nothing.
       arc(DEEP_ORG + "DEEP_Property_Access_Locations/FeatureServer/0/query",
@@ -1024,7 +1066,34 @@ const EveryParkIso = (() => {
     const pts = (access.status === "fulfilled" ? access.value : [])
       .filter(f => f.geometry && f.geometry.x != null)
       .map(f => ({ a: f.attributes || {}, lng: f.geometry.x, lat: f.geometry.y }));
-    return { trails: val(trails), access: val(access), points: pts };
+    // Access points are deliberately NOT clipped. A trailhead or a boat
+    // launch is very often just outside the parcel line — that is what a
+    // way in is — and they are already tied to this place by name match
+    // on DEEP's own PROPERTY field, which is a stronger join than
+    // geometry. Trails have no such join, which is why they need one.
+    return { trails: clipTrails(trails, rings, span), access: val(access), points: pts };
+  }
+
+  // Keep the segments that touch this place; keep everything when there
+  // is no boundary to test against, because a place we could not find an
+  // outline for is exactly the one where the envelope is all there is.
+  // Reported through a seam so a harness can prove the clip fired.
+  function clipTrails(res, rings, span) {
+    const feats = res.status === "fulfilled" ? res.value : [];
+    if (!rings || !rings.length) {
+      window.__isoDeepClip = { fetched: feats.length, kept: feats.length, clipped: false };
+      return feats.map(f => f.attributes || {});
+    }
+    const step = Math.max(span / 400, 1e-6);
+    const kept = feats.filter(f => {
+      const paths = f.geometry && f.geometry.paths;
+      // No geometry means the service ignored the request; falling back
+      // to keeping it is the same answer we gave before this existed.
+      if (!paths) return true;
+      return paths.some(path => pathTouchesRings(path, rings, step));
+    });
+    window.__isoDeepClip = { fetched: feats.length, kept: kept.length, clipped: true };
+    return kept.map(f => f.attributes || {});
   }
 
   // Aggregate a permission across many segments. DEEP records these per
@@ -3345,7 +3414,8 @@ const EveryParkIso = (() => {
       // DEEP first and on its own: it is a state ArcGIS service like the
       // ones already in flight, it does not touch Overpass, and it is
       // the source most likely to actually answer.
-      const deepRaw = await fetchDeepRules(p, bbox).catch(() => null);
+      const deepRaw = await fetchDeepRules(p, bbox, boundary && boundary.rings)
+                              .catch(() => null);
       const deep = deepRaw
         ? { trails: deepRaw.trails, mine: deepMine(p, deepRaw.access) || [] }
         : null;
@@ -3911,6 +3981,8 @@ const EveryParkIso = (() => {
     loop();
   }
 
-  return { open };
+  // `_clip` is a test seam: tools/isotest/deepclip.mjs proves the trail
+  // clip on known geometry, which a screenshot cannot show.
+  return { open, _clip: { pathTouchesRings, insideRings } };
 })();
 window.EveryParkIso = EveryParkIso;
