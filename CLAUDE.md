@@ -1,5 +1,11 @@
 # EveryPark — working notes
 
+> **Read [`INTENT.md`](INTENT.md) first.** It records what this project is for
+> and what Timothy wants next, in his own words, dated. Where it disagrees with
+> this file about *direction* it is newer and wins; where it disagrees about
+> *mechanics* — how the code works, what was decided deliberately, the
+> invariants — this file wins.
+
 An interactive map of every publicly accessible outdoor place in Connecticut
 and New York. Free to host, no server, no database.
 
