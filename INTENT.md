@@ -43,10 +43,16 @@ the effort. It is the centrepiece, not a novelty beside the map.
 
 **Timothy draws the art himself, in Procreate. Icons are the big need.**
 
-Maintain an **asset need list for icons** in this repo: one entry per icon
-wanted, what it is for, where it appears, and the size and shape it has to work
-at. That list is itself a deliverable — it is what lets him sit down and draw a
-batch without having to go and work out what is missing first.
+The list lives at **[`docs/ASSETS-NEEDED.md`](docs/ASSETS-NEEDED.md)**, written
+2026-09-06: every glyph the app draws, what it means, where it shows, the size
+it has to survive, the house rules (drawn not emoji, 24-unit grid, stroke 2,
+`currentColor`, no colour of its own), and the raster-versus-vector question
+that decides how a Procreate file becomes an icon.
+
+**Keep it current.** A landed icon moves to its Done section with a date; a new
+glyph in the app gets a row in the same commit. The largest hole it found is
+that the 3D viewer fetches sixteen kinds of public building and has nothing
+distinct to draw for any of them.
 
 ## Deliberately not next
 

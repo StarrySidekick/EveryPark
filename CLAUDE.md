@@ -597,4 +597,7 @@ inside the closed menu only because it clicks via `evaluate`.
 
 - Isometric 3D park view on zoom, elevation mapped onto the polygon,
   "like a video game" (elevation is already stored — the prerequisite is done)
-- Timothy's own graphics and UI
+- Timothy's own graphics and UI — **the list to draw from is
+  [`docs/ASSETS-NEEDED.md`](docs/ASSETS-NEEDED.md)**, which inventories every
+  glyph the app draws, what it means, what size it has to work at, and the
+  sixteen public buildings the 3D viewer fetches and has nothing to draw for
