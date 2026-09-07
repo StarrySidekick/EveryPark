@@ -1,5 +1,11 @@
 # EveryPark — working notes
 
+> **Read [`INTENT.md`](INTENT.md) first.** It records what this project is for
+> and what Timothy wants next, in his own words, dated. Where it disagrees with
+> this file about *direction* it is newer and wins; where it disagrees about
+> *mechanics* — how the code works, what was decided deliberately, the
+> invariants — this file wins.
+
 An interactive map of every publicly accessible outdoor place in Connecticut
 and New York. Free to host, no server, no database.
 
@@ -591,4 +597,7 @@ inside the closed menu only because it clicks via `evaluate`.
 
 - Isometric 3D park view on zoom, elevation mapped onto the polygon,
   "like a video game" (elevation is already stored — the prerequisite is done)
-- Timothy's own graphics and UI
+- Timothy's own graphics and UI — **the list to draw from is
+  [`docs/ASSETS-NEEDED.md`](docs/ASSETS-NEEDED.md)**, which inventories every
+  glyph the app draws, what it means, what size it has to work at, and the
+  sixteen public buildings the 3D viewer fetches and has nothing to draw for
