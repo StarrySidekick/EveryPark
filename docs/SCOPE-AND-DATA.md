@@ -248,10 +248,11 @@ needs mechanisms that scale with something other than Timothy's hours:
 1. **Update the place counts in `CLAUDE.md` and `START-HERE.md`.** Both
    say 7,727. It is 24,805. Every derived percentage in both files is
    wrong, and these are the files the next session reads first.
-2. **Make evidence tier a first-class field and show it.** Not a fourth
-   colour — a stated basis on the card: cited regulation / official
-   access rating / inferred from mapped features. Cheap, honest, and it
-   converts an invisible 26% into a filterable, countable set.
+2. ~~**Make evidence tier a first-class field and show it.**~~ Done
+   2026-08-25 (`cf3be19`) — `p.evidence` (`cited`/`official`/`inferred`),
+   a stated basis on every card, three filterable legend chips with
+   counts. Checked 2026-09-08: still live, still the only split on the
+   green pins. The tier-3 hand-check below (item 3) still applies.
 3. ~~**Hand-check a random sample of 100 tier-3 greens.**~~ Done
    2026-08-25 — `docs/tier3-sample-2026-08-25.json`, seeded and
    reproducible, drawn from the post-NY-rules tier-3 population of 3,649.
@@ -266,14 +267,27 @@ needs mechanisms that scale with something other than Timothy's hours:
    watch-items surfaced: Winnapaug Farm Preserve is in Westerly RI but
    carries town "Stonington", and Boughton Park (E. Bloomfield) is a live
    example of a lawful residents-only NY park.
-4. **Write the two NY rules** — municipal parkland and cemeteries. 5,966
-   places, 89% of New York's unverified, from two citations.
-5. **Add per-record provenance** before adding any state.
-6. **Then shard**: `places-XX.json` per state, refresh split per state.
-   Do it while it is two states and reversible.
-7. **Then the Northeast**, one state at a time, rules first, measuring
-   that the existing states do not move — the discipline that held CT
-   still through the NY work, which is the reason that work is trusted.
+4. ~~**Write the two NY rules**~~ Done 2026-08-25 (`38a71ce`) — with one
+   real finding, not the two clean citations this assumed: a NY-wide
+   municipal rule turns out not to exist (Town Law 198(4), Comptroller
+   opinions 88-22/91-10, and *Friends of Van Cortlandt Park* run the
+   opposite way from *Leydon*, and that negative result is recorded in
+   `verified.json`'s own `_README`), so `ny-nyc-parks` settles the five
+   boroughs alone under NYC's own 56 RCNY 1-03(a)(1); `ny-cemetery-daylight`
+   does settle statewide. Result: NY 60% → 80% verified, all 3,554 NY
+   cemeteries and 2,982/2,983 NYC town records settled. Municipal parkland
+   outside NYC (Buffalo, Rochester, Yonkers, Syracuse named as next
+   candidates) is still amber and still needs its own research per city.
+5. ~~**Add per-record provenance**~~ Done 2026-08-25 (`b153fba`) —
+   `attrs.src`, a short fetcher token, set once in `Builder.add` and
+   unioned across both dedupe passes.
+6. ~~**Then shard**~~ Done 2026-08-25 (`260547f`) — `places-CT.json` /
+   `places-NY.json` / `places-index.json` (bbox + count per shard), the
+   state on screen rendering first.
+7. **Then the Northeast** — still not done, and per `INTENT.md`
+   (2026-09-06) deliberately not next: CT and NY only for now, New
+   England eventually. Each new state costs a rules audit and a
+   `states`-scoping pass, not just a fetch.
 
 Refill `relief` on the next refresh; it is at 49% and the 3D view wants
 it.

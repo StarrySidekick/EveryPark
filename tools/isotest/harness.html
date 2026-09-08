@@ -41,6 +41,34 @@
     }
     return Promise.reject(new Error("offline harness"));
   };
+  // The same determinism, for the one path the fetch stub above cannot
+  // reach: `loadImage()` in iso.js fetches height tiles and satellite
+  // imagery through `new Image()`, not `fetch()`, so overriding
+  // window.fetch never touched it. On a machine with real internet
+  // access — this one, unlike whatever ran the last green baseline —
+  // that meant fetchHeightSample's terrarium tiles hit the real AWS
+  // service and came back with real elevation, at real network latency,
+  // instead of failing straight into the procedural fallback this
+  // harness exists to guarantee. Two silent effects: check.mjs's tree
+  // and rim counts drifted off the documented baseline while still
+  // passing (real terrain instead of the synthetic island), and
+  // parts.mjs's piece step/wrap failed outright — fetchHeightSample is
+  // awaited before the arrow-wiring code runs, so a several-hundred-ms
+  // real fetch raced past the test's fixed waits, and the piece-switch
+  // read window.__isoPartRings while it still held the PREVIOUS piece's
+  // value, double-counting one piece and going missing on another
+  // ("rings lost in the split: 6 of 5 survive" was never a splitParts
+  // bug — splitParts conserves rings by inspection).
+  window.Image = function() {
+    let _src = "";
+    const im = { onload: null, onerror: null, crossOrigin: null,
+                 addEventListener() {}, removeEventListener() {} };
+    Object.defineProperty(im, "src", {
+      get: () => _src,
+      set: v => { _src = v; setTimeout(() => im.onerror && im.onerror(new Event("error")), 0); }
+    });
+    return im;
+  };
 </script>
 <script src="../../iso.js"></script>
 <script>

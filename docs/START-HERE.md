@@ -103,13 +103,28 @@ correct.
 | `shotui.mjs` | Chrome layout, by screenshot |
 | `deepclip.mjs` | The DEEP trail clip, arithmetically — a name in a list looks plausible whether or not it belongs |
 
-**`parts.mjs` is RED on `main`** as of 2026-09-05, and was red before the
-clip work — verified by stashing. It reports `rings lost in the split: 6
-of 5 survive` and cannot find the piece arrows (`got ""`). `splitParts()`
-itself conserves rings by inspection, so the likely single cause is that
-the arrows are not being found and the ring tally is therefore counting
-one piece twice. Not diagnosed. It guards real land loss, so it wants
-fixing before the next change to the multi-piece view.
+**`parts.mjs` was RED from 2026-09-05 until 2026-09-08 — now fixed, and
+it was never a `splitParts()` bug.** `splitParts()` conserves rings by
+inspection, exactly as suspected. The real cause: `loadImage()` in
+`iso.js` fetches height tiles through `new Image()`, not `fetch()`, so
+`harness.html`'s `window.fetch` stub — the thing that is supposed to make
+this harness offline and deterministic — never touched it. On a machine
+with real internet access, `fetchHeightSample`'s AWS terrarium-tile
+fetches went out for real and came back at real network latency (measured
+at several hundred ms, sometimes more), and that await sits *before* the
+arrow-wiring code runs. `goPart()`'s `close(); setTimeout(() =>
+open(next), 60)` left a real gap in which `window.__isoPartRings` still
+held the *previous* piece's value, so the step/wrap loop in the test —
+racing that gap against a fixed 1400ms wait — double-counted one piece
+and read `""` for the label on others. `harness.html` now stubs `Image`
+the same way it stubs `fetch`, failing every tile/imagery load straight
+into the procedural fallback the harness always claimed to guarantee.
+Confirms the same silent-success shape as everything in `CLAUDE.md`'s
+failure table: nothing crashed, the numbers just quietly stopped meaning
+what the harness said they meant. `check.mjs`'s tree/rim counts had also
+drifted off the documented baseline for the identical reason (real
+terrain instead of the synthetic island) while still passing its
+threshold checks — worth knowing if that baseline is ever revisited.
 
 Setup, which the sandbox needed and a real machine mostly won't:
 

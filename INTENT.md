@@ -29,12 +29,24 @@ hidden, just not where the effort goes.
 The reason is the release: when a stranger opens this, a green pin has to mean
 they can really go there. Breadth that dilutes that is worth less than nothing.
 
-**2. The app should show how sure the data is.**
+**2. The app should show how sure the data is. — Already shipped, 2026-08-25.**
 
-This follows directly from the above and Timothy asked for it. The ingredients
-already exist — `attrs.researched`, `attrs.sources`, `attrs.checked`, the
-rule-versus-place distinction, the amber/green split, `dormant_rules` — but a
-reader currently gets a binary where the data supports a gradient.
+This note was written as if still open; checked 2026-09-08 and it isn't. Every
+green pin already carries `p.evidence` (`cited` / `official` / `inferred`),
+derived from `attrs.researched` and `attrs.officialAccess` in `classify()`
+(`app.js`), shown as its own line on the card (`ev-official`/`ev-inferred`
+styling, "Checked by hand" / "Rated open... PAD-US, not independently checked"
+/ "Presumed public... unconfirmed"), filterable as three chips in the legend,
+and counted — see `docs/SCOPE-AND-DATA.md` §1 for the tallies this was built to
+make visible (`cf3be19`, "Say what each green pin is standing on").
+
+What that work does NOT cover, and what's still actually open: `verified.json`
+§4's separate idea of an **honest candidate tier** — a promising, boundary-and-
+elevation-having but stewardless place (1,949 of them, 10+ acres, no steward on
+record) shown as *promising* rather than flattened into the same amber as a
+parcel nobody can identify at all. That's a fourth bucket among the unverified,
+not another split of the green ones, and nobody has decided what it should say
+or look like. Left here rather than decided for him.
 
 **3. The 3D isometric view, with more detail per park.** This is where he wants
 the effort. It is the centrepiece, not a novelty beside the map.

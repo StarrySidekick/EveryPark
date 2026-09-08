@@ -342,6 +342,7 @@ Every one of these produced output that looked fine.
 | Four CT places jumped 30 km across Long Island Sound to Southold | offshore snap measured distance to the bounding BOX; Southold's box runs the length of the North Fork | snap measures distance to the nearest boundary vertex |
 | Coastal parks described by one access point as if it were the whole park | 141 sites applied one at a time; the last overwrote the first and doubled the citation | grouped per place, applied once, facilities unioned |
 | All 357 coastal sites would read as fee-charging | `Fee` is the string `"NO"`, which is truthy | flags collapsed to a list of only the YES ones, at the fetcher |
+| `parts.mjs` failed piece step/wrap; `check.mjs`'s tree/rim counts silently drifted off their documented baseline | the "offline" test harness stubs `window.fetch`, but `iso.js` loads height tiles and imagery through `new Image()` — on a machine with real internet, those went out for real, at real latency, racing the harness's fixed waits | `harness.html` stubs `Image` the same way it stubs `fetch` |
 
 **The pattern: silent success.** Nothing crashed, files stayed valid, the map
 rendered. That is why the research guard *fails the workflow* rather than
