@@ -8,6 +8,18 @@ land.
 Every number here was measured against `data/places.json` as committed at
 `ae755e6`. Nothing is estimated except where it says so.
 
+**Update, 2026-09-09: the percentages below have moved, the diagnosis has
+not.** The 60%/72% NY/CT split was re-measured off the current
+`data/places-{CT,NY}.json` and is now **80%/72%** — NY's evidence mix
+changed shape along with the number: cited research overtook PAD-US as
+its largest green tier (57% vs 28%, was 12% vs 63%), mostly from the NY
+rules `states`-scoped since this was written. CT barely moved. Current
+figures are in `docs/START-HERE.md`. **Section 1's argument still holds
+exactly as written** — green is still doing three jobs behind one colour,
+there is still no per-record provenance, and the tier-3 error rate
+measured in section 3 has not been re-run — only the table in the middle
+of it is dated. Don't quote the 60%/30%/44%/26% numbers below as current.
+
 **Headline: the dataset is much bigger than the notes say.** `CLAUDE.md`
 and `START-HERE.md` both describe 7,727 places. There are **24,805** —
 CT 8,016 and NY 16,789. Those two docs need updating; every percentage

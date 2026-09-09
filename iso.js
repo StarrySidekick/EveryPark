@@ -3164,8 +3164,19 @@ const EveryParkIso = (() => {
     const gridFor = cellM =>
       Math.max(48, Math.min(176, Math.round(spanM / cellM)));
 
+    // Elevation is real network requests via `new Image()`, which no
+    // `fetch` shim can intercept and which carries no timeout of its
+    // own — the exact `arc()` trap (line ~712) in a second place. A tile
+    // that never answers used to hang the ENTIRE terrain build forever:
+    // buildTerrain() needs heightSample, so "Loading boundary and
+    // terrain…" never went away and there was nothing to click out of.
+    // Bounded here the same way the dressing sources are: a source that
+    // does not answer in time is simply absent, and proceduralHeights()
+    // already exists as the answer for "no elevation data".
+    const HEIGHT_TIMEOUT = 15000;
     let heightSample = null;
-    try { heightSample = await fetchHeightSample(bbox); } catch (e) { /* */ }
+    try { heightSample = await withTimeout(fetchHeightSample(bbox), HEIGHT_TIMEOUT); }
+    catch (e) { /* falls through to proceduralHeights() in buildTerrain() */ }
 
     // Rings that nothing else encloses. Everything else is an inner
     // ring — a hole — and the difference between the two masks is the

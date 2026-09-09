@@ -60,9 +60,12 @@ green space, purple-coded, filterable off. Settled — don't re-litigate.
 New York was added 2026-08-07. Connecticut behaviour is unchanged and was
 held to that by measurement at every step: 0 CT places changed town, 0 CT
 places lost, CT settled at 45% at merge time, and the research audit still
-matched 52 of 52. (After the 2026-08-13 refresh the dataset is 24,805 places —
-CT 8,016 at 72% verified, NY 16,789 at 60% — see `docs/SCOPE-AND-DATA.md`
-for what those percentages actually rest on.)
+matched 52 of 52. (The 2026-08-13 refresh put the dataset at 24,805 places;
+research and a fix for misassigned records since have it at **24,201** —
+CT 7,820 at 72% verified, NY 16,381 at **80%**, current as of 2026-09-09 —
+see `docs/START-HERE.md` for the live figures and `docs/SCOPE-AND-DATA.md`
+for what a percentage like this actually rests on, which is the part that
+doesn't go stale.)
 
 **`data/municipalities.geojson` is the region.** 1,164 polygons — CT's 169
 towns plus NY's 995 towns and cities. It replaces `towns.geojson` on the
@@ -351,10 +354,14 @@ logging — a log nobody reads is the same as no check.
 
 - **Parking coverage ~6%.** OSM has only 687 public parking points statewide;
   that source is exhausted. Would need an NLCD-adjacency heuristic.
-- **8,908 places still unverified**, 5,627 with no recorded steward and 492
-  generic land trusts. The steward tail is flat — the top 100 towns cover
-  only 34% of the stewardless bucket. Measured 2026-08-24 in
-  `docs/SCOPE-AND-DATA.md`, along with what the green pins rest on.
+- **5,465 places unverified** (was 8,908; the drop is real — see below),
+  most still with no specific named steward, only a generic category. The
+  shape `docs/SCOPE-AND-DATA.md` found on 2026-08-24 — a flat tail spread
+  across hundreds of towns, no shortcut in the distribution — is likely
+  still true; it has not been re-measured since. Two of the rules it
+  proposed to shrink New York's tail (`ny-nyc-parks`, `ny-cemetery-daylight`
+  in `data/verified.json`) landed 2026-09; current top-line numbers are in
+  `docs/START-HERE.md`.
 
 ---
 
@@ -425,9 +432,9 @@ letter. Three sources, merged in this order:
    tag is an editor's assertion rather than our guess.
 2. **Wikipedia** REST summary — history, trimmed to three sentences.
 3. **The record we already hold** — always available, so the panel is
-   never empty. Most of the 24,805 places will only ever get this one.
+   never empty. Most of the 24,201 places will only ever get this one.
 
-Nothing is baked; baking 24,805 summaries by hand does not finish.
+Nothing is baked; baking 24,201 summaries by hand does not finish.
 
 **The gates exist because a wrong article is worse than none.** "Memorial
 Park" matches a hundred articles nationwide. A match that did NOT come

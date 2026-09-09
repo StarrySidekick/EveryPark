@@ -31,10 +31,23 @@ they can really go there. Breadth that dilutes that is worth less than nothing.
 
 **2. The app should show how sure the data is.**
 
-This follows directly from the above and Timothy asked for it. The ingredients
-already exist — `attrs.researched`, `attrs.sources`, `attrs.checked`, the
-rule-versus-place distinction, the amber/green split, `dormant_rules` — but a
-reader currently gets a binary where the data supports a gradient.
+**Updated 2026-09-09 — largely shipped, and it predates this file.** Every
+green pin now carries `p.evidence` (`cited` / `official` / `inferred`,
+`classify()` in `app.js`), the popup states which one it is in a full
+sentence (`basisHtml()`), and a "Verified by" filter group lets you turn
+each tier on or off independently of the plain open/permission/unverified
+split. See `docs/START-HERE.md` for the current tier counts.
+
+**What is still binary: the pin itself.** A cited CT DEEP regulation and
+an uncorroborated PAD-US rating are the identical shade of green on the
+map — you only learn which you're looking at by opening the card or by
+using the filter chips to isolate a tier. If "show how sure" means a
+glance at the map should say more than "verified/probably/unknown"
+without a click, that's the gap that's actually left — a pin treatment
+(fill pattern, dot, ring weight) keyed to `p.evidence`, not a new data
+concept. Worth confirming with Timothy which of the two he meant before
+building it, since the popup-and-filter version may already answer what
+he asked for.
 
 **3. The 3D isometric view, with more detail per park.** This is where he wants
 the effort. It is the centrepiece, not a novelty beside the map.

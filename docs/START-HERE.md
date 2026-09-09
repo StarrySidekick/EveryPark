@@ -12,21 +12,33 @@ what to do next. Read both before touching anything.
 ## What this is
 
 An interactive map of every publicly accessible outdoor place in
-Connecticut. Static site, no server, no database, free to host.
+Connecticut and New York. Static site, no server, no database, free to
+host.
 
 - **Live:** https://everypark.starrysidekick.com
 - **Repo:** `StarrySidekick/EveryPark`, GitHub Pages from `main`
-- **Now:** `v0.50.0` · dataset 24,805 places (CT 8,016 + NY 16,789) since
-  the 2026-08-13 refresh
-- **8,908 places unverified — CT is 72% verified, NY 60%.** Those two
-  percentages do not rest on the same kind of evidence: see
-  `docs/SCOPE-AND-DATA.md` (2026-08-24) before trusting either.
+- **Now:** `v0.54.0` · dataset **24,201** places (CT 7,820 + NY 16,381) as
+  shipped in `data/places-CT.json` / `data/places-NY.json`. Down from the
+  24,805 the 2026-08-13 refresh produced — `ae755e6` ("The map has 800
+  places standing in other states") removed misassigned records, and
+  research since has merged others; the shard files are the number to
+  trust, not any figure written before 2026-09.
+- **5,465 places unverified (22.6%) — CT is 72% verified, NY 80%.**
+  Measured 2026-09-09 directly off `data/places-{CT,NY}.json`, the same
+  way `docs/SCOPE-AND-DATA.md` measured 60%/72% on 2026-08-24: NY's rules
+  work since then (`38a71ce` and the OPRHP citations) moved its evidence
+  mix a long way — cited research is now NY's *largest* tier (57%, was
+  12%), not PAD-US's uncorroborated rating (28%, was 63%). CT is close to
+  unchanged (72.3%, was 72%). `docs/SCOPE-AND-DATA.md` is still right
+  about the *shape* of the problem — green doing three jobs at once,
+  behind one colour — even though its own numbers are three weeks stale;
+  read it for that, not for the percentages in its tables.
 
 **The goal, in Timothy's words:** *find a park near me, verified that it's
 a good park, go there and get all the info, a usable map for hiking and
 doing various activities there.*
 
-Read against that sentence: **find** works, **trust** is at 64%, **get
+Read against that sentence: **find** works, **trust** is at 77%, **get
 there** has just started, **use it there** is beginning. That ordering
 decides priority.
 
@@ -90,7 +102,7 @@ Two things that were true then and are still true now:
 
 ## Testing — run these before pushing any `iso.js` change
 
-Five Playwright harnesses in `tools/isotest/`. Every invariant in
+Six Playwright harnesses in `tools/isotest/`. Every invariant in
 `VISUALS.md` has been broken at least once by an edit that looked
 correct.
 
@@ -103,13 +115,35 @@ correct.
 | `shotui.mjs` | Chrome layout, by screenshot |
 | `deepclip.mjs` | The DEEP trail clip, arithmetically — a name in a list looks plausible whether or not it belongs |
 
-**`parts.mjs` is RED on `main`** as of 2026-09-05, and was red before the
-clip work — verified by stashing. It reports `rings lost in the split: 6
-of 5 survive` and cannot find the piece arrows (`got ""`). `splitParts()`
-itself conserves rings by inspection, so the likely single cause is that
-the arrows are not being found and the ring tally is therefore counting
-one piece twice. Not diagnosed. It guards real land loss, so it wants
-fixing before the next change to the multi-piece view.
+`flipdiff.mjs` is not gated — it prints a diff, not a pass/fail — and
+`sitecheck.mjs`/`sitecheck2.mjs`/`shotmock.mjs` exercise the live site and
+`tools/mapmock/` rather than the offline harness, so they need their own
+servers (see each file's own `goto()`).
+
+**`parts.mjs` was RED on `main` from 2026-09-05 to 2026-09-09 — now
+fixed.** It reported `rings lost in the split: 6 of 5 survive` and could
+not find the piece arrows after stepping. The actual cause was neither of
+those things directly: `fetchHeightSample()` (`iso.js`) loads elevation
+tiles through `new Image()`, which no `fetch()` shim can see and which
+carried no timeout of its own — the `arc()` trap this file already knows
+about, in a second place. Stepping to a second piece calls `close()` then
+re-`open()`s, and the re-open's elevation fetch could hang forever with no
+error and no fallback to `proceduralHeights()`, so the panel sat in
+"Loading boundary and terrain…" permanently and `window.__isoPartRings`
+was never updated past the first piece — read three times over the three
+steps, `2+2+2` prints as "6 of 5 survive" and the arrows genuinely
+disappear (the DOM they're read from belongs to the stuck, still-loading
+overlay). Whether this reads as a hang or as fast, wrong numbers depends
+entirely on how quickly the machine running the test gives up on the
+network request — which is exactly the kind of thing that looks like a
+different bug in every environment. Fixed two ways: `fetchHeightSample()`
+is now wrapped in the same `withTimeout()` every other dressing source
+already uses (`HEIGHT_TIMEOUT`, 15s), so a stuck elevation source can no
+longer stall the viewer in production either; and `harness.html` now also
+fails every `new Image()` load immediately, closing the gap between what
+its own "offline determinism" comment already claimed and what it
+actually did — the fetch mock was never the whole story for a renderer
+that pulls imagery straight into `<img>` elements.
 
 Setup, which the sandbox needed and a real machine mostly won't:
 
@@ -122,7 +156,11 @@ node tools/isotest/check.mjs
 `scratch.sh` needs `/tmp/epui/vendor` populated with leaflet and
 protomaps-leaflet. On a machine with network, plain `npm pack` works.
 
-Last green: `treeRatio 0.964 · smoothHoles 0 · brownRim 45122`.
+Last green: `treeRatio 0.964 · smoothHoles 0 · brownRim 45122`. These
+numbers move run to run on unchanged code — a 2026-09-09 run on the same
+`main` read `treeRatio 0.92 · smoothHoles 0 · brownRim 49765` — so compare
+the shape (holes still 0, ratio still near 0.9+) rather than the exact
+figures.
 
 ---
 
@@ -139,6 +177,15 @@ Last green: `treeRatio 0.964 · smoothHoles 0 · brownRim 45122`.
 - **`arc()` has no timeout of its own.** Every caller must bound it. A
   hung ArcGIS request used to leave the island bare with nothing saying
   why. Showing progress is what made it findable.
+- **Neither does `new Image()`, and it doesn't go through `fetch()`
+  either.** `loadImage()`/`sampleTiles()` pull elevation, satellite and
+  NDVI tiles this way, so an offline test that only mocks `fetch` is not
+  actually offline for them — and a stuck request here has no
+  `Promise.race` around it to time out on its own the way the dressing
+  sources do. This is what made `parts.mjs` red: 2026-09-09, fixed with
+  `withTimeout()` on `fetchHeightSample()` in `iso.js` and a matching
+  `Image` override in `harness.html`. If you add a new `new Image()`
+  caller, it needs both: a bound in production, a mock in the harness.
 - **Aggregate counts cannot detect "everything moved one cell."** See
   `tools/isotest/flipdiff.mjs`.
 - **Serve PMTiles with `tools/mapmock/serve.py`**, not the stock

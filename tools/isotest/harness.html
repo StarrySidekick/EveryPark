@@ -7,6 +7,19 @@
 </head>
 <body>
 <script>
+  // Elevation, satellite and NDVI tiles arrive via `new Image()`, which
+  // no fetch() shim can see — left real, this harness was not actually
+  // offline for them, and how fast a real request errors depends on
+  // whatever network the machine running the test happens to have. A
+  // proxy that lets the connection hang rather than refusing it outright
+  // turned "no elevation data" (the correct, already-handled case) into
+  // "waiting forever with nothing to say why", which is the exact
+  // un-bounded-request trap this project already knows about from arc().
+  // So every image load fails immediately too, same as every fetch below.
+  window.Image = class {
+    set src(v) { setTimeout(() => this.onerror && this.onerror(new Error("offline harness")), 0); }
+  };
+
   // Offline determinism: every fetch fails, so the viewer falls back to
   // procedural terrain and a full-square island. That exercises the whole
   // renderer without any network, which is exactly what a regression
