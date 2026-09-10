@@ -299,12 +299,34 @@ Timothy says a fact; write it into `verified.json`; publish. Two entry types:
 change upstream, locations don't.
 
 **`rules`** — match on `type` / `subtype` / `agency`, so one cited regulation
-settles hundreds of places at once. Twenty rules currently cover ~4,800 places
-(CT state land, WMAs, cemeteries, municipal open space under
-*Leydon v. Greenwich*, and named land trusts).
+settles hundreds of places at once. 22 rules currently cover 10,825 places,
+measured against `data/places.json` at the 2026-09-10 publish (CT state land,
+WMAs, cemeteries, municipal open space under *Leydon v. Greenwich*, named land
+trusts, and NY's ten Forest Preserve / DEC / OPRHP / municipal / cemetery
+rules — this count moved a great deal once New York's rules landed; don't
+trust an older number quoted anywhere else). **Give every rule a `label`** —
+one short human sentence ("Connecticut state land regulation") — because that
+string is what `verifyplaces.py` copies into every place it settles as
+`attrs.citedRule`, and the card reads it back. Write the label once, here;
+don't duplicate it into app.js.
 
 **Every entry requires `source` and `checked`.** A claim without a citation is
 a guess, and guesses are what this file exists to replace.
+
+**A place-level entry and a rule leave a different mark, and the card says
+which.** Both used to set `attrs.researched = true` identically, so "a person
+looked at this exact park" and "this park belongs to a class of land a
+regulation covers" rendered as the same sentence — the actual gap behind
+INTENT.md's "show how sure the data is". A named `places` entry now also
+stamps `attrs.citedPlace = true`; a `rules` hit stamps `attrs.citedRule =
+"<label>"`. citedPlace wins if a place happens to carry both — the more
+specific claim is the stronger one. Neither is
+recomputed client-side — a rule's label lives in `verified.json`, not in a
+second copy inside `app.js` — so a new rule only ever needs writing once. Also
+now shown, both here for the first time: `attrs.checked` as a real date plus
+"N months/years ago" (`agedLabel()` in app.js), and every URL in
+`attrs.sources` as a numbered, clickable citation (`sourcesHtml()`) — both
+fields existed in the data long before either was ever displayed.
 
 Two verdict flags, the positive and negative of the same research:
 `reachable: true` = cited proof the public can walk in free (settles the

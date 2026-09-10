@@ -1369,6 +1369,7 @@
  "rules": [
   {
    "id": "ct-state-land",
+   "label": "Connecticut state land regulation",
    "match": {
     "type": "state"
    },
@@ -1387,6 +1388,7 @@
   },
   {
    "id": "ct-wma",
+   "label": "Connecticut wildlife management area regulation",
    "match": {
     "subtype": "Wildlife Management Area"
    },
@@ -1405,6 +1407,7 @@
   },
   {
    "id": "cemetery-daylight",
+   "label": "Connecticut cemetery access custom",
    "match": {
     "type": "cemetery"
    },
@@ -1419,6 +1422,7 @@
   },
   {
    "id": "avalonia",
+   "label": "Avalonia Land Conservancy policy",
    "match": {
     "agency": "Avalonia Land Conservancy"
    },
@@ -1440,6 +1444,7 @@
   },
   {
    "id": "wyndham",
+   "label": "Wyndham Land Trust policy",
    "match": {
     "agency": "Wyndham Land Trust"
    },
@@ -1459,6 +1464,7 @@
   },
   {
    "id": "flanders",
+   "label": "Flanders Nature Center & Land Trust policy",
    "match": {
     "agency": "Flanders Nature Center"
    },
@@ -1479,6 +1485,7 @@
   },
   {
    "id": "aspetuck",
+   "label": "Aspetuck Land Trust policy",
    "match": {
     "agency": "Aspetuck Land Trust"
    },
@@ -1499,6 +1506,7 @@
   },
   {
    "id": "glastonbury",
+   "label": "Town of Glastonbury open-space policy",
    "match": {
     "agency": "Town of Glastonbury"
    },
@@ -1516,6 +1524,7 @@
   },
   {
    "id": "tnc-ct",
+   "label": "The Nature Conservancy (Connecticut) policy",
    "match": {
     "agency": "The Nature Conservancy"
    },
@@ -1535,6 +1544,7 @@
   },
   {
    "id": "ct-municipal-openspace",
+   "label": "Connecticut municipal open-space law",
    "match": {
     "agency": "City or town"
    },
@@ -1551,6 +1561,7 @@
   },
   {
    "id": "ny-forest-preserve",
+   "label": "New York Forest Preserve regulation",
    "match": {
     "subtype": "Forest Preserve",
     "agency": "NYS DEC"
@@ -1574,6 +1585,7 @@
   },
   {
    "id": "ny-forest-preserve-detached",
+   "label": "New York Forest Preserve regulation",
    "match": {
     "subtype": "Forest Preserve (detached parcel)",
     "agency": "NYS DEC"
@@ -1597,6 +1609,7 @@
   },
   {
    "id": "ny-state-forest",
+   "label": "New York state forest regulation",
    "match": {
     "subtype": "State Forest",
     "agency": "NYS DEC"
@@ -1620,6 +1633,7 @@
   },
   {
    "id": "ny-wma",
+   "label": "New York wildlife management area regulation",
    "match": {
     "subtype": "Wildlife Management Area",
     "agency": "NYS DEC"
@@ -1643,6 +1657,7 @@
   },
   {
    "id": "ny-unique-area",
+   "label": "New York DEC unique area regulation",
    "match": {
     "subtype": "Unique Area",
     "agency": "NYS DEC"
@@ -1666,6 +1681,7 @@
   },
   {
    "id": "ny-multiple-use-area",
+   "label": "New York DEC multiple use area regulation",
    "match": {
     "subtype": "Multiple Use Area",
     "agency": "NYS DEC"
@@ -1689,6 +1705,7 @@
   },
   {
    "id": "ny-oprhp-state-park",
+   "label": "New York state park regulation",
    "match": {
     "subtype": "State park",
     "agency": "State parks agency"
@@ -1711,6 +1728,7 @@
   },
   {
    "id": "ny-oprhp-recreation-area",
+   "label": "New York state recreation area regulation",
    "match": {
     "subtype": "State recreation area",
     "agency": "State parks agency"
@@ -1733,6 +1751,7 @@
   },
   {
    "id": "ny-oprhp-osm-name",
+   "label": "New York state park regulation",
    "match": {
     "agency": "New York State Office of Parks, Recreation and Historic Preservation"
    },
@@ -1754,6 +1773,7 @@
   },
   {
    "id": "ny-oprhp-osm-name-alt",
+   "label": "New York state park regulation",
    "match": {
     "agency": "State of New York Department of Parks, Recreation and Historic Preservation"
    },
@@ -1775,6 +1795,7 @@
   },
   {
    "id": "ny-nyc-parks",
+   "label": "New York City municipal parkland policy",
    "match": {
     "type": "town",
     "town": "New York"
@@ -1796,6 +1817,7 @@
   },
   {
    "id": "ny-cemetery-daylight",
+   "label": "New York cemetery access law",
    "match": {
     "type": "cemetery"
    },

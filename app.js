@@ -371,6 +371,66 @@
     return `<div class="pchecked ev-inferred">${VERDICT_SVG.unknown} Presumed public — ${what} mapped here, but access itself is unconfirmed</div>`;
   }
 
+  // How sure are we, really — the gradient Timothy asked for (2026-09-06):
+  // not a fourth colour, a stated basis. "Checked by hand" used to mean two
+  // different things worn identically: a person looked at THIS place, or a
+  // cited regulation settled a whole CLASS of land it belongs to (a state
+  // park is open because Connecticut state land is open, not because
+  // anyone looked at that one park). citedPlace/citedRule (verifyplaces.py)
+  // tell those apart; this only ever states what's already in the record —
+  // no new claim gets made here, only a truer account of the old one.
+  //
+  // "over N years/months ago" rather than a day count: nobody needs to
+  // know 39 versus 41 days, but "checked this month" versus "checked over
+  // a year ago" changes how much the number in front of it is worth.
+  function agedLabel(iso) {
+    if (!iso) return "";
+    const then = new Date(iso + "T00:00:00");
+    if (isNaN(then.getTime())) return "";
+    const days = Math.round((Date.now() - then.getTime()) / 864e5);
+    if (days < 0 || days < 21) return "";
+    const mo = Math.max(1, Math.round(days / 30));
+    if (days < 365) return `${mo} month${mo === 1 ? "" : "s"} ago`;
+    const yrs = Math.round(days / 365);
+    return `${yrs} year${yrs === 1 ? "" : "s"} ago`;
+  }
+
+  // The citation itself, as links — so "how sure is this" isn't just a
+  // label to trust, it's something you can go and check. Sources were
+  // already being recorded (verifyplaces.py) and never shown anywhere.
+  function sourcesHtml(A) {
+    const s = A.sources;
+    if (!s || !s.length) return "";
+    const links = s.map((u, i) =>
+      `<a href="${u}" target="_blank" rel="noopener">[${i + 1}]</a>`).join(" ");
+    return ` &middot; ${s.length} source${s.length === 1 ? "" : "s"} ${links}`;
+  }
+
+  function whenHtml(A) {
+    if (!A.checked) return "";
+    const aged = agedLabel(A.checked);
+    return ` &middot; ${A.checked}${aged ? ` (${aged})` : ""}`;
+  }
+
+  // The single confidence line every card carries. Four tiers, ordered by
+  // how strong the claim actually is — a specific citation for this exact
+  // place beats a regulation covering the class it belongs to, which beats
+  // an official rating nobody here has audited, which beats a guess from a
+  // mapped ballfield. Runs on amber cards too (a `private`-flagged place
+  // is still researched, just researched to be closed), which is why this
+  // isn't gated on p.status the way the old inline check was.
+  function confidenceHtml(p) {
+    const A = p.attrs || {};
+    if (A.citedPlace)
+      return `<div class="pchecked ev-place">${VERDICT_SVG.open} Checked by hand for this place` +
+        whenHtml(A) + sourcesHtml(A) + `</div>`;
+    if (A.citedRule)
+      return `<div class="pchecked ev-rule">${VERDICT_SVG.open} Covered by ${A.citedRule} &mdash; not independently checked for this place` +
+        whenHtml(A) + sourcesHtml(A) + `</div>`;
+    if (p.status !== "park") return "";   // amber already explains itself
+    return basisHtml(p);                  // official rating / inferred
+  }
+
   function feeHtml(p) {
     let out = "";
     if (p.aka && p.aka.length)
@@ -509,10 +569,7 @@
 
       ${p.status === "unverified"
         ? `<div class="pnote">${statusReason(p)}</div>` : ""}
-      ${(p.attrs && p.attrs.researched)
-        ? `<div class="pchecked">${VERDICT_SVG.open} Checked by hand${p.attrs.checked
-             ? ` · ${p.attrs.checked}` : ""}</div>`
-        : p.status === "park" ? basisHtml(p) : ""}
+      ${confidenceHtml(p)}
 
       <div class="popup-links">
         <a class="primary" href="${dir}" target="_blank" rel="noopener">${FEAT_SVG.arrow} Directions</a>
@@ -634,6 +691,16 @@
       .openOn(map);
     loadTerrain(p);
   }
+
+  // Test seam: open a card by (partial, case-insensitive) name without
+  // hunting for its marker on the map — the marks draw on one canvas, so
+  // there's nothing in the DOM for a harness to click. Same spirit as
+  // __epVisible/__epEvidence above.
+  window.__epOpenByName = q => {
+    const p = allParks.find(x => x.name && x.name.toLowerCase().includes(String(q).toLowerCase()));
+    if (p) openPlace(p);
+    return p ? p.name : null;
+  };
 
   function paintMarks() {
     const dpr = Math.min(2, window.devicePixelRatio || 1);

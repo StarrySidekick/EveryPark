@@ -64,6 +64,7 @@ def merge_additions(places, data_dir):
                  "manual": True, "src": ["manual"]}
         if a.get("source"):
             attrs["researched"] = True
+            attrs["citedPlace"] = True
             attrs["sources"] = a["source"]
         if a.get("checked"):
             attrs["checked"] = a["checked"]

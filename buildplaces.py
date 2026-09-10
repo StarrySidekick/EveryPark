@@ -968,6 +968,7 @@ def main():
                      "manual": True}
             if a.get("source"):
                 attrs["researched"] = True
+                attrs["citedPlace"] = True
                 attrs["sources"] = a["source"]
             if a.get("checked"):
                 attrs["checked"] = a["checked"]

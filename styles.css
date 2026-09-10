@@ -462,12 +462,21 @@ a.badge:hover { filter: brightness(1.15); text-decoration: underline; }
 /* Research provenance — this fact was confirmed by a person, not inferred */
 .pchecked { font-size: .7rem; color: #1d6b3f; background: #e8f4ec;
             border-radius: 3px; padding: 4px 8px; margin-top: 6px; }
-/* The other two evidence tiers. Deliberately NOT a new pin colour — the
-   basis is card-level honesty, and three greens on the map would just be
-   noise. Official keeps a cool neutral; inferred leans amber-ish text on
-   the same quiet ground so "presumed" reads as softer than "checked". */
+/* The other evidence tiers. Deliberately NOT a new pin colour — the basis
+   is card-level honesty, and four greens on the map would just be noise.
+   ev-place is the bare .pchecked green above: a person looked at THIS
+   place, the strongest claim the app makes. ev-rule is a class-level
+   citation — still cited, still green-family, but visibly softer, because
+   "this land is public by regulation" is a different claim from "someone
+   checked this exact park". Official keeps a cool neutral; inferred leans
+   amber-ish text on the same quiet ground so "presumed" reads as softer
+   than either kind of "cited". */
+.pchecked.ev-rule     { color: #5c6b1f; background: #f0f2df; }
 .pchecked.ev-official { color: #274a63; background: #e9f0f5; }
 .pchecked.ev-inferred { color: #7a5a20; background: #f6f0e2; }
+/* Source links — the citation itself, not just a claim to trust. Numbered
+   rather than named because a card is 300px wide and a URL isn't. */
+.pchecked a { color: inherit; font-weight: 700; text-decoration: underline; }
 
 /* Build badge — visible proof of which code and data are loaded. */
 /* Pinned to the actual top-right corner of the header. Sitting inline

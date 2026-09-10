@@ -118,6 +118,16 @@ def apply_verified(places, path):
             if rule.get("siteRules"):
                 A["siteRules"] = rule["siteRules"]
             A["researched"] = True
+            # Provenance: a rule settles a whole CLASS of land, which reads
+            # very differently from a person having checked this exact
+            # place. Both set "researched" (the app's existing cited/
+            # official/inferred split doesn't need to move), but the app
+            # needs to tell them apart to answer "how sure are we, really" —
+            # citedPlace (below, in the place-entry loop) is the stronger
+            # claim and wins if both apply. The sentence lives on the rule
+            # in verified.json, not in a second copy inside app.js, so a
+            # new rule only needs a label written once.
+            A["citedRule"] = rule.get("label") or rule.get("id")
             if rule.get("checked"):
                 A["checked"] = rule["checked"]
             if rule.get("source"):
@@ -212,8 +222,12 @@ def apply_verified(places, path):
             if e.get(k) is not None:
                 p[k] = e[k]
         # Provenance: the card can say this was checked by a human, and
-        # anyone auditing later can follow the citation.
+        # anyone auditing later can follow the citation. citedPlace is the
+        # strongest claim the app makes — a person looked at THIS place,
+        # not a class it belongs to — so it wins over citedRule if a
+        # category rule also happens to cover the same record.
         A["researched"] = True
+        A["citedPlace"] = True
         if e.get("source"):
             src = e["source"]
             A["sources"] = src if isinstance(src, list) else [src]
