@@ -245,13 +245,17 @@ needs mechanisms that scale with something other than Timothy's hours:
 
 ## What to do next, in order
 
-1. **Update the place counts in `CLAUDE.md` and `START-HERE.md`.** Both
-   say 7,727. It is 24,805. Every derived percentage in both files is
-   wrong, and these are the files the next session reads first.
-2. **Make evidence tier a first-class field and show it.** Not a fourth
-   colour — a stated basis on the card: cited regulation / official
-   access rating / inferred from mapped features. Cheap, honest, and it
-   converts an invisible 26% into a filterable, countable set.
+**Update, 2026-09-11: items 1, 2, 4, 5 and 6 below are done.** This section
+was never revisited after the 2026-08-24 assessment it belongs to, so it
+sat here reading as an open list for over two weeks after most of it
+closed. Struck out below rather than deleted, because the numbers next to
+each item are still the reference point for whether it actually worked.
+
+1. ~~**Update the place counts in `CLAUDE.md` and `START-HERE.md`.**~~
+   Done — both now carry 24,805 (CT 8,016 + NY 16,789).
+2. ~~**Make evidence tier a first-class field and show it.**~~ Done,
+   `cf3be19` (2026-08-25) — the "Verified by" chip row and the stated
+   basis on the card, this same day as the tier-3 sample below.
 3. ~~**Hand-check a random sample of 100 tier-3 greens.**~~ Done
    2026-08-25 — `docs/tier3-sample-2026-08-25.json`, seeded and
    reproducible, drawn from the post-NY-rules tier-3 population of 3,649.
@@ -266,11 +270,27 @@ needs mechanisms that scale with something other than Timothy's hours:
    watch-items surfaced: Winnapaug Farm Preserve is in Westerly RI but
    carries town "Stonington", and Boughton Park (E. Bloomfield) is a live
    example of a lawful residents-only NY park.
-4. **Write the two NY rules** — municipal parkland and cemeteries. 5,966
-   places, 89% of New York's unverified, from two citations.
-5. **Add per-record provenance** before adding any state.
-6. **Then shard**: `places-XX.json` per state, refresh split per state.
-   Do it while it is two states and reversible.
+4. ~~**Write the two NY rules** — municipal parkland and cemeteries.~~
+   Half landed as planned, half didn't and for a real reason. `38a71ce`
+   (2026-08-25) shipped `ny-cemetery-daylight` (all 3,510 NY cemeteries
+   now `status: park`) and `ny-nyc-parks` (2,660 of 2,661 places in the
+   five boroughs). The *general* NY municipal-parkland rule this item
+   asked for was not written, because the research for it found NY has no
+   clean equivalent to *Leydon v. Greenwich* — a residents-only precedent
+   complicates it, and Boughton Park (E. Bloomfield, found in the tier-3
+   sample above) is a live example of a lawful residents-only NY town
+   park. `ny-nyc-parks` is deliberately scoped to `town='New York'` rather
+   than forced statewide on weaker footing; its own `why` field in
+   `verified.json` says so. NY unverified is 3,300 today (measured against
+   `data/places-NY.json`, 2026-09-11) — down from the 6,688 this item was
+   written against, but the remainder is genuinely unsettled by any single
+   citation, not merely unwritten.
+5. ~~**Add per-record provenance** before adding any state.~~ Done,
+   `b153fba` — every record's `attrs.src` names the fetcher(s) that
+   produced it.
+6. ~~**Then shard**: `places-XX.json` per state, refresh split per
+   state.~~ Done, `260547f` — `data/places-CT.json`, `data/places-NY.json`
+   and `data/places-index.json` ship alongside the combined file.
 7. **Then the Northeast**, one state at a time, rules first, measuring
    that the existing states do not move — the discipline that held CT
    still through the NY work, which is the reason that work is trusted.

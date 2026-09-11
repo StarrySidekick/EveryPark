@@ -29,15 +29,19 @@ hidden, just not where the effort goes.
 The reason is the release: when a stranger opens this, a green pin has to mean
 they can really go there. Breadth that dilutes that is worth less than nothing.
 
-**2. The app should show how sure the data is.**
-
-This follows directly from the above and Timothy asked for it. The ingredients
-already exist — `attrs.researched`, `attrs.sources`, `attrs.checked`, the
-rule-versus-place distinction, the amber/green split, `dormant_rules` — but a
-reader currently gets a binary where the data supports a gradient.
+**2. ~~The app should show how sure the data is.~~ — done, and done before
+this file was written.** `cf3be19` (2026-08-25) already split green into
+three stated tiers — cited research, PAD-US rating, inferred from a mapped
+feature — with a "Verified by" chip row that makes each one filterable and
+countable. This paragraph was carried into this file eleven days after it
+landed; it should have been struck out the day it was written. Left here so
+the next session doesn't rediscover it as open.
 
 **3. The 3D isometric view, with more detail per park.** This is where he wants
 the effort. It is the centrepiece, not a novelty beside the map.
+2026-09-11: the trail lines it draws finally carry the state's own paint
+colour (see START-HERE.md, "Blazed trail lines from DEEP") — still open:
+pre-baked terrain, adjacency, a scale bar, the context margin.
 
 ## Assets: a standing job
 

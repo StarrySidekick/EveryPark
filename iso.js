@@ -7,7 +7,8 @@
 
    - Boundary: point-in-polygon against CT DEEP / OSM mirrors / PAD-US.
    - Elevation: AWS Terrain Tiles (terrarium); procedural fallback.
-   - Trails (OSM + Blue-Blazed) as worn tan paths; water flattened blue.
+   - Trails: OSM paths in worn tan, Blue-Blazed System segments in DEEP's
+     own per-segment blaze colour (blazeColorOf); water flattened blue.
    - Roads, buildings and parking lots from one Overpass query: roads
      asphalt grey, buildings extruded blocks, parking pads marked.
    - Sport courts from the OSM leisure layer, sport-coloured with a
@@ -649,6 +650,33 @@ const EveryParkIso = (() => {
     return { roads, buildings, parking, publics };
   }
 
+  // The Blue-Blazed Hiking Trail System is CFPA's statewide network, and
+  // DEEP's own layer for it carries the real paint colour per segment in
+  // Map_Color -- not the descriptive Blaze string ("CFPA Blue Rectangle")
+  // but a value meant for cartography: mostly plain CSS colour words
+  // (Red, Yellow, Blue, Orange, Green, Purple, Black, Pink, Violet), Gray
+  // standing in for a white blaze that would vanish against pale ground,
+  // and the flagship Blue trail carrying its own hex (#00CCFF). Fetched
+  // live 2026-09-11: 351 segments, all but a handful of one-off
+  // multicolour splits covered by those eleven values. Trust the
+  // agency's own cartographic colour rather than re-deriving one from
+  // the Blaze description -- it is the value DEEP itself draws with.
+  //
+  // This is a different DEEP layer from DEEP_Trails_Set (fetchDeepRules,
+  // below), whose TRAILMARK already names the blaze in the WHAT'S HERE
+  // text. That layer is fetched with returnGeometry only when rules ask
+  // for it and its geometry is thrown away after the clip -- it was
+  // never meant to be drawn. This one is drawn, and the two agree by
+  // construction: the same trail earns the same colour in both places
+  // because both ultimately describe the same paint on the same tree.
+  function blazeColorOf(feat) {
+    const raw = feat && feat.attributes && feat.attributes.Map_Color;
+    if (!raw) return null;
+    const s = String(raw).trim();
+    if (!s || /^none$/i.test(s)) return null;
+    return s;
+  }
+
   // ---- Trails + water + courts (ArcGIS) + Overpass extras ---------
   // Fetch once, keep the raw geometry; rasterising to the current grid
   // is a separate step so the block-size slider can rebuild instantly.
@@ -695,8 +723,12 @@ const EveryParkIso = (() => {
       [arc(OSM6 + "OSM_NA_Trails/FeatureServer/0/query",
            { ...common, where: "highway IN ('path','track','bridleway')" }),
        v => { raw.trailFeats = raw.trailFeats.concat(v); }],
+      // Map_Color rides along on purpose: this layer is the state's own
+      // curated Blue-Blazed system, and it already carries the paint
+      // colour per segment. See blazeColorOf() for what that field
+      // actually contains.
       [arc(DEEP + "BlueBlazedHikingTrails/FeatureServer/0/query",
-           { ...common, where: "1=1" }),
+           { ...common, where: "1=1", outFields: "Blaze,Map_Color" }),
        v => { raw.trailFeats = raw.trailFeats.concat(v); }],
       [arc(OSM6 + "OSM_NA_Water/FeatureServer/0/query", { ...common, where: "1=1" }),
        v => { raw.waterRings = ringsOf(v); }],
@@ -1368,7 +1400,13 @@ const EveryParkIso = (() => {
       return false;
     };
     const out = [];
-    for (const f of features)
+    for (const f of features) {
+      // The blaze belongs to the FEATURE, not the run -- read it once per
+      // feature and stamp every run its geometry produces. A run is an
+      // array, which is an object, so it can carry the colour as a
+      // property without changing what every existing reader of [gx, gy,
+      // cum] sees.
+      const color = blazeColorOf(f);
       for (const path of (f.geometry && f.geometry.paths) || []) {
         let run = [];
         for (const [x, y] of path) {
@@ -1380,10 +1418,11 @@ const EveryParkIso = (() => {
             const cum = prev
               ? prev[2] + Math.hypot(gx - prev[0], gy - prev[1]) : 0;
             run.push([gx, gy, cum]);
-          } else { if (run.length > 1) out.push(run); run = []; }
+          } else { if (run.length > 1) { run.color = color; out.push(run); } run = []; }
         }
-        if (run.length > 1) out.push(run);
+        if (run.length > 1) { run.color = color; out.push(run); }
       }
+    }
     return out;
   }
 
@@ -1391,6 +1430,9 @@ const EveryParkIso = (() => {
   // GRID space, dropping the gaps of a dash pattern. Short pieces are
   // what stop a long road being clipped by terrain drawn after it, and
   // grid space is what lets each piece be draped on the ground later.
+  // A piece carries its line's colour as a 5th slot -- undefined for
+  // everything that isn't a real blaze, which is what makes drawRibbon's
+  // fallback to the plain trail colour automatic rather than a branch.
   function pathPieces(lines, dash) {
     const out = [];
     for (const line of lines || [])
@@ -1406,7 +1448,7 @@ const EveryParkIso = (() => {
             if (phase >= dash[0]) continue;
           }
           out.push([x1 + (x2 - x1) * f0, y1 + (y2 - y1) * f0,
-                    x1 + (x2 - x1) * f1, y1 + (y2 - y1) * f1]);
+                    x1 + (x2 - x1) * f1, y1 + (y2 - y1) * f1, line.color]);
           if (out.length > 9000) return out;
         }
       }
@@ -2235,6 +2277,32 @@ const EveryParkIso = (() => {
     const roadEdge = (() => { const c = tod(104, 104, 104); return `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`; })();
     const pxPerGrid = s * 1.55;
 
+    // Resolve a blaze's CSS colour word (or hex) to the same time-of-day
+    // shading every other ground colour gets, so a Blue trail at dusk
+    // reads as dusk rather than as a raw saturated swatch pasted over it.
+    // A 1x1 canvas is the only way to ask the browser what a CSS colour
+    // string actually is without hand-maintaining a colour-name table --
+    // there are at most a handful of distinct Map_Color values on screen
+    // at once, so this runs a handful of times per scene build, not per
+    // ribbon piece.
+    const blazeCache = new Map();
+    const blazeCol = (raw) => {
+      if (blazeCache.has(raw)) return blazeCache.get(raw);
+      let out = null;
+      try {
+        const pc = document.createElement("canvas");
+        pc.width = 1; pc.height = 1;
+        const pctx = pc.getContext("2d");
+        pctx.fillStyle = raw;
+        pctx.fillRect(0, 0, 1, 1);
+        const d = pctx.getImageData(0, 0, 1, 1).data;
+        const c = tod(d[0], d[1], d[2]);
+        out = `rgb(${c[0] | 0},${c[1] | 0},${c[2] | 0})`;
+      } catch (e) { out = null; }
+      blazeCache.set(raw, out);
+      return out;
+    };
+
     // A ribbon DRAPED on the ground: widened perpendicular in grid space,
     // then every corner projected at its own terrain height, so it hugs
     // the slope instead of hovering.
@@ -2259,7 +2327,11 @@ const EveryParkIso = (() => {
           ctx.strokeStyle = fill; ctx.lineWidth = 1; ctx.stroke();
         };
         if (kind === "road") { band(0.34, roadEdge); band(0.22, roadCol); }
-        else band(0.24, trailCol);
+        // pc[4] is the piece's blaze colour, carried from pathPieces();
+        // undefined for everything that isn't a real DEEP blaze, which
+        // is what makes this fall back to the plain trail colour with
+        // no branch of its own.
+        else band(0.24, (pc[4] && blazeCol(pc[4])) || trailCol);
       }
     };
 
@@ -3983,6 +4055,7 @@ const EveryParkIso = (() => {
 
   // `_clip` is a test seam: tools/isotest/deepclip.mjs proves the trail
   // clip on known geometry, which a screenshot cannot show.
-  return { open, _clip: { pathTouchesRings, insideRings } };
+  return { open, _clip: { pathTouchesRings, insideRings },
+            _blaze: { blazeColorOf, linesFrom, pathPieces } };
 })();
 window.EveryParkIso = EveryParkIso;

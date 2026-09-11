@@ -16,8 +16,8 @@ Connecticut. Static site, no server, no database, free to host.
 
 - **Live:** https://everypark.starrysidekick.com
 - **Repo:** `StarrySidekick/EveryPark`, GitHub Pages from `main`
-- **Now:** `v0.50.0` · dataset 24,805 places (CT 8,016 + NY 16,789) since
-  the 2026-08-13 refresh
+- **Now:** `v0.54.0` · dataset 24,805 places (CT 8,016 + NY 16,789) since
+  the 2026-09-01 refresh
 - **8,908 places unverified — CT is 72% verified, NY 60%.** Those two
   percentages do not rest on the same kind of evidence: see
   `docs/SCOPE-AND-DATA.md` (2026-08-24) before trusting either.
@@ -90,9 +90,10 @@ Two things that were true then and are still true now:
 
 ## Testing — run these before pushing any `iso.js` change
 
-Five Playwright harnesses in `tools/isotest/`. Every invariant in
-`VISUALS.md` has been broken at least once by an edit that looked
-correct.
+Seven Playwright harnesses in `tools/isotest/` (the "Five" this used to say
+was already stale before this edit — count the table, not the prose).
+Every invariant in `VISUALS.md` has been broken at least once by an edit
+that looked correct.
 
 | Harness | Guards |
 |---|---|
@@ -102,6 +103,7 @@ correct.
 | `gestures.mjs` | Zoom anchoring, twist, and drag buttons — arithmetically |
 | `shotui.mjs` | Chrome layout, by screenshot |
 | `deepclip.mjs` | The DEEP trail clip, arithmetically — a name in a list looks plausible whether or not it belongs |
+| `blaze.mjs` | The real `Map_Color` vocabulary parses correctly, and survives `linesFrom`/`pathPieces` onto a drawn ribbon piece |
 
 **`parts.mjs` is RED on `main`** as of 2026-09-05, and was red before the
 clip work — verified by stashing. It reports `rings lost in the split: 6
@@ -296,16 +298,36 @@ can be tested, which is the whole reason to move.**
 - Then the 2023 parcel layer (as a *candidate* generator, not places) and
   the CLCC land-trust directory.
 
-### 2. Blazed trail lines from DEEP
+### 2. ~~Blazed trail lines from DEEP~~ — the colour half landed (v0.54.0)
 
-The largest usefulness gain left in the viewer, and the data is *already
-being fetched* for the rules. `TRAILMARK` gives the real blaze — Sleeping
-Giant alone has 22. A line you can match to the paint on the tree is the
-most navigationally useful thing this could show. Also distinguish
-`TRAILCLASS` (drawing a sidewalk like a woodland trail is misleading) and
-`TRAILSURF` (decides whether a pushchair can go).
+Fixed the bbox over-capture first (v0.53.0, `pathTouchesRings`/`clipTrails`).
 
-Fix the bbox over-capture first.
+The line actually drawn on the terrain never came from `TRAILMARK` — it
+comes from a *different* DEEP layer, `BlueBlazedHikingTrails` (the state's
+curated CFPA system), fetched for geometry all along but with
+`outFields: ""`, so every segment drew in one uniform tan whatever DEEP
+called it. That layer carries its own `Map_Color` field — the literal
+colour DEEP draws the trail in on its own maps, mostly plain CSS words
+(Red, Yellow, Blue, Orange, Green, Purple, Black, Pink, Violet), `Gray`
+standing in for a white blaze that would vanish on pale ground, and the
+flagship Blue trail carrying its own hex. `blazeColorOf()` reads it,
+`linesFrom()`/`pathPieces()` carry it from feature to drawn ribbon piece,
+and `drawRibbon()` resolves it to the same time-of-day shading every other
+ground colour gets (a 1x1-canvas CSS-colour probe, memoized — there are
+never more than a handful of distinct colours on screen). Verified against
+the real service 2026-09-11: 351 segments, the vocabulary above covers all
+but a handful of one-off multicolour splits. `tools/isotest/blaze.mjs`
+asserts the vocabulary and the colour surviving both hops, offline and
+deterministic; a manual offline render with an injected red segment showed
+it as a visibly distinct dashed red line against the ordinary tan, screenshot
+checked by eye.
+
+**Still open:** `TRAILMARK`/`TRAILCLASS`/`TRAILSURF` from `DEEP_Trails_Set`
+already name the blaze, surface and class in the WHAT'S HERE text (the two
+DEEP layers agree by construction — same trail, same paint) but nothing yet
+distinguishes trail *width or dash* by class — a paved Bike Route still
+draws with the same ribbon as a singletrack hiking trail. That is the next
+slice of this, not a new feature.
 
 ### 3. Pre-baked terrain
 
