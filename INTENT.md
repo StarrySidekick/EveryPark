@@ -29,15 +29,25 @@ hidden, just not where the effort goes.
 The reason is the release: when a stranger opens this, a green pin has to mean
 they can really go there. Breadth that dilutes that is worth less than nothing.
 
-**2. The app should show how sure the data is.**
-
-This follows directly from the above and Timothy asked for it. The ingredients
-already exist — `attrs.researched`, `attrs.sources`, `attrs.checked`, the
-rule-versus-place distinction, the amber/green split, `dormant_rules` — but a
-reader currently gets a binary where the data supports a gradient.
+**2. ~~The app should show how sure the data is.~~ — already done, and done
+before this file was written.** Checked 2026-09-13: `p.evidence` (`cited` /
+`official` / `inferred`) has been on every green pin since 2026-08-25
+(`cf3be19`, "Say what each green pin is standing on") — a stated basis on the
+card (`basisHtml()` in `app.js`), three filter chips, and a test seam
+(`window.__epEvidence`). This item was carried over stale from the audit that
+asked for it; the gradient it wanted is live. What is NOT done, and is a real
+next step if this is revisited: `docs/SCOPE-AND-DATA.md` §1 still wants an
+honest *candidate* tier above plain "inferred" for the 1,949 stewardless
+places over 10 acres with boundaries and elevation but no citation — those
+are not equivalent to a quarter-acre parcel nobody can identify, and the map
+currently treats them the same.
 
 **3. The 3D isometric view, with more detail per park.** This is where he wants
-the effort. It is the centrepiece, not a novelty beside the map.
+the effort. It is the centrepiece, not a novelty beside the map. A north
+arrow and scale bar landed 2026-09-13 (the view "rotates freely with nothing
+to say which way is north" — noted in `docs/START-HERE.md` §4 — is fixed);
+still open there: the context margin (parks currently end in a cliff),
+pre-baked terrain, and adjacency between neighbouring parks.
 
 ## Assets: a standing job
 

@@ -2819,6 +2819,80 @@ const EveryParkIso = (() => {
     ctx.font = "11px system-ui";
     ctx.textAlign = "center";
     ctx.fillText(`${Math.round(min)}\u2013${Math.round(max)} m`, W / 2, Hh - 10);
+
+    // A compass and a scale bar \u2014 the view rotates freely and zooms
+    // freely, and until now nothing on screen said which way was north
+    // or how big a block was. Both are drawn top/bottom-CENTRE for the
+    // same reason the elevation text is: the four corners are all
+    // spoken for by HTML buttons (see iso-corner-* in styles.css), and
+    // the centre is the one strip of the canvas nothing else claims.
+    //
+    // North is derived from the SAME cos/sin the terrain itself is
+    // projected with (not recomputed some other way), so the arrow can
+    // never disagree with the ground it is standing on. World north is
+    // the grid's -y direction (gridToLL: gy=0 is the bbox's northern
+    // edge), rotated through project()'s own x/y foreshortening
+    // (1.55 / .8) so the needle's screen angle matches how a real
+    // compass line drawn on the terrain would foreshorten as it turns.
+    {
+      const nx = sin * 1.55, ny = -cos * .8;
+      const ang = Math.atan2(ny, nx);
+      S._northAngle = ang;          // test seam: tools/isotest/compass.mjs
+      const ccx = W / 2, ccy = 30, r = 13;
+      ctx.save();
+      ctx.translate(ccx, ccy);
+      ctx.fillStyle = "rgba(20,24,20,.5)";
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+      ctx.rotate(ang + Math.PI / 2);   // the needle below points "up" at ang=-PI/2
+      ctx.beginPath();
+      ctx.moveTo(0, -r + 3); ctx.lineTo(4, 4); ctx.lineTo(0, 1); ctx.lineTo(-4, 4);
+      ctx.closePath();
+      ctx.fillStyle = "#e0483a";
+      ctx.fill();
+      ctx.restore();
+      ctx.fillStyle = "rgba(255,255,255,.9)";
+      ctx.font = "bold 9px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText("N", ccx, ccy - r - 4);
+    }
+
+    // The scale bar measures along whichever WORLD axis (east or north)
+    // is currently closer to horizontal on screen, rather than always
+    // reading the same fixed screen direction \u2014 the projection is not
+    // isometric (x is stretched 1.55x, depth compressed to .8x), so a
+    // bar that always meant "one block east" would silently read wrong
+    // once the island had turned a quarter-circle towards you.
+    {
+      const mPerBlock = S.mPerBlock || 10;
+      const eastDx = cos * s * 1.55, eastDy = sin * s * .8;
+      const northDx = sin * s * 1.55, northDy = -cos * s * .8;
+      const eastLen = Math.hypot(eastDx, eastDy), eastFlat = Math.abs(eastDy) / (eastLen || 1);
+      const northLen = Math.hypot(northDx, northDy), northFlat = Math.abs(northDy) / (northLen || 1);
+      const pxPerBlock = eastFlat <= northFlat ? eastLen : northLen;
+      const pxPerMeter = pxPerBlock / mPerBlock;
+      if (pxPerMeter > 0 && isFinite(pxPerMeter)) {
+        const targetPx = Math.max(50, Math.min(140, W * .12));
+        const rawM = targetPx / pxPerMeter;
+        const mag = Math.pow(10, Math.floor(Math.log10(Math.max(rawM, 1e-6))));
+        const norm = rawM / mag;
+        const niceM = (norm < 1.5 ? 1 : norm < 3.5 ? 2 : norm < 7.5 ? 5 : 10) * mag;
+        S._scaleMeters = niceM;    // test seam
+        const barPx = niceM * pxPerMeter;
+        const label = niceM >= 1000 ? `${(niceM / 1000).toFixed(niceM % 1000 ? 1 : 0)} km`
+                                     : `${Math.round(niceM)} m`;
+        const bx0 = W / 2 - barPx / 2, by = Hh - 30;
+        ctx.strokeStyle = "rgba(255,255,255,.85)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(bx0, by - 4); ctx.lineTo(bx0, by); ctx.lineTo(bx0 + barPx, by);
+        ctx.lineTo(bx0 + barPx, by - 4);
+        ctx.stroke();
+        ctx.fillStyle = "rgba(255,255,255,.9)";
+        ctx.font = "10px system-ui";
+        ctx.textAlign = "center";
+        ctx.fillText(label, W / 2, by - 6);
+      }
+    }
   }
 
   // The scene only changes when the view or the settings change, but the

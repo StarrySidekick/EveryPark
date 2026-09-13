@@ -583,6 +583,38 @@ button must stay **visible**, and it finds the smooth toggle by
 `.iso-tool` with textContent exactly `Smooth` — which still works from
 inside the closed menu only because it clicks via `evaluate`.
 
+### North arrow and scale bar (v0.54.0)
+
+Both are drawn on the canvas itself, top/bottom-**centre**, for the same
+reason the elevation readout is: the four corners are all spoken for by
+HTML buttons, and centre is the one strip nothing else claims. Both are
+baked into `renderScene()`'s offscreen cache like everything else in it, so
+they update whenever the view's own signature changes — which already
+includes yaw — rather than needing a repaint path of their own.
+
+**The needle is derived from the same `cos`/`sin` the terrain itself is
+projected with**, never recomputed a second way — so it cannot disagree
+with the ground under it. World north is the grid's `-y` direction
+(`gridToLL`: `gy=0` is the bbox's northern edge); rotate that through
+`yaw` and then through `project()`'s own x/depth foreshortening (1.55x /
+.8x) and you have the needle's screen angle. `S._northAngle` is a test
+seam carrying that value, checked in `tools/isotest/compass.mjs` against
+an independently-computed expectation at several yaws — a compass that
+points the wrong way looks exactly like a correct one in a still
+screenshot, the same trap `gestures.mjs` exists for.
+
+**The scale bar cannot read one fixed screen direction, because the
+projection is not isometric.** x is stretched 1.55x and depth compressed
+to .8x, so "one block" is a different number of screen pixels depending on
+which way it's pointing *and* on the current rotation. It measures along
+whichever world axis — east or north — currently lands closer to
+horizontal on screen, picked by comparing how much each foreshortens
+vertically at this yaw. Get this wrong and the bar is fine at yaw 0 and
+silently wrong a quarter-turn later, which is exactly the shape of bug
+this file keeps warning about. The distance shown is rounded to the
+classic 1/2/5-per-decade map-scale ladder rather than whatever pixel count
+falls out, via `S._scaleMeters` (also a test seam).
+
 ## Conventions
 
 - Comments explain **why**, not what — especially the non-obvious constraint

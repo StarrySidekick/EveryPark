@@ -102,6 +102,7 @@ correct.
 | `gestures.mjs` | Zoom anchoring, twist, and drag buttons — arithmetically |
 | `shotui.mjs` | Chrome layout, by screenshot |
 | `deepclip.mjs` | The DEEP trail clip, arithmetically — a name in a list looks plausible whether or not it belongs |
+| `compass.mjs` | North-arrow angle vs. yaw, and that the scale bar lands on a round distance |
 
 **`parts.mjs` is RED on `main`** as of 2026-09-05, and was red before the
 clip work — verified by stashing. It reports `rings lost in the split: 6
@@ -321,10 +322,22 @@ Compute at build time which places share a boundary, and say so:
 *"continues into Higby Mountain Preserve"*. **No other map tells you that
 the town park behind the school connects to 400 acres of state forest.**
 
+~~A scale bar and north arrow~~ — done 2026-09-13: `renderScene()` in
+`iso.js` draws both, top/bottom-centre (the four corners are all spoken for
+by HTML buttons). The needle is derived from the same cos/sin the terrain
+itself is projected with, so it cannot disagree with the ground it's
+standing on; the scale bar measures along whichever world axis (east or
+north) is currently closer to horizontal on screen, because the projection
+foreshortens x and depth differently (1.55x / .8x) and a bar that always
+read one fixed screen direction would go quietly wrong a quarter-turn in.
+Checked arithmetically in `tools/isotest/compass.mjs` (angle at several
+yaws against an independently-computed expectation, plus that the chosen
+distance lands on the 1/2/5 map-scale ladder) and by eye in
+`tools/isotest/shotui.mjs`'s screenshots.
+
 Also still open: the **context margin** (parks currently end in a cliff),
-a scale bar and north arrow (the view rotates freely with nothing to say
-which way is north), verification corroboration counts, a
-report-a-problem link, and freshness ageing.
+verification corroboration counts, a report-a-problem link, and freshness
+ageing.
 
 ---
 
