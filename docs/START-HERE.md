@@ -90,7 +90,7 @@ Two things that were true then and are still true now:
 
 ## Testing — run these before pushing any `iso.js` change
 
-Five Playwright harnesses in `tools/isotest/`. Every invariant in
+Six Playwright harnesses in `tools/isotest/`. Every invariant in
 `VISUALS.md` has been broken at least once by an edit that looked
 correct.
 
@@ -102,14 +102,17 @@ correct.
 | `gestures.mjs` | Zoom anchoring, twist, and drag buttons — arithmetically |
 | `shotui.mjs` | Chrome layout, by screenshot |
 | `deepclip.mjs` | The DEEP trail clip, arithmetically — a name in a list looks plausible whether or not it belongs |
+| `evidence.mjs` | The RULES page states all three evidence tiers (cited / official / inferred), and the non-park sentence is unchanged |
 
-**`parts.mjs` is RED on `main`** as of 2026-09-05, and was red before the
-clip work — verified by stashing. It reports `rings lost in the split: 6
-of 5 survive` and cannot find the piece arrows (`got ""`). `splitParts()`
-itself conserves rings by inspection, so the likely single cause is that
-the arrows are not being found and the ring tally is therefore counting
-one piece twice. Not diagnosed. It guards real land loss, so it wants
-fixing before the next change to the multi-piece view.
+~~**`parts.mjs` is RED on `main`**~~ — green again as of 2026-09-15
+(`rings lost` reported as `5 of 5 survive`, arrows found on every run,
+three repeats to rule out flakiness). It was red as of 2026-09-05, and no
+commit since has touched `splitParts()`, `harness.html` or `parts.mjs`
+itself (checked with `git log -S`), so whatever produced the red result
+that day did not survive it — most likely a timing race in the test's own
+`waitForTimeout` calls in a slower sandbox, not a bug in the split. Left
+here rather than deleted, because a test flipping colour with no code
+change behind it is itself worth knowing if it happens again.
 
 Setup, which the sandbox needed and a real machine mostly won't:
 

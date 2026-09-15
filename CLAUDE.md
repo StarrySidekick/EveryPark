@@ -187,7 +187,7 @@ Static site plus batch ETL. No server, no database, no runtime API calls.
 |---|---|
 | `index.html` | Skeleton, filter chips, legend, guide |
 | `config.js` | All tunable knobs: colours, categories, exclusions, versions |
-| `app.js` | The application (~2,600 lines) |
+| `app.js` | The application (~3,600 lines) |
 | `vectorlayers.js` | Tile rendering and polygon clicks |
 | `styles.css` | Presentation |
 

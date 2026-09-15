@@ -1328,10 +1328,23 @@ const EveryParkIso = (() => {
     if (no.length) rules.push(`Not allowed: ${no.join(", ")}.`);
     if (t.access === "permit") { rules.push("A permit is wanted."); ruleSrc = "OpenStreetMap"; }
     if (t.access === "private") { rules.push("Mapped as private."); ruleSrc = "OpenStreetMap"; }
+    // The same three-tier basis the 2D card states (basisHtml in
+    // app.js) — cited, an official rating nobody here has audited, or a
+    // pure inference from what is mapped. The viewer used to say nothing
+    // at all for the middle two, which is most of what is green: a park
+    // whose only line here was "No posted hours recorded" read as if
+    // access itself had been checked, when only its facilities had.
     if (a.researched && a.checked)
       rules.push(`Access confirmed ${a.checked} against ${
         (a.sources && a.sources.length) ? "a published source" : "our own research"}.`);
-    else if (p.status !== "park")
+    else if (p.evidence === "official")
+      rules.push("Rated open to the public in USGS PAD-US — not independently checked.");
+    else if (p.status === "park") {
+      const what = a.trails ? "trails" : a.beach ? "a beach" : a.pool ? "a pool"
+                 : a.sports ? "sports fields" : a.playground ? "a playground"
+                 : a.parking ? "parking" : "facilities";
+      rules.push(`Presumed public — ${what} mapped here, but access itself is unconfirmed.`);
+    } else
       rules.push("We have not confirmed public access here — treat it as unknown.");
     if (!t.opening_hours) rules.push("No posted hours recorded.");
     if (!t.dog && !dog) rules.push("Nothing recorded about dogs.");
