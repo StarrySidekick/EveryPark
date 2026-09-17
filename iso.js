@@ -2106,6 +2106,13 @@ const EveryParkIso = (() => {
   // wall shading made the hem look noisy and flickery as it rotated.
   const WALL = [88, 76, 60];
 
+  // Screen-space direction of north at a given yaw, for the compass badge.
+  // North in grid space is decreasing gy (row 0 = north, see
+  // coverGridFrom above) — a pure function so tools/isotest/northarrow.mjs
+  // can assert it against the real projection instead of trusting that a
+  // hand-fitted angle stayed in sync with a rotation this file changes.
+  const northDir = yaw => [Math.sin(yaw), -Math.cos(yaw)];
+
   function renderScene(canvas, S, yaw) {
     const { H, inside, trailM, waterM, roadM, buildM, parkM, courtM,
             dropM, edge, p, spriteAt, tex, coverM, holeM } = S;
@@ -2808,6 +2815,35 @@ const EveryParkIso = (() => {
         ctx.moveTo(lx, ly + fs * .35); ctx.lineTo(lx, lyG);
         ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = 1; ctx.stroke();
       }
+    }
+
+    // North arrow, bottom-centre, stacked above the elevation range. The
+    // view rotates freely with nothing else to say which way is north, so
+    // a park with a road on its east side used to look identical to one
+    // with the road on its west side once you had spun it. The needle is
+    // computed off the SAME cos/sin that places every roof and tree \u2014
+    // not a hand-fitted angle \u2014 so it can never drift out of sync with
+    // the terrain under it. It ignores the 1.55/.8 anisotropic scale in
+    // `project()`: a compass reads as a circle, not the ground's skew.
+    {
+      const [northDX, northDY] = northDir(yaw);
+      const r = 13, ax = W / 2, ay = Hh - 48;
+      ctx.save();
+      ctx.translate(ax, ay);
+      ctx.strokeStyle = "rgba(255,255,255,.5)";
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-northDX * r * .55, -northDY * r * .55);
+      ctx.lineTo(northDX * r, northDY * r);
+      ctx.strokeStyle = "rgba(217,164,65,.95)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = "rgba(255,255,255,.85)";
+      ctx.font = "10px system-ui";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText("N", northDX * (r + 9), northDY * (r + 9));
+      ctx.restore();
     }
 
     // The elevation range sits bottom-CENTRE. It was bottom-left until
@@ -3849,6 +3885,10 @@ const EveryParkIso = (() => {
     window.__isoPartRings = parts ? parts[partIndex].rings.length
                                   : (boundary ? boundary.rings.length : 0);
     window.__isoSetYaw = v => { yaw = target = v; draw(canvas, S, yaw); };
+    // tools/isotest/northarrow.mjs: the compass has to be checked against
+    // the REAL projection, not against the same formula that draws it.
+    window.__isoNorthDir = northDir;
+    window.__isoGrid = () => GRID;
     // tools/isotest/gestures.mjs needs to see the rotation TARGET, not
     // the eased yaw — a twist is judged by what it asked for, and the
     // easing would otherwise hide a wrong sign behind a slow approach.
