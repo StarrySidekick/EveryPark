@@ -36,6 +36,16 @@ already exist — `attrs.researched`, `attrs.sources`, `attrs.checked`, the
 rule-versus-place distinction, the amber/green split, `dormant_rules` — but a
 reader currently gets a binary where the data supports a gradient.
 
+**The UI half shipped 2026-09-18**: the "Can I go?" and "Verified by" filter
+chips now carry live counts (`Checked by hand · 4,822`, and so on — previously
+present as filters but silent about their own size, the only readout was the
+`__epEvidence` console seam), plus a one-line summary under "Verified by"
+stating how many of the dataset have a confirmed verdict and what percentage
+that is. What is *not* done: this is still the app stating what fraction of
+the WHOLE dataset is confirmed, not a per-place confidence score, and item 1
+(narrowing where research effort goes) is the harder, ongoing half this item
+was always secondary to.
+
 **3. The 3D isometric view, with more detail per park.** This is where he wants
 the effort. It is the centrepiece, not a novelty beside the map.
 

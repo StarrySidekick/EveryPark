@@ -92,6 +92,12 @@ header .tagline { font-size: .78rem; opacity: .85; display: block; font-weight: 
   opacity: .62;
   padding-left: 2px;
 }
+.glabel-note {
+  font-size: .64rem;
+  opacity: .8;
+  padding-left: 2px;
+  font-variant-numeric: tabular-nums;
+}
 .chip.acc { border-width: 2px; }
 .chip.acc.active[data-access="open"]       { background:#e6f6ec; color:#1d6b3f; border-color:#e6f6ec; }
 .chip.acc.active[data-access="permission"] { background:#fdf3e3; color:#8a5a1b; border-color:#fdf3e3; }

@@ -689,9 +689,22 @@
     if (!placeGrid.size && allParks.length) indexPlaces();
     if (tilesActive) EveryParkTiles.refresh(activeTypes);
     let shown = 0;
-    for (const p of allParks) if (visible(p)) shown++;
+    // Tallied in the same pass as visibility, rather than a second loop
+    // over 24,805 places. Independent of which chips are active — this is
+    // "how sure is the whole dataset", not "how many currently match", so
+    // toggling a filter must not move these numbers.
+    const accCounts = { open: 0, permission: 0, unknown: 0 };
+    const evCounts = { cited: 0, official: 0, inferred: 0 };
+    let unverifiedCount = 0;
+    for (const p of allParks) {
+      if (visible(p)) shown++;
+      if (accCounts.hasOwnProperty(p.access)) accCounts[p.access]++;
+      if (p.status === "park") evCounts[p.evidence] = (evCounts[p.evidence] || 0) + 1;
+      else if (p.status === "unverified") unverifiedCount++;
+    }
     paintMarks();
     if (metaEl) metaEl.textContent = `${shown.toLocaleString()} parks shown`;
+    updateConfidenceCounts(accCounts, evCounts, unverifiedCount);
   }
   map.on("moveend zoomend", paintMarks);
 
@@ -2603,7 +2616,19 @@
     });
   });
 
+  // Confidence readout (INTENT #2, 2026-09-06): "the app should show how
+  // sure the data is". The access and evidence chips already existed as
+  // filters and were silent about their own size — the only way to see how
+  // many places sat in each tier was the __epEvidence test seam. Timothy's
+  // rule is "a claim without a number is not a result", and that applies to
+  // the UI as much as to a commit message. Base labels are captured once,
+  // here, so repeated refreshes append a fresh count rather than stacking.
+  const ACC_LABEL = { open: "Open to all", permission: "By permission", unknown: "Unverified" };
+  const EV_LABEL = { cited: "Checked by hand", official: "Official rating", inferred: "Presumed" };
+  const accChips = {}, evChips = {};
+
   document.querySelectorAll(".chip[data-access]").forEach(chip => {
+    accChips[chip.dataset.access] = chip;
     chip.addEventListener("click", () => {
       const a = chip.dataset.access;
       if (activeAccess.has(a)) { activeAccess.delete(a); chip.classList.remove("active"); }
@@ -2613,6 +2638,7 @@
   });
 
   document.querySelectorAll(".chip[data-evidence]").forEach(chip => {
+    evChips[chip.dataset.evidence] = chip;
     chip.addEventListener("click", () => {
       const ev = chip.dataset.evidence;
       if (activeEvidence.has(ev)) { activeEvidence.delete(ev); chip.classList.remove("active"); }
@@ -2620,6 +2646,23 @@
       refresh();
     });
   });
+
+  const evidenceSummaryEl = document.getElementById("evidenceSummary");
+
+  function updateConfidenceCounts(accCounts, evCounts, unverifiedCount) {
+    for (const k in accChips)
+      accChips[k].textContent = `${ACC_LABEL[k]} · ${(accCounts[k] || 0).toLocaleString()}`;
+    for (const k in evChips)
+      evChips[k].textContent = `${EV_LABEL[k]} · ${(evCounts[k] || 0).toLocaleString()}`;
+    if (evidenceSummaryEl) {
+      const confirmed = (evCounts.cited || 0) + (evCounts.official || 0) + (evCounts.inferred || 0);
+      const total = confirmed + unverifiedCount;
+      const pct = total ? Math.round((confirmed / total) * 100) : 0;
+      evidenceSummaryEl.textContent = total
+        ? `${confirmed.toLocaleString()} of ${total.toLocaleString()} places have a confirmed verdict (${pct}%)`
+        : "";
+    }
+  }
 
   const layersPanel = document.getElementById("layersPanel");
   (document.getElementById("layersBtn") || {addEventListener(){}}).addEventListener("click", (e) => {

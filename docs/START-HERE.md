@@ -103,13 +103,18 @@ correct.
 | `shotui.mjs` | Chrome layout, by screenshot |
 | `deepclip.mjs` | The DEEP trail clip, arithmetically — a name in a list looks plausible whether or not it belongs |
 
-**`parts.mjs` is RED on `main`** as of 2026-09-05, and was red before the
-clip work — verified by stashing. It reports `rings lost in the split: 6
-of 5 survive` and cannot find the piece arrows (`got ""`). `splitParts()`
-itself conserves rings by inspection, so the likely single cause is that
-the arrows are not being found and the ring tally is therefore counting
-one piece twice. Not diagnosed. It guards real land loss, so it wants
-fixing before the next change to the multi-piece view.
+~~**`parts.mjs` is RED on `main`**~~ — was red as of 2026-09-05 (reporting
+`rings lost in the split: 6 of 5 survive` and no piece arrows found,
+`got ""`), and was red before that day's clip work too — verified by
+stashing at the time. **Re-checked 2026-09-18: passes 3/3 runs**,
+unmodified, on the current session's machine (`totalRings.seen` is 5 as
+expected, arrows found on every piece). Nothing in `iso.js` or
+`parts.mjs` changed between the two checks — the most likely explanation
+is that the original failure was specific to the old cloud sandbox's
+Chromium (no GPU, and this file's setup section already said "a real
+machine mostly won't" need the vendoring dance that sandbox did). Left
+undiagnosed rather than declared fixed: if it goes red again on a
+different machine, the diagnostic detail above is where to start.
 
 Setup, which the sandbox needed and a real machine mostly won't:
 
