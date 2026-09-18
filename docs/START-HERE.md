@@ -103,18 +103,36 @@ correct.
 | `shotui.mjs` | Chrome layout, by screenshot |
 | `deepclip.mjs` | The DEEP trail clip, arithmetically — a name in a list looks plausible whether or not it belongs |
 
-~~**`parts.mjs` is RED on `main`**~~ — was red as of 2026-09-05 (reporting
-`rings lost in the split: 6 of 5 survive` and no piece arrows found,
-`got ""`), and was red before that day's clip work too — verified by
-stashing at the time. **Re-checked 2026-09-18: passes 3/3 runs**,
-unmodified, on the current session's machine (`totalRings.seen` is 5 as
-expected, arrows found on every piece). Nothing in `iso.js` or
-`parts.mjs` changed between the two checks — the most likely explanation
-is that the original failure was specific to the old cloud sandbox's
-Chromium (no GPU, and this file's setup section already said "a real
-machine mostly won't" need the vendoring dance that sandbox did). Left
-undiagnosed rather than declared fixed: if it goes red again on a
-different machine, the diagnostic detail above is where to start.
+~~**`parts.mjs` is RED on `main`**~~ — corrected 2026-09-18, and this note
+was already wrong before today, not just stale. It was red as of
+2026-09-05 (`rings lost in the split: 6 of 5 survive`, no piece arrows
+found). **The real cause was found and fixed on 2026-09-08, on branch
+`claude/relaxed-lovelace-b23q2h`** (never merged to `main`, which is why
+this note still said RED): `fetchHeightSample` loads terrain tiles with
+`new Image()`, not `fetch()`, so `harness.html`'s `window.fetch` stub
+never touched it. On a machine with real internet access those tiles load
+for real, at real latency, and that wins or loses a race against the
+arrow-wiring code in `goPart`'s piece-switch — so the test is **flaky on
+`main` by network timing**, not reliably red or green. Three more
+unmerged sessions since (`87ulcd` 09-15, `e96efe0` 09-17, and this one,
+09-18 — 3/3 in this one) each independently found it green on unmodified
+`main` and each nearly re-litigated the same "is it still broken" question
+this note was supposed to answer. **Don't trust a single green or red run
+of this file until `b23q2h`'s harness fix (stub `Image` the same way
+`fetch` already is) actually lands on `main`.**
+
+**Housekeeping finding, 2026-09-18: there is a real backlog of unmerged
+`claude/*` branches sitting off this same `main` commit** (`d8bddb0`),
+several overlapping. Worth Timothy's own triage rather than another
+session guessing at merge order: `b23q2h` (the parts.mjs fix above),
+`00cmm0` (2026-09-10, a much richer 4-tier confidence readout ON THE
+CARD — `attrs.citedPlace`/`citedRule`, "checked by hand for THIS place"
+vs "covered by a cited regulation" vs PAD-US vs inferred — landed before
+this session's filter-chip counts and does not conflict with them),
+`87ulcd` (2026-09-15, extends that same gradient into the 3D viewer's
+RULES page), `9t6mbq` (2026-09-11, real DEEP blaze colours on trail
+lines), `e96efe0` (2026-09-17, a north-arrow compass badge). None of
+these are on `main` yet.
 
 Setup, which the sandbox needed and a real machine mostly won't:
 

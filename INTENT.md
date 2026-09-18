@@ -36,15 +36,22 @@ already exist — `attrs.researched`, `attrs.sources`, `attrs.checked`, the
 rule-versus-place distinction, the amber/green split, `dormant_rules` — but a
 reader currently gets a binary where the data supports a gradient.
 
-**The UI half shipped 2026-09-18**: the "Can I go?" and "Verified by" filter
-chips now carry live counts (`Checked by hand · 4,822`, and so on — previously
-present as filters but silent about their own size, the only readout was the
-`__epEvidence` console seam), plus a one-line summary under "Verified by"
-stating how many of the dataset have a confirmed verdict and what percentage
-that is. What is *not* done: this is still the app stating what fraction of
-the WHOLE dataset is confirmed, not a per-place confidence score, and item 1
-(narrowing where research effort goes) is the harder, ongoing half this item
-was always secondary to.
+**Dataset-level readout shipped 2026-09-18**: the "Can I go?" and "Verified
+by" filter chips now carry live counts (`Checked by hand · 4,822`, and so
+on — previously present as filters but silent about their own size, the only
+readout was the `__epEvidence` console seam), plus a one-line summary under
+"Verified by" stating how many of the dataset have a confirmed verdict and
+what percentage that is. This is aggregate, not per-place.
+
+**A richer per-place version already exists and is NOT on `main` yet** —
+branch `claude/relaxed-lovelace-00cmm0` (2026-09-10) states four tiers on
+the card itself (checked by hand for THIS place / covered by a cited
+regulation / PAD-US rated / inferred from a mapped feature), and
+`claude/relaxed-lovelace-87ulcd` (2026-09-15) carries the same gradient into
+the 3D viewer's RULES page. Merge those before building anything else here —
+they are the harder, more useful half of this item and duplicating them
+would be wasted work. Item 1 (narrowing where research effort goes) is
+separately still open and is the part neither branch touches.
 
 **3. The 3D isometric view, with more detail per park.** This is where he wants
 the effort. It is the centrepiece, not a novelty beside the map.
