@@ -3,7 +3,7 @@
 Cut every road into tiles — all of them, at every zoom.
 
     python3 fetchroads.py                       # raw/roads.npz
-    python3 makeroadtiles.py --zooms 7 8 9 10 11 12 13 14
+    python3 makeroadtiles.py stage              # z5-z13, what ships
     python3 makeroadtiles.py pack -o data/roads.pmtiles
 
 WHAT MAKES THIS DIFFERENT FROM maketiles.py
@@ -414,13 +414,25 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("cmd", nargs="?", default="stage", choices=["stage", "pack"])
     ap.add_argument("--src", default="raw/roads.npz")
+    # The defaults are what actually ships, so `stage` then `pack` with no
+    # arguments rebuilds the archive that is committed.
+    #
+    # z5 is in here because protomaps-leaflet reads the tile ONE level
+    # below the zoom you are looking at (levelDiff, default 1): the z5
+    # tiles are what you see at map zoom 6. Staged without them the
+    # whole-region view — the view this layer exists for — comes up
+    # completely empty and nothing says why.
+    #
+    # z14 is not, because it is 28 MB of a 93 MB archive and all it buys
+    # is 0.45 m instead of 0.9 m of quantisation, invisible until about
+    # map zoom 18. Add it to both --zooms and --maxzoom to put it back.
     ap.add_argument("--zooms", nargs="+", type=int,
-                    default=[7, 8, 9, 10, 11, 12, 13, 14])
+                    default=[5, 6, 7, 8, 9, 10, 11, 12, 13])
     ap.add_argument("-o", "--out", default="data/roads.pmtiles")
     ap.add_argument("--stage-dir", nargs="+", default=[STAGE_DIR],
                     help="where stage pickles go (stage) or come from (pack)")
-    ap.add_argument("--minzoom", type=int, default=7)
-    ap.add_argument("--maxzoom", type=int, default=14)
+    ap.add_argument("--minzoom", type=int, default=5)
+    ap.add_argument("--maxzoom", type=int, default=13)
     args = ap.parse_args()
 
     if args.cmd == "stage":

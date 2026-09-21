@@ -632,8 +632,17 @@ back as you go in. Four things make keeping them affordable here:
   makes road tilesets big. The labels layer over the imagery basemaps
   still has them.
 
-Result, measured: **617,634 roads, 11.5 M vertices, z7-z14 with every
-road at every level.**
+Result, measured: **617,634 roads plus 143,759 footpath segments, 11.5 M
+vertices, z5-z13 with every road at every level — 65 MB.** The tiler cuts
+z14 too and it is deliberately not packed: 28 MB of a 93 MB archive, for
+0.45 m instead of 0.9 m of quantisation, which is invisible below about
+map zoom 18.
+
+**The archive has to start two levels below the lowest zoom you want
+roads at.** protomaps-leaflet reads the tile ONE level below the zoom on
+screen (`levelDiff`, default 1) and draws it at 512 px, so the z5 tiles
+are what you see at map zoom 6. Built from z7 up, the whole-region view
+came up completely empty and nothing said why.
 
 **Sub-pixel thinning, with a real bound.** `thin()` drops a vertex within
 one tile unit (1/16 of a screen pixel) of the line between its
@@ -690,7 +699,7 @@ time a missing archive would take every trail with it and say nothing.
 
 ```bash
 python3 fetchroads.py                       # ~12 min, mostly the trail fetch
-python3 makeroadtiles.py stage              # ~4 min
+python3 makeroadtiles.py stage              # ~4 min; defaults are what ships
 python3 tools/roadcheck.py --geocode        # exits 1 if the tiles lie
 python3 makeroadtiles.py pack -o data/roads.pmtiles
 node tools/isotest/roadsview.mjs            # needs tools/isotest/serve.py on :8125
