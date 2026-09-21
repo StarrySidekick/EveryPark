@@ -1,0 +1,9 @@
+Third-party scripts index.html loads from unpkg, kept here so the
+Playwright checks in this folder run with no network at all.
+
+Refresh when the pinned versions in index.html change:
+
+  curl -sS -o leaflet.js   https://unpkg.com/leaflet@1.9.4/dist/leaflet.js
+  curl -sS -o leaflet.css  https://unpkg.com/leaflet@1.9.4/dist/leaflet.css
+  curl -sS -o protomaps-leaflet.js \
+       https://unpkg.com/protomaps-leaflet@4.0.1/dist/protomaps-leaflet.js

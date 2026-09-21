@@ -35,6 +35,13 @@ means changing the wording is a code edit, not a rebuild.
 map tiles across zooms 6–14 and packed into one file. The browser pulls only the
 tiles on screen using HTTP range requests, so panning costs kilobytes.
 
+**`data/roads.pmtiles`** (65 MB) — every road the Census Bureau records in both
+states, 617,634 of them, plus 143,759 footpath segments, cut into zooms 5–13.
+Unlike every other road layer you have used, **nothing is dropped as you zoom
+out**: the same roads are in the zoom-5 tile as in the zoom-13 one, so the
+network reads as a map of where people are. The Adirondacks are a hole in the
+weave. See "Roads" in `CLAUDE.md` for how that is made to fit in 65 MB.
+
 ## Publishing — the one rule
 
 **Data flows only through the Actions.** Edit `data/verified.json` (or code),
@@ -125,11 +132,15 @@ index.html          markup, filter chips, legend
 config.js           all customisation: colours, sources, dataVersion
 app.js              map, markers, popups, filtering, search
 vectorlayers.js     vector tile rendering, hover, click
+roadlayers.js       the road ladder: paint rules, chips, legend
 buildplaces.py      builds data/places.json from raw sources
 maketiles.py        builds data/everypark.pmtiles
+fetchroads.py       pulls TIGER/Line roads + OSM trails into raw/roads.npz
+makeroadtiles.py    builds data/roads.pmtiles (no level of detail)
 tiles.html          browser page that downloads raw geometry
 build.html          browser page that rebuilds baked.json
-data/               places.json, everypark.pmtiles, towns.geojson, additions.json
+data/               places.json, everypark.pmtiles, roads.pmtiles,
+                    towns.geojson, additions.json
 ```
 
 ## Traps worth remembering

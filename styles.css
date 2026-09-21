@@ -321,7 +321,22 @@ main { flex: 1; display: flex; position: relative; min-height: 0; }
 .legend-row .sw.ring { background: rgba(67,160,71,.28); border: 2.5px solid; border-radius: 2px; }
 .legend-note { margin-top: 6px; color: var(--muted); font-size: .66rem; }
 #legend.collapsed .legend-row, #legend.collapsed .legend-note,
-#legend.collapsed .legend-padus { display: none; }
+#legend.collapsed .legend-roads, #legend.collapsed .legend-padus { display: none; }
+
+/* Road swatches are lines, not patches: a rank is only legible against
+   the others by how thick it is, so the swatch carries the same ladder
+   the map does. Height is set inline from CONFIG.roads.ranks. */
+.legend-row .sw.road-sw {
+  width: 22px; border-radius: 2px; opacity: 1;
+  align-self: center;
+}
+.legend-roads .legend-row { margin-top: 2px; }
+
+/* The rank chips. A road chip's dot is the colour the road is drawn in,
+   so the filter panel and the map agree without a separate key. */
+.chip.road-chip { font-size: .72rem; }
+.chip.road-mode { border-style: dashed; }
+#roadChips .chips { flex-wrap: wrap; }
 .legend-padus { display: none; }
 #legend.padus .legend-padus { display: block; }
 .chip.attr[disabled] { opacity: .4; cursor: default; }

@@ -162,7 +162,16 @@ const EveryParkTiles = (() => {
       landRule("townparks"),
       landRule("cemeteries"),
       {
+        // Trails here only when the roads archive is not drawing them.
+        // CONFIG.roads carries the same OpenStreetMap paths at every
+        // zoom in its `path` rank, so drawing both would be one trail in
+        // two colours. The flag is read at PAINT time, not when the
+        // rules are built: roadlayers.js only finds out whether its
+        // archive is really there after a round trip, and by then these
+        // rules exist. Read once at build time, a missing roads archive
+        // would take the trails with it and say nothing.
         dataLayer: "trails",
+        filter: () => !CONFIG.trailLines || CONFIG.trailLines.inTiles !== false,
         symbolizer: new protomapsL.LineSymbolizer({
           color: T.color, width: T.weight, dash: [5, 4], opacity: T.opacity
         })
@@ -345,6 +354,15 @@ const EveryParkTiles = (() => {
     },
 
     active() { return !!layer; },
+
+    // Repaint with the filters unchanged. `refresh` needs the chip set
+    // handed back in; this is for when something else changed what the
+    // paint rules should draw.
+    repaint() {
+      if (!layer) return;
+      if (layer.rerenderTiles) layer.rerenderTiles();
+      else if (layer.redraw) layer.redraw();
+    },
 
     // Diagnostics, reachable from the console.
     _probe(lat, lng) {
