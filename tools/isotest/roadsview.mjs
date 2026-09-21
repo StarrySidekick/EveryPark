@@ -99,7 +99,9 @@ if (ink[8] < ink[13] * 0.5)
 // 2. The rank chips do something, and it is the thing they say.
 await goto(41.7637, -72.6851, 12);
 const before = await inkFraction();
-await page.click('#filtersBtn');
+// The road ranks live in the Layers panel, not in Filters: Filters is
+// about which PLACES show, Layers is about what the map draws.
+await page.click('#layersBtn');
 await page.click('.chip[data-road="local"]');
 await page.waitForTimeout(2000);
 const afterOff = await inkFraction();

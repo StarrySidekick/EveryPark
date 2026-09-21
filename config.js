@@ -113,6 +113,13 @@ const CONFIG = {
       // of roads someone else chose to show at that zoom — it thins out
       // as you pull back, it carries no rank we can restyle, and it
       // would draw a second set of roads over CONFIG.roads. See there.
+      //
+      // Names come from CARTO's labels-only raster rather than the Esri
+      // reference layer the imagery basemaps use: that one carries
+      // administrative BOUNDARIES as well as names, and a second set of
+      // grey town lines over the ones this map already draws is noise.
+      // Dark text, so it is the light-ground variant.
+      labelsUrl: "https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png",
       attribution: "Relief and hydrography: USGS · Boundaries: CT DEEP, OpenStreetMap, USGS PAD-US"
     },
     {
@@ -150,6 +157,10 @@ const CONFIG = {
     },
     {
       label: "Street map",
+      // No labelsUrl: this one draws its names into the basemap itself,
+      // so the Names toggle has nothing to switch off here. That is the
+      // one place in the panel where a toggle does nothing, and it is a
+      // property of the tiles rather than something worth code.
       url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>'
     }
@@ -289,7 +300,7 @@ const CONFIG = {
   // Shown in the top-right corner. Bumped by hand on every code change,
   // so there's visible proof of which build is actually loaded rather
   // than guessing whether a cached copy is being served.
-  siteVersion: "v0.54.0",
+  siteVersion: "v0.55.0",
 
   // ---- VECTOR TILES --------------------------------------------------
   // Every boundary and trail, pre-cut into map tiles and packed into one
@@ -311,6 +322,35 @@ const CONFIG = {
     // tiles are stretched, which is why the map still draws when you zoom
     // right in. Must match --maxzoom used when building.
     maxDataZoom: 14
+  },
+
+  // ---- WHAT'S ON THE MAP ---------------------------------------------
+  // Which drawn layers start switched on. The Layers panel is the UI;
+  // this is only what a first-time visitor sees. After that their own
+  // choices are remembered in their browser (localStorage key below) and
+  // these defaults are not consulted again for them.
+  //
+  // Changing a default here does NOT change what an existing visitor
+  // sees, including you — clear the key or use the panel.
+  mapLayers: {
+    remember: "ep-layers-v1",
+
+    names:     true,    // place labels over the ground
+    relief:    true,    // USGS shaded relief
+    water:     true,    // USGS hydrography
+    texture:   true,    // the mown checkerboard
+    shapes:    true,    // park boundaries, from the tile archive
+    pins:      true,    // the category marks, zoom 12 and in
+    towns:     true,    // municipal boundaries
+    roads:     true,    // CONFIG.roads, all of it
+    blueblaze: true,    // CFPA Blue-Blazed hiking trails, from the archive
+    districts: false    // National Register historic districts
+
+    // The four layers at the bottom of the panel — PAD-US, protected
+    // parcels, Blue-Blazed trails, unmapped trail areas — are not here
+    // and are not remembered. Each one asks a live service for data the
+    // moment it is switched on, and a remembered "on" would mean every
+    // visit started with four network round trips nobody asked for.
   },
 
   // ---- ROADS ---------------------------------------------------------

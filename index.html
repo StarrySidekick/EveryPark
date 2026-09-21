@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
   <!-- ?v= is a cache-buster: bump it on every deploy so visitors get fresh code -->
-  <link rel="stylesheet" href="styles.css?v=121">
+  <link rel="stylesheet" href="styles.css?v=122">
 </head>
 <body>
 
@@ -41,18 +41,6 @@
         </div>
       </div>
 
-      <div class="group" title="Places you walk through rather than land you enter">
-        <span class="glabel">Places to wander</span>
-        <div class="chips">
-          <button class="chip active" data-layer="districts"><span class="dot dot-district"></span>Historic districts</button>
-        </div>
-      </div>
-
-      <div class="group" id="roadGroup" title="Every recorded road, at every zoom — nothing is thinned">
-        <span class="glabel">Roads</span>
-        <div id="roadChips"></div>
-      </div>
-
       <div class="group" title="Who owns and maintains the land">
         <span class="glabel">Who runs it</span>
         <div class="chips">
@@ -64,6 +52,55 @@
           </div>
           </div>
         </div>
+    </div>
+
+    <div class="layers-wrap">
+      <button id="layersBtn" title="What the map draws">Layers</button>
+      <div id="layersPanel" hidden>
+
+        <div class="lp-group">
+          <div class="lp-title">Ground</div>
+          <div class="chips" id="baseChips"></div>
+          <div class="chips">
+            <button class="chip" data-layer="relief">Relief</button>
+            <button class="chip" data-layer="water">Water</button>
+            <button class="chip" data-layer="texture">Mown texture</button>
+            <button class="chip" data-layer="names">Names</button>
+          </div>
+        </div>
+
+        <div class="lp-group" id="roadGroup">
+          <div class="lp-title">Roads
+            <button class="chip lp-master" data-layer="roads">On</button>
+          </div>
+          <div id="roadChips"></div>
+        </div>
+
+        <div class="lp-group">
+          <div class="lp-title">Places</div>
+          <div class="chips">
+            <button class="chip" data-layer="shapes">Park shapes</button>
+            <button class="chip" data-layer="pins">Pins</button>
+            <button class="chip" data-layer="towns">Town borders</button>
+            <button class="chip" data-layer="blueblaze">Blue-Blazed trails</button>
+            <button class="chip" data-layer="districts"><span class="dot dot-district"></span>Historic districts</button>
+          </div>
+        </div>
+
+        <div class="lp-group">
+          <div class="lp-title">Fetched when you ask</div>
+          <div class="chips">
+            <button class="chip" id="gapToggle">Unmapped trails</button>
+            <button class="chip lp-fallback" id="padusToggle" hidden>Access rating</button>
+            <button class="chip lp-fallback" id="parcelToggle" hidden>Protected parcels</button>
+            <button class="chip lp-fallback" id="bbToggle" hidden>Blue-Blazed (live)</button>
+          </div>
+          <div class="lp-note">Asks a live service for its data the moment you
+            switch it on, so it takes a second and needs a connection. Not
+            remembered between visits.</div>
+        </div>
+
+      </div>
     </div>
 
     <button id="nearBtn" title="Parks you could drive to from here">Near me</button>
@@ -142,10 +179,11 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="https://unpkg.com/protomaps-leaflet@4.0.1/dist/protomaps-leaflet.js"></script>
-  <script src="config.js?v=121"></script>
-  <script src="vectorlayers.js?v=121"></script>
-  <script src="roadlayers.js?v=121"></script>
-  <script src="iso.js?v=121"></script>
-  <script src="app.js?v=121"></script>
+  <script src="config.js?v=122"></script>
+  <script src="prefs.js?v=122"></script>
+  <script src="vectorlayers.js?v=122"></script>
+  <script src="roadlayers.js?v=122"></script>
+  <script src="iso.js?v=122"></script>
+  <script src="app.js?v=122"></script>
 </body>
 </html>
