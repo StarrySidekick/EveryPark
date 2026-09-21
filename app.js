@@ -50,30 +50,42 @@
   map.getPane("epRoadLines").style.pointerEvents = "none";
   map.getPane("epRoads").style.pointerEvents = "none";
 
-  const baseLayers = {};
+  // Each basemap is kept as SEPARATE tile layers rather than one
+  // L.layerGroup, because relief, water and names are each their own
+  // switch in the Layers panel now. A group can only be added or removed
+  // whole, so the group had to go before any of them could be toggled.
+  const baseParts = {};
   const baseByName = {};
-  CONFIG.basemaps.forEach((b, i) => {
+  CONFIG.basemaps.forEach(b => {
     baseByName[b.label] = b;
     // A basemap with `ground` instead of `url` is DRAWN, not fetched:
     // the colour and the mown texture come from CSS, and relief, water
-    // and roads are layered over it. Leaflet still treats the group as a
-    // base layer, so it takes part in the radio switch like any other.
-    const parts = b.url
-      ? [L.tileLayer(b.url, { attribution: b.attribution, maxZoom: 19,
-                              maxNativeZoom: b.maxNativeZoom || 19 })]
-      : [];
-    if (b.shadeUrl) parts.push(L.tileLayer(b.shadeUrl, {
-      maxZoom: 19, maxNativeZoom: 16, opacity: b.shadeOpacity || 0.4,
-      className: "ep-shade", attribution: b.attribution }));
-    if (b.waterUrl) parts.push(L.tileLayer(b.waterUrl, {
-      maxZoom: 19, maxNativeZoom: 16, pane: "epWater" }));
-    // Roads drawn over the ground: how you'd actually get there.
-    if (b.roadsUrl) parts.push(L.tileLayer(b.roadsUrl, { maxZoom: 19, pane: "epRoads" }));
-    if (b.labelsUrl) parts.push(L.tileLayer(b.labelsUrl, { maxZoom: 19, pane: "epRoads" }));
-    baseLayers[b.label] = L.layerGroup(parts);
-    if (i === 0) baseLayers[b.label].addTo(map);
+    // and roads are layered over it. Such a basemap has no `base` layer
+    // at all, which is why every use of it below is guarded.
+    baseParts[b.label] = {
+      base: b.url ? L.tileLayer(b.url, {
+        attribution: b.attribution, maxZoom: 19,
+        maxNativeZoom: b.maxNativeZoom || 19 }) : null,
+      shade: b.shadeUrl ? L.tileLayer(b.shadeUrl, {
+        maxZoom: 19, maxNativeZoom: 16, opacity: b.shadeOpacity || 0.4,
+        className: "ep-shade", attribution: b.attribution }) : null,
+      water: b.waterUrl ? L.tileLayer(b.waterUrl, {
+        maxZoom: 19, maxNativeZoom: 16, pane: "epWater" }) : null,
+      // Kept for a basemap that wants a raster road overlay; none do
+      // since CONFIG.roads landed.
+      roads: b.roadsUrl ? L.tileLayer(b.roadsUrl, {
+        maxZoom: 19, pane: "epRoads" }) : null,
+      labels: b.labelsUrl ? L.tileLayer(b.labelsUrl, {
+        maxZoom: 19, pane: "epRoads" }) : null
+    };
   });
-  L.control.layers(baseLayers, null, { position: "bottomright" }).addTo(map);
+
+  // What the visitor last chose, or the first basemap. Read before any
+  // layer state, because every other switch is applied against it.
+  let currentBase = CONFIG.basemaps[0].label;
+  const rememberedBase = EveryParkPrefs.getList("base", []);
+  if (rememberedBase[0] && baseParts[rememberedBase[0]])
+    currentBase = rememberedBase[0];
 
   // The mown checkerboard. One screen-space overlay above the polygons
   // textures the ground AND the park fills in a single pass — the
@@ -90,6 +102,27 @@
   // A handle for debugging and for the performance harness in
   // tools/isotest. Read-only in practice; nothing in the app uses it.
   window.__map = map;
+
+  // What the map is ACTUALLY drawing, as opposed to what the panel has
+  // been told. The checks in tools/isotest assert against this rather
+  // than against the chips, because a chip that lights up while nothing
+  // changes on the map is the exact failure worth catching.
+  window.__layers = () => ({
+    base: currentBase,
+    relief:  !!(baseParts[currentBase].shade  && map.hasLayer(baseParts[currentBase].shade)),
+    water:   !!(baseParts[currentBase].water  && map.hasLayer(baseParts[currentBase].water)),
+    names:   !!(baseParts[currentBase].labels && map.hasLayer(baseParts[currentBase].labels)),
+    texture: turf.style.display !== "none",
+    towns:   map.hasLayer(townBorderLayer),
+    pins:    markCanvas.style.display !== "none",
+    shapes:  typeof EveryParkTiles !== "undefined" && EveryParkTiles.shown
+             ? EveryParkTiles.shown() : null,
+    roads:   typeof EveryParkRoads !== "undefined" && EveryParkRoads._probe
+             ? EveryParkRoads._probe().visible : null,
+    blueblaze: typeof EveryParkTiles !== "undefined" && EveryParkTiles.blueBlazedShown
+               ? EveryParkTiles.blueBlazedShown() : null,
+    districts: districtsOn
+  });
 
   // Start where the visitor is, not in the middle of the state. Medium-
   // tight: close enough that individual parks are distinguishable, wide
@@ -111,20 +144,141 @@
        { enableHighAccuracy: false, timeout: 8000, maximumAge: 600000 });
   }
 
+  // Whether a drawn layer is on: the visitor's choice if they have made
+  // one, otherwise CONFIG.mapLayers. Everything in the Layers panel asks
+  // this one function, so there is a single answer per layer rather than
+  // one per place that draws it.
+  const layerOn = name =>
+    EveryParkPrefs.get(name, (CONFIG.mapLayers || {})[name]);
+
+  const setPart = (layer, on) => {
+    if (!layer) return;
+    if (on && !map.hasLayer(layer)) layer.addTo(map);
+    else if (!on && map.hasLayer(layer)) map.removeLayer(layer);
+  };
+
   const applyBase = b => {
     if (!b) return;
     // Texture belongs on the drawn ground only. Over an aerial photo a
-    // checkerboard reads as a rendering fault, not as grass.
+    // checkerboard reads as a rendering fault, not as grass — so it is
+    // the basemap AND the switch, not either alone.
     map.getContainer().style.background = b.ground || "";
-    turf.style.display = b.turf ? "" : "none";
+    turf.style.display = (b.turf && layerOn("texture")) ? "" : "none";
     document.body.classList.toggle("base-drawn", !!b.ground);
   };
-  applyBase(CONFIG.basemaps[0]);
-  map.on("baselayerchange", e => applyBase(baseByName[e.name]));
 
-  // Imagery is reachable from the map's own layers control in the
-  // bottom corner. It had a header button briefly; the header is for
-  // things you reach for often, and a basemap swap is not one.
+  // Draw order is insertion order inside a pane, so the ground goes on
+  // before the relief that shades it. Switching basemap therefore means
+  // taking everything off and putting it back in order, not swapping one
+  // layer for another.
+  function syncBase() {
+    for (const [label, p] of Object.entries(baseParts))
+      if (label !== currentBase)
+        for (const l of Object.values(p)) setPart(l, false);
+    const p = baseParts[currentBase];
+    if (!p) return;
+    setPart(p.base, true);
+    setPart(p.shade, layerOn("relief"));
+    setPart(p.water, layerOn("water"));
+    setPart(p.roads, true);
+    setPart(p.labels, layerOn("names"));
+    applyBase(baseByName[currentBase]);
+    document.querySelectorAll("#baseChips .chip").forEach(c =>
+      c.classList.toggle("active", c.dataset.base === currentBase));
+  }
+
+  // One switch per drawn layer. Everything the Layers panel can turn on
+  // or off comes through here, so "is this layer on" has exactly one
+  // answer and turning it on at load and turning it on by clicking are
+  // the same code path. They were not, in the first draft, and the two
+  // disagreed about the mown texture.
+  function syncLayer(name) {
+    const on = layerOn(name);
+    const parts = baseParts[currentBase] || {};
+    switch (name) {
+      case "relief":  setPart(parts.shade, on); break;
+      case "water":   setPart(parts.water, on); break;
+      case "names":   setPart(parts.labels, on); break;
+      case "texture": applyBase(baseByName[currentBase]); break;
+      case "towns":   setPart(townBorderLayer, on); break;
+      case "pins":
+        markCanvas.style.display = on ? "" : "none";
+        // Repaint on the way back on. paintMarks bails out while pins
+        // are off, so the canvas still holds whatever was on screen when
+        // they went off — which is the wrong place if the map has moved
+        // since, and empty if they were off at load.
+        if (on) paintMarks();
+        break;
+      case "shapes":
+        if (typeof EveryParkTiles !== "undefined" && EveryParkTiles.setVisible)
+          EveryParkTiles.setVisible(on);
+        break;
+      case "roads":
+        if (typeof EveryParkRoads !== "undefined" && EveryParkRoads.setVisible)
+          EveryParkRoads.setVisible(on);
+        break;
+      case "blueblaze":
+        // Two sources, one switch. The archive draws these normally; the
+        // live loader is only reached when the archive is missing, which
+        // is also the only time the fallback chip for it is visible.
+        if (tilesActive && typeof EveryParkTiles !== "undefined"
+            && EveryParkTiles.setBlueBlazed) EveryParkTiles.setBlueBlazed(on);
+        else setPart(bbLayer, on);
+        break;
+      case "districts":
+        districtsOn = on;
+        syncDistricts();
+        break;
+    }
+  }
+
+  const PANEL_LAYERS = ["relief", "water", "names", "texture", "shapes",
+                        "pins", "towns", "roads", "blueblaze", "districts"];
+
+  function wireLayerPanel() {
+    document.querySelectorAll("#layersPanel .chip[data-layer]").forEach(chip => {
+      const name = chip.dataset.layer;
+      chip.classList.toggle("active", layerOn(name));
+      chip.addEventListener("click", () => {
+        const on = !layerOn(name);
+        EveryParkPrefs.set(name, on);
+        chip.classList.toggle("active", on);
+        syncLayer(name);
+      });
+    });
+    PANEL_LAYERS.forEach(syncLayer);
+  }
+
+  // The ground picker lives in the Layers panel rather than in Leaflet's
+  // own control in the bottom corner. That control was a deliberate
+  // choice once — "the header is for things you reach for often, and a
+  // basemap swap is not one" — and it is superseded rather than
+  // forgotten: the panel answers one question, "what is the map drawing",
+  // and the ground is the bottom layer of that answer. Two controls for
+  // the same thing would be worse than either.
+  (function buildBaseChips() {
+    const host = document.getElementById("baseChips");
+    if (!host) return;
+    CONFIG.basemaps.forEach(b => {
+      const el = document.createElement("button");
+      el.className = "chip base-chip";
+      el.dataset.base = b.label;
+      el.textContent = b.label;
+      el.addEventListener("click", () => {
+        currentBase = b.label;
+        EveryParkPrefs.setList("base", [b.label]);
+        syncBase();
+      });
+      host.appendChild(el);
+    });
+  })();
+  syncBase();
+  // wireLayerPanel() is NOT called here. It applies every switch, and
+  // half of what it switches — the marks canvas, the town borders, the
+  // tile layers — is declared further down this file. Calling it here
+  // threw "cannot access markCanvas before initialization", which is
+  // the temporal dead zone doing exactly its job. It runs with the rest
+  // of the layer setup instead.
 
   // ------------------------------------------------------------------
   // Icons are generated, not files: the ring takes the owner's colour and
@@ -234,6 +388,12 @@
       }
     return out;
   }
+
+  // Municipal boundaries. Two different loaders draw these — the baked
+  // path and the sharded one — and neither used to keep a reference to
+  // what it had added, so there was nothing to remove. They both fill
+  // this group now.
+  const townBorderLayer = L.layerGroup();
 
   const markCanvas = L.DomUtil.create("canvas", "ep-mark-canvas");
   markCanvas.style.pointerEvents = "none";
@@ -641,6 +801,9 @@
   }
 
   function paintMarks() {
+    // Switched off in the Layers panel: the canvas is hidden, so
+    // everything below would be drawing into something nobody sees.
+    if (!layerOn("pins")) return;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const size = map.getSize();
     const w = size.x + MARK_PAD * 2, h = size.y + MARK_PAD * 2;
@@ -726,6 +889,7 @@
       if (document.querySelector(".leaflet-popup")) return;
       const z = map.getZoom();
       if (z < MARK_ZOOM) return;
+      if (!layerOn("pins")) return;      // nothing visible to have hit
       let best = null, bestD = 40;                 // pixels
       const cp = map.latLngToContainerPoint(e.latlng);
       for (const p of allParks) {
@@ -750,7 +914,7 @@
 
     buildTownIndex(towns);
     if (CONFIG.townBorders.show) {
-      L.geoJSON(towns, {
+      townBorderLayer.addLayer(L.geoJSON(towns, {
         style: {
           color: CONFIG.townBorders.color,
           weight: CONFIG.townBorders.weight,
@@ -758,7 +922,8 @@
           fill: false,
           interactive: false
         }
-      }).addTo(map);
+      }));
+      syncLayer("towns");
     }
 
     for (const s of stateData.parks) {
@@ -3044,12 +3209,10 @@
       ? `${lyr.getLayers().length.toLocaleString()} places to wander` : "";
   }
 
-  (document.querySelector('[data-layer="districts"]') || {addEventListener(){}})
-    .addEventListener("click", e => {
-      districtsOn = !districtsOn;
-      e.currentTarget.classList.toggle("active", districtsOn);
-      syncDistricts();
-    });
+  // Districts are switched from the Layers panel like every other drawn
+  // layer; syncLayer("districts") owns the flag. This used to carry its
+  // own click handler, which matched the same chip and fired second,
+  // undoing what the panel had just done.
   syncDistricts();
 
   // Random park: fly somewhere that passes the current filters.
@@ -3214,6 +3377,23 @@
     if (srBox && !srBox.hidden && !e.target.closest(".search-wrap")) closeResults();
   }, true);
 
+  // The four layers at the bottom of the Layers panel each fetch from
+  // somebody else's service the moment they are switched on. Every other
+  // layer on this map is already on the machine; these are the only ones
+  // that can fail because a network did. Say so rather than throwing an
+  // unhandled rejection into a console nobody has open.
+  async function liveLayer(label, fn) {
+    try {
+      await fn();
+      return true;
+    } catch (err) {
+      console.warn(label + " failed to load:", err);
+      showStatus(label + " could not be loaded — check your connection");
+      setTimeout(hideStatus, 4000);
+      return false;
+    }
+  }
+
   (document.getElementById("padusToggle") || {addEventListener(){}}).addEventListener("click", async (e) => {
     const btn = e.currentTarget;
     if (map.hasLayer(padusLayer)) {
@@ -3231,7 +3411,7 @@
         showStatus("Zoom in to see official access areas");
         setTimeout(hideStatus, 3000);
       }
-      await refreshPadusLayer();
+      await liveLayer("Access rating", refreshPadusLayer);
     }
   });
 
@@ -3249,7 +3429,7 @@
         showStatus("Zoom in to see protected land parcels");
         setTimeout(hideStatus, 3000);
       }
-      await refreshParcels();
+      await liveLayer("Protected parcels", refreshParcels);
     }
   });
 
@@ -3260,7 +3440,10 @@
       btn.classList.remove("active");
     } else {
       btn.classList.add("active");
-      await loadBlueBlazed();
+      if (!await liveLayer("Blue-Blazed trails", loadBlueBlazed)) {
+        btn.classList.remove("active");
+        return;
+      }
       bbLayer.addTo(map);
     }
   });
@@ -3272,7 +3455,10 @@
       btn.classList.remove("active");
     } else {
       btn.classList.add("active");
-      await buildGaps();
+      if (!await liveLayer("Unmapped trail areas", buildGaps)) {
+        btn.classList.remove("active");
+        return;
+      }
       gapLayer.addTo(map);
     }
   });
@@ -3300,6 +3486,21 @@
 
   if (CONFIG.vectorTiles && CONFIG.vectorTiles.enabled)
     tilesActive = EveryParkTiles.init(map, activeTypes);
+
+  // Everything the Layers panel switches now exists, so the remembered
+  // state can be applied and the chips can be wired.
+  wireLayerPanel();
+
+  // PAD-US's access rating, the protected parcels and the live
+  // Blue-Blazed loader all begin `if (tilesActive) return` — the archive
+  // supersedes them, and with it loaded their buttons would light up and
+  // draw nothing. They are fallbacks for a missing archive, not features,
+  // so they appear only in the case where they work. Three buttons that
+  // do nothing is worse than no buttons: that is what these were before
+  // the panel existed, minus the buttons.
+  if (!tilesActive)
+    document.querySelectorAll("#layersPanel .lp-fallback")
+            .forEach(el => { el.hidden = false; });
 
   document.querySelector("#legend .legend-title").addEventListener("click", () => {
     document.getElementById("legend").classList.toggle("collapsed");
@@ -3450,10 +3651,11 @@
     const towns = await fetch("data/municipalities.geojson").then(r => r.json());
     buildTownIndex(towns);
     if (CONFIG.townBorders.show) {
-      L.geoJSON(towns, {
+      townBorderLayer.addLayer(L.geoJSON(towns, {
         style: { color: CONFIG.townBorders.color, weight: CONFIG.townBorders.weight,
                  opacity: CONFIG.townBorders.opacity, fill: false, interactive: false }
-      }).addTo(map);
+      }));
+      syncLayer("towns");
     }
   }
 

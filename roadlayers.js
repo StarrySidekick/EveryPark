@@ -20,6 +20,7 @@
 const EveryParkRoads = (() => {
   let layer = null, map = null;
   let mode = "atlas";                 // "atlas" | "ink"
+  let visible = true;                 // the master switch in the panel
   const off = new Set();              // rank ids the visitor switched off
 
   const cfg = () => CONFIG.roads || {};
@@ -103,7 +104,7 @@ const EveryParkRoads = (() => {
     // Biggest first: the chip row is also how you learn the ladder.
     [...(c.ranks || [])].reverse().forEach(r => {
       const b = document.createElement("button");
-      b.className = "chip active road-chip";
+      b.className = "chip road-chip" + (off.has(r.id) ? "" : " active");
       b.dataset.road = r.id;
       b.style.setProperty("--dot", r.casing || r.color);
       b.innerHTML = `<span class="dot"></span>${r.label}`;
@@ -111,18 +112,20 @@ const EveryParkRoads = (() => {
       b.addEventListener("click", () => {
         if (off.has(r.id)) { off.delete(r.id); b.classList.add("active"); }
         else { off.add(r.id); b.classList.remove("active"); }
+        EveryParkPrefs.setList("roadsOff", [...off]);
         repaint();
       });
       chips.appendChild(b);
     });
 
     const ink = document.createElement("button");
-    ink.className = "chip road-chip road-mode";
+    ink.className = "chip road-chip road-mode" + (mode === "ink" ? " active" : "");
     ink.textContent = "One ink";
     ink.title = "Drop the colours and read the whole network as density";
     ink.addEventListener("click", () => {
       mode = mode === "ink" ? "atlas" : "ink";
       ink.classList.toggle("active", mode === "ink");
+      EveryParkPrefs.set("roadsInk", mode === "ink");
       repaint();
     });
     chips.appendChild(ink);
@@ -137,6 +140,7 @@ const EveryParkRoads = (() => {
       host.querySelectorAll(".chip[data-road]").forEach(b =>
         b.classList.toggle("active", !off.has(b.dataset.road)));
       none.textContent = anyOn ? "Show all" : "Hide all";
+      EveryParkPrefs.setList("roadsOff", [...off]);
       repaint();
     });
     chips.appendChild(none);
@@ -159,7 +163,7 @@ const EveryParkRoads = (() => {
       ).join("") +
       `<div class="legend-note">Nothing is dropped when you zoom out, so the
         thickness of the weave is the thickness of settlement. Turn ranks off
-        in Filters.</div>`;
+        in Layers.</div>`;
     host.appendChild(box);
   }
 
@@ -195,6 +199,13 @@ const EveryParkRoads = (() => {
         return false;
       }
       map = theMap;
+      // What the visitor last chose. The ranks are a list rather than a
+      // flag because "which ones are off" is the state worth keeping —
+      // a rank added to the ladder later then starts ON, which is the
+      // right default for something nobody has an opinion about yet.
+      visible = EveryParkPrefs.get("roads", (CONFIG.mapLayers || {}).roads);
+      EveryParkPrefs.getList("roadsOff", []).forEach(id => off.add(id));
+      if (EveryParkPrefs.get("roadsInk", false)) mode = "ink";
       try {
         layer = protomapsL.leafletLayer({
           url: c.url,
@@ -206,7 +217,7 @@ const EveryParkRoads = (() => {
           // one thing this layer is for.
           pane: "epRoadLines"
         });
-        layer.addTo(map);
+        if (visible) layer.addTo(map);
       } catch (e) {
         console.warn("Roads failed to load:", e);
         return false;
@@ -218,9 +229,19 @@ const EveryParkRoads = (() => {
       return true;
     },
 
+    // Every road on or off, from the Layers panel. Removing the layer
+    // rather than painting nothing also stops it fetching tiles as you
+    // pan, which on this archive is the expensive part.
+    setVisible(on) {
+      visible = !!on;
+      if (!layer || !map) return;
+      if (visible && !map.hasLayer(layer)) layer.addTo(map);
+      else if (!visible && map.hasLayer(layer)) map.removeLayer(layer);
+    },
+
     // Diagnostics, reachable from the console.
     _probe() {
-      return { mode, off: [...off], hasLayer: !!layer,
+      return { mode, off: [...off], hasLayer: !!layer, visible,
                ranks: (cfg().ranks || []).map(r => r.id),
                scaleNow: map ? scaleAt(map.getZoom()) : null };
     },

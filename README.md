@@ -133,6 +133,7 @@ config.js           all customisation: colours, sources, dataVersion
 app.js              map, markers, popups, filtering, search
 vectorlayers.js     vector tile rendering, hover, click
 roadlayers.js       the road ladder: paint rules, chips, legend
+prefs.js            what the browser remembers about the Layers panel
 buildplaces.py      builds data/places.json from raw sources
 maketiles.py        builds data/everypark.pmtiles
 fetchroads.py       pulls TIGER/Line roads + OSM trails into raw/roads.npz

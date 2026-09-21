@@ -713,3 +713,78 @@ resolves a handful of addresses through the **Census Bureau's own
 geocoder** so the projection is checked against somebody else's code
 reading the same TIGER lines. That last one comes back at 6-7 m. Roads
 only need rebuilding when TIGER publishes a new year.
+
+---
+
+## The Layers panel (v0.55.0)
+
+One answer to "what is the map drawing", in the header next to Filters.
+The split that decides where a switch belongs: **Filters is about which
+PLACES show; Layers is about what is DRAWN.** The road ranks and the
+historic districts moved out of Filters on that rule.
+
+`syncLayer(name)` in `app.js` is the single switch for every drawn
+layer. Applying a remembered choice at load and applying a click are the
+same call — in the first draft they were two code paths and they
+disagreed about the mown texture.
+
+`CONFIG.mapLayers` holds the defaults; `prefs.js` holds what the visitor
+chose, in one localStorage key. **A default in config is only consulted
+for a layer the visitor has never touched** — changing one does not
+change what you see if you have used the panel. `EveryParkPrefs.forget()`
+in the console is the reset.
+
+**Basemaps are no longer one `L.layerGroup` each.** Relief, water and
+names are separate switches, and a group can only be added or removed
+whole. Each basemap is now `{base, shade, water, roads, labels}` and
+`syncBase()` puts them on in that order, because draw order inside a
+pane is insertion order — the ground has to go on before the relief that
+shades it.
+
+Leaflet's own layers control in the bottom corner is gone; the ground
+picker is in the panel. That control was once a deliberate choice ("the
+header is for things you reach for often, and a basemap swap is not
+one") and this supersedes it rather than forgetting it: the panel
+answers one question and the ground is the bottom layer of that answer.
+
+**Names on the drawn basemap come from CARTO's labels-only raster**, not
+the Esri reference layer the imagery basemaps use. That one carries
+administrative boundaries as well as names, and a second set of grey
+town lines over the ones this map already draws is noise. The Street map
+basemap draws its own names, so the toggle does nothing there — a
+property of those tiles, not a bug.
+
+### Three toggles that would have lied
+
+`refreshPadusLayer`, `refreshParcels` and `loadBlueBlazed` all begin
+`if (tilesActive) return` — the tile archive supersedes them. Their
+buttons had been removed from `index.html` at some point while the
+handlers stayed, guarded by `|| {addEventListener(){}}`, so restoring
+the panel restored three buttons that would light up and draw nothing.
+
+They are **fallbacks for a missing archive, not features**, and they are
+now shown only when `tilesActive` is false. Blue-Blazed got a real
+switch instead: it is drawn from the archive, so the Layers chip filters
+that paint rule (`setBlueBlazed`), the same way the trails rule is
+gated.
+
+PAD-US's access rating is genuinely dead while the archive loads, and
+reviving it means baking the rating into the tiles. That is work, not a
+button.
+
+### Traps
+
+| What happened | Root cause | Guard |
+|---|---|---|
+| Three fallback buttons shipped visible despite `hidden` | `.chip` is `display: flex`, which beats the user agent's `[hidden] { display: none }` — the same trap `#filtersPanel` hit, now three times in this file | `#layersPanel .chip[hidden]` spelled out in `styles.css`, with the reason |
+| "Cannot access 'markCanvas' before initialization" | `wireLayerPanel()` applies every switch, and half of what it switches is declared further down `app.js` | it runs with the rest of the layer setup, not beside the basemap code |
+| Pins came back empty after being switched off and on | `paintMarks` bails out while they are off, so the canvas still held wherever the map was when they went off | `syncLayer("pins")` repaints on the way back on |
+| Clicking bare ground opened a place with the pins hidden | the nearest-place click had no idea the marks were off | it checks `layerOn("pins")` |
+| An offline click on a live layer threw an unhandled rejection | those four handlers had never been reachable, so they had never had to survive a failed fetch | `liveLayer()` wraps them and says so on the status line |
+
+`tools/isotest/layers.mjs` is the check. Every toggle is asserted against
+`window.__layers()`, which reports what is **on the map** rather than
+what the panel believes, and the locally drawn layers are asserted
+against the pixels as well — a chip that lights up while nothing changes
+is the failure worth catching, and it is invisible in a screenshot of
+the panel. It also reloads the page and asserts every choice survived.

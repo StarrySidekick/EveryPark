@@ -13,6 +13,10 @@
 
 const EveryParkTiles = (() => {
   let layer = null, map = null, active = null;
+  // Not `visible`: that name is already a function here, deciding
+  // whether one FEATURE draws. This is whether the whole layer is on.
+  let shapesOn = true;
+  let blueBlazedOn = true;
   let hoverKey = null, hoverLabelEl = null;
   // normalised name -> "open" | "permission" | "unverified" | "fee".
   // The tiles carry geometry and source attributes but not our verdict,
@@ -178,6 +182,9 @@ const EveryParkTiles = (() => {
       },
       {
         dataLayer: "blueblazed",
+        // Read at paint time, like the trails rule above, so the Layers
+        // panel can switch it without rebuilding the rules.
+        filter: () => blueBlazedOn,
         symbolizer: new protomapsL.LineSymbolizer({
           color: B.color, width: B.weight, opacity: B.opacity
         })
@@ -301,6 +308,12 @@ const EveryParkTiles = (() => {
       }
       map = theMap;
       active = activeTypes;
+      // The visitor may have switched the shapes off last visit. The
+      // layer is still built — rebuilding it on a toggle would refetch
+      // every tile — it just does not go on the map.
+      shapesOn = EveryParkPrefs.get("shapes", (CONFIG.mapLayers || {}).shapes);
+      blueBlazedOn = EveryParkPrefs.get("blueblaze",
+                                        (CONFIG.mapLayers || {}).blueblaze);
       try {
         layer = protomapsL.leafletLayer({
           url: CONFIG.vectorTiles.url,
@@ -313,7 +326,7 @@ const EveryParkTiles = (() => {
           maxDataZoom: CONFIG.vectorTiles.maxDataZoom || 14,
           pane: "overlayPane"
         });
-        layer.addTo(map);
+        if (shapesOn) layer.addTo(map);
       } catch (e) {
         console.warn("Vector tiles failed to load:", e);
         return false;
@@ -329,6 +342,30 @@ const EveryParkTiles = (() => {
       map.on("mousemove", onMove);
       map.on("click", onClick);
       return true;
+    },
+
+    // The Blue-Blazed network on or off. Unlike the shapes this is one
+    // rule inside a shared layer, so it is a repaint rather than an
+    // add/remove: the tiles are already here either way.
+    setBlueBlazed(on) {
+      blueBlazedOn = !!on;
+      if (layer && layer.rerenderTiles) layer.rerenderTiles();
+      else if (layer && layer.redraw) layer.redraw();
+    },
+    blueBlazedShown() { return blueBlazedOn; },
+
+    // Whether the shapes are on the map right now, for the checks.
+    shown() { return !!(layer && map && map.hasLayer(layer)); },
+
+    // Park boundaries on or off, from the Layers panel. Kept as an
+    // add/remove rather than an opacity change so a hidden layer stops
+    // fetching tiles as you pan, which is the whole point of switching
+    // it off on a slow connection.
+    setVisible(on) {
+      shapesOn = !!on;
+      if (!layer || !map) return;
+      if (shapesOn && !map.hasLayer(layer)) layer.addTo(map);
+      else if (!shapesOn && map.hasLayer(layer)) map.removeLayer(layer);
     },
 
     // Lets a clicked polygon show the same popup as its pin.

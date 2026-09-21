@@ -126,6 +126,35 @@ header .tagline { font-size: .78rem; opacity: .85; display: block; font-weight: 
 #layersPanel .chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 #layersPanel .lp-note { font-size: .66rem; color: var(--muted); margin-top: 2px; }
 
+/* The same trap #filtersPanel hit: `display: flex` above beats the user
+   agent's [hidden] { display: none }, so hidden=true never closed it.
+   Third time in this file, so it is written out for both the panel and
+   the chips inside it: .chip is display:flex too, and the fallback
+   buttons below shipped visible for exactly this reason. Any element
+   here given display by a rule needs its own [hidden] escape. */
+#layersPanel[hidden] { display: none !important; }
+#layersPanel .chip[hidden], #layersPanel .lp-group[hidden] { display: none !important; }
+
+.layers-wrap { position: relative; }
+#layersPanel {
+  top: calc(100% + 8px);
+  left: 0; right: auto;
+  min-width: 290px;
+  max-height: 72vh; overflow-y: auto;
+  gap: 11px;
+}
+#layersPanel .chips { flex-wrap: wrap; gap: 5px; }
+#layersPanel .lp-group { display: flex; flex-direction: column; gap: 5px; }
+/* The group heading carries the master switch for that group, so the
+   two read as one thing: "Roads: on", not a heading and a stray chip. */
+#layersPanel .lp-title {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+#layersPanel .chip.lp-master { padding: 2px 9px; font-size: .64rem; }
+/* A ground choice is one-of, not one-of-many, so it reads as a row of
+   segments rather than as independent switches. */
+#layersPanel .chip.base-chip { font-size: .72rem; padding: 4px 9px; }
+
 /* ---------- Popup blocks ---------- */
 .pblock { border-radius: 3px; padding: 6px 9px; margin-bottom: 7px; }
 .pblock .pb-head { font-weight: 700; font-size: .78rem; }
