@@ -41,8 +41,13 @@
   // ground and belongs under the parks; roads are wayfinding and belong
   // over them, or every road vanishes the moment it crosses a forest.
   map.createPane("epWater").style.zIndex = 210;
+  // Drawn roads go between the parks (overlayPane, 400) and the place
+  // labels the imagery basemaps put in epRoads: a label under a road is
+  // unreadable, and a road under a forest is not a road.
+  map.createPane("epRoadLines").style.zIndex = 435;
   map.createPane("epRoads").style.zIndex = 440;
   map.getPane("epWater").style.pointerEvents = "none";
+  map.getPane("epRoadLines").style.pointerEvents = "none";
   map.getPane("epRoads").style.pointerEvents = "none";
 
   const baseLayers = {};
@@ -3280,6 +3285,19 @@
   // Boundaries and trails come from the tile archive. If it's missing or
   // the renderer failed to load, everything falls back to fetching per
   // viewport exactly as it did before.
+  // Roads first, because whether they loaded decides whether the park
+  // tiles also have to draw trails. Both carry the same OpenStreetMap
+  // paths; drawing them twice is how you get one trail in two colours.
+  const roadsActive = (typeof EveryParkRoads !== "undefined")
+    && EveryParkRoads.init(map);
+  if (!roadsActive) {
+    if (CONFIG.trailLines) CONFIG.trailLines.inTiles = true;
+    // An empty "Roads" heading in the filter panel is worse than no
+    // heading: it reads as a thing that is broken rather than off.
+    const g = document.getElementById("roadGroup");
+    if (g) g.hidden = true;
+  }
+
   if (CONFIG.vectorTiles && CONFIG.vectorTiles.enabled)
     tilesActive = EveryParkTiles.init(map, activeTypes);
 

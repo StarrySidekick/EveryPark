@@ -1,0 +1,85 @@
+name: Rebuild roads
+
+# Every recorded road in both states, re-cut into data/roads.pmtiles.
+#
+# Separate from "Refresh EveryPark data" on purpose. That run is already
+# close to GitHub's 360-minute ceiling, and roads have nothing to do with
+# it: TIGER/Line publishes once a year, so this needs running when the
+# Census puts out a new vintage and at no other time. Changing how roads
+# LOOK needs none of this — that is CONFIG.roads, and a plain commit.
+#
+# Roughly 20 minutes: ~12 fetching (most of it the OpenStreetMap trail
+# mirror, which is paged box by box), ~4 cutting tiles, the rest packing.
+on:
+  workflow_dispatch:
+    inputs:
+      year:
+        description: "TIGER/Line vintage (blank = whatever fetchroads.py pins)"
+        required: false
+        default: ""
+  schedule:
+    # TIGER's new vintage lands in the autumn; check once a year, in
+    # November, rather than monthly for a file that changes annually.
+    - cron: "0 7 3 11 *"
+
+permissions:
+  contents: write
+
+# Shares the lock with publish and refresh: all three write to data/.
+concurrency:
+  group: everypark-data
+  cancel-in-progress: false
+
+jobs:
+  roads:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install numpy requests pyshp pmtiles mapbox-vector-tile
+
+      - name: Pull TIGER/Line and the trail mirror
+        run: |
+          if [ -n "${{ inputs.year }}" ]; then
+            sed -i "s/^TIGER_YEAR = .*/TIGER_YEAR = ${{ inputs.year }}/" fetchroads.py
+          fi
+          python3 fetchroads.py
+
+      - name: Cut tiles
+        run: python3 makeroadtiles.py stage --src raw/roads.npz
+
+      # The gate. Decodes what was just written with a library that
+      # shares no code with the encoder, and checks the projection
+      # against the Census Bureau's own geocoder. A silently mirrored or
+      # shifted archive looks completely fine on a map.
+      - name: Check the tiles against the source
+        run: python3 tools/roadcheck.py --src raw/roads.npz --geocode
+
+      - name: Pack
+        run: python3 makeroadtiles.py pack -o data/roads.pmtiles
+
+      - name: Commit
+        run: |
+          git config user.name  "everypark-bot"
+          git config user.email "actions@github.com"
+          git add data/roads.pmtiles
+          if git diff --cached --quiet; then
+            echo "nothing changed"
+            exit 0
+          fi
+          git commit -m "Rebuild road tiles from TIGER/Line"
+          for attempt in 1 2 3; do
+            if git push; then
+              echo "pushed on attempt $attempt"
+              exit 0
+            fi
+            git pull --rebase --autostash origin main || exit 1
+            sleep 5
+          done
+          exit 1

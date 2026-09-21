@@ -30,6 +30,35 @@ Read against that sentence: **find** works, **trust** is at 64%, **get
 there** has just started, **use it there** is beginning. That ordering
 decides priority.
 
+
+---
+
+## Roads, added 2026-09-21 (v0.54.0)
+
+Every recorded road in both states, drawn at the same density at every
+zoom. Timothy's ask: *"I want to be able to see all the roads at once,
+regardless of zoom level"* — roads as a heat map of civilization rather
+than as wayfinding, with population centres to follow.
+
+What to know before touching it:
+
+- **The ladder is TIGER's own** (MTFCC + route type), not invented here.
+  Nine ranks, `CONFIG.roads.ranks`, which is also the draw order, the
+  chip order and the legend order. Changing how roads look is a
+  `config.js` edit and a commit — no rebuild, no Action.
+- **The state line you can see in the zoomed-out view is a data
+  boundary, not a real one.** Roads stop at Connecticut and New York
+  because that is all `fetchroads.py` pulls. Massachusetts is just as
+  settled; we have not asked the Census for it. Adding a state is one
+  entry in `STATE_FIPS` and a rebuild.
+- **Rebuilding is rare.** TIGER publishes yearly; the workflow is
+  `roads.yml`, manual or every November.
+- `tools/roadcheck.py` fails the build if the tiles disagree with the
+  source. It is the only thing standing between a subtly mirrored
+  archive and a map that looks completely fine while being wrong.
+
+Next, per Timothy: **population centres.**
+
 ---
 
 ## Deploying (this changed)

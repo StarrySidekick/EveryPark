@@ -1,0 +1,8 @@
+{
+  "name": "everypark-checks",
+  "private": true,
+  "description": "Nothing on the site needs npm — this is only for the Playwright checks in tools/isotest, which drive a real browser over a local copy of the map. The site itself is three script tags and no build step.",
+  "devDependencies": {
+    "playwright": "^1.63.0"
+  }
+}

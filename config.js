@@ -109,7 +109,10 @@ const CONFIG = {
       // vector tiles carry no water layer, so on parchment nobody was
       // doing the job the photograph used to do.
       waterUrl: "https://basemap.nationalmap.gov/arcgis/rest/services/USGSHydroCached/MapServer/tile/{z}/{y}/{x}",
-      roadsUrl: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}",
+      // No roadsUrl any more. Esri's transportation overlay is a picture
+      // of roads someone else chose to show at that zoom — it thins out
+      // as you pull back, it carries no rank we can restyle, and it
+      // would draw a second set of roads over CONFIG.roads. See there.
       attribution: "Relief and hydrography: USGS · Boundaries: CT DEEP, OpenStreetMap, USGS PAD-US"
     },
     {
@@ -121,7 +124,6 @@ const CONFIG = {
       url: "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}",
       attribution: "Imagery &copy; USGS The National Map (NAIP)",
       maxNativeZoom: 16,
-      roadsUrl: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}",
       labelsUrl: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
     },
     {
@@ -144,7 +146,6 @@ const CONFIG = {
       label: "Satellite (sharp, one season)",
       url: "https://clarity.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
       attribution: "Imagery &copy; Esri Clarity, Maxar, Earthstar Geographics",
-      roadsUrl: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}",
       labelsUrl: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
     },
     {
@@ -288,7 +289,7 @@ const CONFIG = {
   // Shown in the top-right corner. Bumped by hand on every code change,
   // so there's visible proof of which build is actually loaded rather
   // than guessing whether a cached copy is being served.
-  siteVersion: "v0.53.0",
+  siteVersion: "v0.54.0",
 
   // ---- VECTOR TILES --------------------------------------------------
   // Every boundary and trail, pre-cut into map tiles and packed into one
@@ -310,6 +311,99 @@ const CONFIG = {
     // tiles are stretched, which is why the map still draws when you zoom
     // right in. Must match --maxzoom used when building.
     maxDataZoom: 14
+  },
+
+  // ---- ROADS ---------------------------------------------------------
+  // Every road the Census Bureau records in Connecticut and New York,
+  // plus the footpaths OpenStreetMap knows about, drawn at the SAME
+  // density whatever the zoom (Timothy, 2026-09-21: "I want to be able
+  // to see all the roads at once, regardless of zoom level").
+  //
+  // That is the opposite of what every other web map does, and the
+  // reason is what it shows: a road network nobody has thinned is a map
+  // of where people are. Pull back to the whole of New York and the
+  // Adirondacks are a hole in the weave; the Hudson Valley is a thread
+  // count. Nothing is dropped, so nothing is being hidden from you.
+  //
+  // The ladder below is TIGER's own, not one invented here. MTFCC is the
+  // Census feature class on every road segment, and RTTYP is the route
+  // type — I for interstate, U for a US route, S for a state route. That
+  // is where "I-84 is a thick yellow line" comes from: it is an S1100
+  // primary road whose route type is I.
+  //
+  // Rebuild after changing sources:
+  //   python3 fetchroads.py
+  //   python3 makeroadtiles.py stage
+  //   python3 tools/roadcheck.py --geocode        # fails the build if wrong
+  //   python3 makeroadtiles.py pack -o data/roads.pmtiles
+  roads: {
+    enabled: true,
+    url: "data/roads.pmtiles",
+    // The archive holds z5-z13; past 13 the same tiles are stretched.
+    //
+    // Note what the renderer does with these numbers: protomaps-leaflet
+    // reads the tile ONE level below the zoom you are looking at and
+    // draws it at 512 px (`levelDiff`, which defaults to 1). So the z5
+    // tiles are what you see at map zoom 6, and the archive has to start
+    // a level lower than the lowest zoom you want roads at. Without z5
+    // and z6 in it, the whole-region view — the one this layer is for —
+    // came up completely empty and nothing said why.
+    //
+    // makeroadtiles.py cuts z14 as well and it is deliberately not
+    // packed. z14 is 28 MB of the 89 MB — a third of the archive — and
+    // all it buys is the difference between 0.9 m and 0.45 m of
+    // positional quantisation, which is invisible until about zoom 18
+    // and shows as a four-pixel stagger on a diagonal road at zoom 19.
+    // Stopping at 13 also means a quarter as many range requests when
+    // you pan about at high zoom, since one tile then covers four
+    // screens' worth. To put it back: pack with --maxzoom 14 and set
+    // this to 14.
+    maxDataZoom: 13,
+
+    // The ONLY thing zoom is allowed to change. Widths in pixels are
+    // multiplied by this, interpolated between the stops, so the weave
+    // reads as tone when you are far out and as streets when you are in.
+    // Which roads are drawn never changes.
+    scale: [[7, 0.30], [9, 0.52], [11, 0.78], [13, 1.0], [15, 1.45], [19, 2.6]],
+
+    // How much wider than its road a casing is drawn, in pixels.
+    casingWidth: 1.5,
+
+    // Draw order is this order — first is underneath, so the interstate
+    // is drawn last and crosses over everything. `id` must match the
+    // layer names makeroadtiles.py writes.
+    ranks: [
+      { id: "path", label: "Trail / footpath", color: "#4f7d52", width: 1.0,
+        opacity: 0.9, dash: [2, 3],
+        what: "Walkways, bike paths, bridle paths and OpenStreetMap footpaths — roads for people on foot." },
+      { id: "track", label: "Dirt track", color: "#9d8a63", width: 0.9,
+        opacity: 0.85, dash: [3, 3],
+        what: "TIGER's vehicular trail: unpaved, four-wheel-drive. The edge of the road network." },
+      { id: "service", label: "Service / alley", color: "#a8a293", width: 0.7,
+        opacity: 0.8,
+        what: "Alleys, driveways, parking aisles and service drives. Real roads that go nowhere in particular." },
+      { id: "local", label: "Local street", color: "#8f8875", width: 1.0,
+        opacity: 0.92,
+        what: "Neighbourhood roads, rural roads and city streets. Eighty-five per cent of every road in both states." },
+      { id: "collector", label: "County road", color: "#b08f63", width: 1.4,
+        opacity: 0.95,
+        what: "Secondary roads without a US or state route number: county roads and named through roads." },
+      { id: "arterial", label: "State / US route", color: "#d9a05a", width: 1.9,
+        opacity: 1, casing: "#8a5c2a",
+        what: "Secondary roads carrying a numbered US or state route — Route 7, US 44." },
+      { id: "ramp", label: "Ramp", color: "#e8bf62", width: 1.1, opacity: 1,
+        what: "On and off ramps. Drawn in the colour of the road they serve." },
+      { id: "highway", label: "Expressway", color: "#f2bf45", width: 2.5,
+        opacity: 1, casing: "#8a6512",
+        what: "Limited-access highway without an interstate number — the Merritt, the Taconic." },
+      { id: "interstate", label: "Interstate", color: "#efa90f", width: 3.2,
+        opacity: 1, casing: "#7d4e06",
+        what: "I-84, I-91, I-95. A primary road whose TIGER route type is I." }
+    ],
+
+    // "One ink" mode: drop the colours and let the whole network be one
+    // tone, so the only thing left to read is how much of it there is.
+    ink: { color: "#26332a", opacity: 0.5 }
   },
 
   // ---- PUBLIC LAND — THE MAIN EVENT -----------------------------------
@@ -340,6 +434,12 @@ const CONFIG = {
   // current view only, so detail stays high without slowing the map.
   trailLines: {
     enabled: true,
+    // The park tiles carry trails at z12-14 and CONFIG.roads carries the
+    // same OpenStreetMap paths at every zoom, in the `path` rank. Drawing
+    // both means the same trail in two colours. The roads layer wins;
+    // app.js turns this back on if the roads archive fails to load, so
+    // trails never disappear entirely.
+    inTiles: false,
     minZoom: 13,
     color: "#ffd24a",      // warm yellow reads well on satellite
     weight: 2,

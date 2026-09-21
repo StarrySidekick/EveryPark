@@ -601,3 +601,106 @@ inside the closed menu only because it clicks via `evaluate`.
   [`docs/ASSETS-NEEDED.md`](docs/ASSETS-NEEDED.md)**, which inventories every
   glyph the app draws, what it means, what size it has to work at, and the
   sixteen public buildings the 3D viewer fetches and has nothing to draw for
+
+---
+
+## Roads (v0.54.0)
+
+Every road the Census Bureau records in both states, drawn at the same
+density whatever the zoom. Timothy, 2026-09-21: *"I want to be able to
+see all the roads at once, regardless of zoom level"* — the road network
+as a heat map of where people are, not as wayfinding.
+
+**This is the opposite of what every web map does, and the reason they
+all do it is arithmetic.** A zoom-7 tile covers a third of New York.
+Putting a million driveways in it is a multi-megabyte tile that draws as
+a grey smear, so renderers drop minor roads at low zoom and add them
+back as you go in. Four things make keeping them affordable here:
+
+- **Quantisation is the simplification.** `fetchroads.py` writes
+  coordinates as integers on the zoom-14 tile grid, once. Zoom *z* is
+  `>> (14 - z)`. Vertices landing on the same integer collapse, so a road
+  needing 40 points at z14 needs 2 at z8 with no Douglas-Peucker pass and
+  no floating point anywhere in the tiler.
+- **One feature per rank per tile.** Each tile holds at most nine
+  features, one per rank, each a MultiLineString of every road of that
+  rank in the tile. No per-feature tags, and in the browser a rank is one
+  canvas path stroked once.
+- **Identical runs dedupe.** At z8 two parallel streets 100 m apart
+  quantise to the same pair of integers. The second is the same ink.
+- **No names.** A string table per tile, repeated at every zoom, is what
+  makes road tilesets big. The labels layer over the imagery basemaps
+  still has them.
+
+Result, measured: **617,634 roads, 11.5 M vertices, z7-z14 with every
+road at every level.**
+
+**Sub-pixel thinning, with a real bound.** `thin()` drops a vertex within
+one tile unit (1/16 of a screen pixel) of the line between its
+neighbours. Deliberately *not* the usual one-pass version, which tests
+only the candidate against the new chord: drop four in a row off a gentle
+curve that way and the line wanders a long way, one tolerance at a time.
+Every vertex dropped since the last kept one is re-tested, so the
+tolerance is a hard bound — `tools/roadcheck.py` measures it and the
+worst case comes back at exactly 1.00 units. It removes 53% of the bytes
+at z9 and 22% at z14.
+
+### TIGER, not OpenStreetMap
+
+The map leans on OSM everywhere else, so this needs saying. Two reasons:
+
+- Bulk OSM means a Geofabrik extract — 450 MB for New York alone, and
+  **the extract host is not reachable from every machine this project is
+  built on** (it is blocked from the current one; the Census is not).
+  Overpass cannot answer "every road in New York" at all.
+- TIGER/Line *is* the record of what roads exist: the Census Bureau's
+  road census, published per county, updated yearly, with a rank code
+  (MTFCC) on every feature. "Every road that is recorded" is literally
+  what that file is.
+
+**The ladder is TIGER's, not one invented here.** MTFCC is the feature
+class; RTTYP is the route type — `I` interstate, `U` US route, `S` state
+route. "I-84 is a thick yellow line" falls straight out: it is an S1100
+primary road whose RTTYP is `I`. Nine ranks, in `CONFIG.roads.ranks`,
+which is also the draw order and the chip order.
+
+**TIGER's one weakness is trails.** The Capitol Region planning area has
+21,422 road features and exactly 24 walkways and bike paths. So footpaths
+come from the same Esri-hosted OSM mirror the park trails already use
+(143,759 segments region-wide) and land in the `path` rank.
+
+**The park tiles stop drawing trails when the roads archive is
+drawing them** (`CONFIG.trailLines.inTiles`), or the same trail is drawn
+twice in two colours. The flag is read at *paint* time, not when
+`vectorlayers.js` builds its rules — `roadlayers.js` only learns whether
+its archive is really there after a round trip, and read once at build
+time a missing archive would take every trail with it and say nothing.
+
+### Traps this hit
+
+| What happened | Root cause | Guard |
+|---|---|---|
+| Ground-truth check said an interstate was 533 m from where it is | distance measured to the nearest **vertex**; a straight mile of interstate is two vertices a mile apart | distance to the nearest **segment**, and the landmark tolerance says out loud that it is eyeballed |
+| Local test server drew no roads at all | Python's `http.server` does not implement Range, and PMTiles is nothing but range requests | `tools/isotest/serve.py` |
+| Playwright served the page no Leaflet at all | the checks are offline; the CDN scripts had nowhere to come from | `tools/isotest/vendor/`, routed in |
+| The vendor route never ran | Playwright gives the **last** matching route priority, so a catch-all registered after a specific one silently wins | one handler that decides |
+| Roads drawn over the place labels on imagery | both were in the `epRoads` pane, and insertion order decided it | own pane `epRoadLines` at 435, under labels, over parks |
+
+### Rebuilding
+
+```bash
+python3 fetchroads.py                       # ~12 min, mostly the trail fetch
+python3 makeroadtiles.py stage              # ~4 min
+python3 tools/roadcheck.py --geocode        # exits 1 if the tiles lie
+python3 makeroadtiles.py pack -o data/roads.pmtiles
+node tools/isotest/roadsview.mjs            # needs tools/isotest/serve.py on :8125
+```
+
+`tools/roadcheck.py` is the gate. It decodes the tiles with
+`mapbox_vector_tile` — a library sharing no code with the hand-written
+encoder in `makeroadtiles.py` — checks that every road's endpoints are in
+the tiles exactly, measures the thinning against its own budget, and
+resolves a handful of addresses through the **Census Bureau's own
+geocoder** so the projection is checked against somebody else's code
+reading the same TIGER lines. That last one comes back at 6-7 m. Roads
+only need rebuilding when TIGER publishes a new year.
