@@ -155,6 +155,27 @@ header .tagline { font-size: .78rem; opacity: .85; display: block; font-weight: 
    segments rather than as independent switches. */
 #layersPanel .chip.base-chip { font-size: .72rem; padding: 4px 9px; }
 
+/* ---------- Offline ---------- */
+/* A layer that is fetched from somebody else is marked, not disabled:
+   a stale browser cache may still be able to draw it, and taking a
+   basemap away from someone who can still see it is its own lie. */
+#layersPanel .chip.needs-net { opacity: .45; border-style: dashed; }
+#layersPanel .chip.needs-net::after { content: " (needs signal)"; font-size: .6rem; }
+
+.off-bar {
+  height: 6px; border-radius: 3px; background: #e2e7e3; overflow: hidden;
+}
+.off-bar > div { height: 100%; width: 0%; background: var(--accent); transition: width .2s; }
+
+#offlineBadge {
+  background: #8a3324; color: #fff; border-radius: 3px;
+  padding: 2px 7px; font-size: .62rem; font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase; margin-right: 6px;
+}
+/* Same trap as the panel and its chips: an element given display by a
+   rule of its own ignores [hidden] without this. Fourth time. */
+#offlineBadge[hidden], .off-bar[hidden] { display: none !important; }
+
 /* ---------- Popup blocks ---------- */
 .pblock { border-radius: 3px; padding: 6px 9px; margin-bottom: 7px; }
 .pblock .pb-head { font-weight: 700; font-size: .78rem; }

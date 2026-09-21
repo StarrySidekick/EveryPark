@@ -300,7 +300,7 @@ const CONFIG = {
   // Shown in the top-right corner. Bumped by hand on every code change,
   // so there's visible proof of which build is actually loaded rather
   // than guessing whether a cached copy is being served.
-  siteVersion: "v0.55.0",
+  siteVersion: "v0.56.0",
 
   // ---- VECTOR TILES --------------------------------------------------
   // Every boundary and trail, pre-cut into map tiles and packed into one
@@ -317,11 +317,39 @@ const CONFIG = {
   // Set enabled:false to fall back to the old live per-viewport fetching.
   vectorTiles: {
     enabled: true,
+    // Relative to the site, or an absolute URL if the archive moves to
+    // its own host. The two PMTiles files are the only things here big
+    // enough to be worth moving: the repo grows by their whole size on
+    // every rebuild, and git keeps every copy forever. Anywhere that
+    // answers HTTP range requests with an Access-Control-Allow-Origin
+    // header will do; GitHub Pages does both, GitHub *Releases* does
+    // ranges but sends no CORS header, so release assets cannot be read
+    // by the browser (they would still work for a native app).
+    // Changing this URL is all the app needs; sw.js is told the new
+    // location at load and saves from there.
     url: "data/everypark.pmtiles",
     // Highest zoom the archive actually contains. Beyond this the same
     // tiles are stretched, which is why the map still draws when you zoom
     // right in. Must match --maxzoom used when building.
     maxDataZoom: 14
+  },
+
+  // ---- OFFLINE --------------------------------------------------------
+  // The map is meant to be used in places with no signal, which is most
+  // of what it maps. sw.js precaches the code and the JSON on the first
+  // visit; the two PMTiles archives are ~156 MB and are only saved when
+  // the visitor presses the button in the Layers panel.
+  //
+  // What CANNOT work offline, and why it is said out loud in the panel
+  // rather than quietly failing: aerial imagery, relief shading, water
+  // and place names are other people's raster tiles, and the 3D viewer's
+  // terrain comes from AWS. Everything this project generates itself
+  // works with the radio off.
+  offline: {
+    enabled: true,
+    // Shown on the save button before the download starts. Update it
+    // when the archives change size; it is a label, not a measurement.
+    sizeHint: "156 MB"
   },
 
   // ---- WHAT'S ON THE MAP ---------------------------------------------

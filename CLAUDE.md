@@ -788,3 +788,97 @@ what the panel believes, and the locally drawn layers are asserted
 against the pixels as well — a chip that lights up while nothing changes
 is the failure worth catching, and it is invisible in a screenshot of
 the panel. It also reloads the page and asserts every choice survived.
+
+---
+
+## Offline (v0.56.0)
+
+The map is for places without a bar of reception, so it works with the
+radio off. Measured, not asserted: `tools/isotest/offline.mjs` saves the
+region, cuts the browser's network, **reloads**, and finds the same ink
+on the canvas as online — roads 29.07%, parks 14.61%, identical both
+ways — plus a search for "Sleeping Giant" that still answers.
+
+**What works offline:** everything this project generates. Parks, every
+boundary, every road, the trails, the dataset, search, filters, the
+Layers panel. The Field guide basemap is drawn from CSS and vector
+tiles rather than fetched, which is why there is a map at all without a
+connection; that was decided for other reasons and turned out to be the
+thing that made this possible.
+
+**What does not, and says so:** aerial imagery, relief shading, water
+and place names are other people's raster tiles, and the 3D viewer's
+terrain comes from AWS. The panel names them, and while offline they are
+marked `needs-net` rather than hidden — a stale browser cache may still
+draw them, and taking a basemap away from someone who can still see it
+is its own kind of lie.
+
+### The service worker
+
+Three caches, and the split matters:
+
+| Cache | Holds | Lifetime |
+|---|---|---|
+| `ep-shell-<version>` | the code | replaced wholesale on deploy |
+| `ep-data-v1` | the JSON | survives deploys, stale-while-revalidate |
+| `ep-archives-v1` | the PMTiles, ~156 MB | only ever written when the visitor asks |
+
+Re-downloading 156 MB because a stylesheet changed would be
+indefensible, which is why the shell cache is the only one keyed on
+`siteVersion`.
+
+**The hard part is that PMTiles is nothing but range requests.** A
+service worker cannot cache a 206: `cache.put` rejects a partial
+response outright, and a cache full of arbitrary byte windows would be
+useless anyway. So the archive is stored once, whole, and the worker
+answers ranges by slicing the stored Blob.
+
+`blob.slice()` and not `arrayBuffer()`. Blob slicing is lazy and
+file-backed, so serving a 4 KB tile out of a 65 MB archive reads 4 KB.
+`arrayBuffer()` would read 65 MB, on every tile.
+
+The download streams through a counting `TransformStream` straight into
+`cache.put`. Buffering both archives to build a Blob first would be
+~156 MB of RAM on a phone for no reason, and dropping the progress
+report instead would leave someone staring at a dead button for several
+minutes on a real connection.
+
+`navigator.storage.persist()` is requested before saving. Without it the
+browser may evict the whole thing the next time it wants disk, which for
+a map saved deliberately before a hike is exactly the wrong moment.
+
+### The archives are not necessarily on this origin
+
+`CONFIG.vectorTiles.url` and `CONFIG.roads.url` may be absolute. They
+are the only files big enough to be worth moving off the repo — git
+keeps a whole copy of each on every rebuild, forever — and the worker is
+**told** where they are on every page load rather than assuming
+`data/*.pmtiles`. Hard-coding the path would mean the day they move is
+the day offline silently stops working.
+
+A host qualifies if it answers range requests **and** sends
+`Access-Control-Allow-Origin`. Measured 2026-09-21:
+
+| Host | Range | CORS | Usable from the browser |
+|---|---|---|---|
+| GitHub Pages (this site) | 206, `accept-ranges: bytes` | `*` | yes |
+| GitHub Releases | 206, correct `Content-Range` | **absent on both hops** | **no** |
+
+GitHub Releases also redirects to a time-limited signed Azure URL, so
+even with CORS the redirect would need headers on both hops. It remains
+fine for a native app, which does not enforce CORS.
+
+### Vendored, not fetched
+
+Leaflet and protomaps-leaflet live in `vendor/`. An offline park guide
+cannot begin by asking unpkg for the code that draws the map. This also
+deleted the CDN-stubbing from every Playwright check: there is nothing
+left to intercept.
+
+### Traps
+
+| What happened | Root cause | Guard |
+|---|---|---|
+| The offline badge and progress bar shipped visible | `#offlineBadge` and `.off-bar` are given `display` by their own rules, which beats `[hidden]` — fourth instance in this file | explicit `[hidden] { display: none !important }`, written next to the rule |
+| Status said "unavailable" on a first visit | nothing controls the page until the worker activates, so the status question had nobody to answer it | wait for `controllerchange`, with a timeout |
+| One missing shell file would have left no offline app at all | `cache.addAll` is all-or-nothing and names no culprit | each file cached individually, failures logged by name |
