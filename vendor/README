@@ -1,0 +1,13 @@
+Leaflet and protomaps-leaflet, served from this repo instead of unpkg.
+
+An offline park guide cannot begin by asking a CDN for the code that
+draws the map. These are byte-for-byte the files index.html used to load
+from unpkg, at the versions it pinned.
+
+Refresh by re-pinning the version here AND in the service worker's
+SHELL list, then:
+
+  curl -sS -o leaflet.js   https://unpkg.com/leaflet@1.9.4/dist/leaflet.js
+  curl -sS -o leaflet.css  https://unpkg.com/leaflet@1.9.4/dist/leaflet.css
+  curl -sS -o protomaps-leaflet.js \
+       https://unpkg.com/protomaps-leaflet@4.0.1/dist/protomaps-leaflet.js

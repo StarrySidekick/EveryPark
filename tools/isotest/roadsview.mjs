@@ -14,30 +14,13 @@ const fails = [];
 const browser = await chromium.launch({ executablePath: EXEC });
 const page = await browser.newPage({ viewport: { width: 1200, height: 820 } });
 
-// Offline, like the rest of tools/isotest. The page asks unpkg for
-// Leaflet and protomaps-leaflet; those come from vendor/ instead, so
-// this check needs no network and cannot be broken by a CDN. Refresh
-// them with the curl lines in vendor/README when index.html's pinned
-// versions move.
-//
-// One handler for everything: Playwright gives the LAST matching route
-// priority, so a catch-all registered after a specific one silently
-// wins and the specific one never runs.
-const VENDOR = new URL("./vendor/", import.meta.url).pathname;
-await page.route(/^https?:/, route => {
-  const u = route.request().url();
-  if (u.startsWith("http://127.0.0.1") || u.startsWith("http://localhost"))
-    return route.continue();
-  if (u.includes("unpkg.com")) {
-    const name = u.includes("protomaps") ? "protomaps-leaflet.js"
-               : u.endsWith(".css") ? "leaflet.css" : "leaflet.js";
-    return route.fulfill({ path: VENDOR + name,
-      contentType: name.endsWith(".css") ? "text/css" : "application/javascript" });
-  }
-  // Basemap rasters and live ArcGIS queries are not what this checks,
-  // and waiting on them makes the timings meaningless.
-  return route.abort();
-});
+// Leaflet and protomaps are served from vendor/ in the repo now, so
+// there is nothing to intercept and no CDN to be broken by. Basemap
+// rasters and live ArcGIS are still aborted: they are not what these
+// checks are about, and waiting on them makes the timings meaningless.
+await page.route(/^https?:/, route =>
+  route.request().url().startsWith("http://127.0.0.1")
+    ? route.continue() : route.abort());
 
 const errors = [];
 page.on("pageerror", e => errors.push("PAGEERROR " + e));
