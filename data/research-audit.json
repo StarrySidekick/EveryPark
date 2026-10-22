@@ -1,9 +1,9 @@
 {
- "entries": 61,
- "matched": 61,
+ "entries": 80,
+ "matched": 80,
  "unmatched": [],
  "rules": 22,
- "rule_hits": 10903,
+ "rule_hits": 10874,
  "dead_rules": [],
- "researched_places": 10883
+ "researched_places": 10854
 }

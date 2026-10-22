@@ -4,7 +4,7 @@
   {
    "state": "CT",
    "file": "places-CT.json",
-   "count": 7820,
+   "count": 7797,
    "bbox": [
     -73.719,
     40.983,
@@ -15,7 +15,7 @@
   {
    "state": "NY",
    "file": "places-NY.json",
-   "count": 16382,
+   "count": 16255,
    "bbox": [
     -79.757,
     40.5,
