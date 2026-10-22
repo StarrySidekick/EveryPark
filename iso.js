@@ -1554,7 +1554,9 @@ const EveryParkIso = (() => {
     expand:  '<path d="M3 3h7v2.4H5.4V10H3zM14 3h7v7h-2.4V5.4H14zM3 14h2.4v4.6H10V21H3zM18.6 14H21v7h-7v-2.4h4.6z"/>',
     dice:    '<rect x="3.5" y="3.5" width="17" height="17" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="8.5" cy="8.5" r="1.6"/><circle cx="15.5" cy="8.5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="8.5" cy="15.5" r="1.6"/><circle cx="15.5" cy="15.5" r="1.6"/>',
     shrink:  '<path d="M10 3h2.4v7H5.4V7.6H10zM11.6 3H14v4.6h4.6V10h-7zM3 14h7v7H7.6v-4.6H3zM14 14h7v2.4h-4.6V21H14z"/>',
-    scroll:  '<path d="M5 3h11a2.5 2.5 0 0 1 2.5 2.5V19a2 2 0 0 0 2 2H7a2 2 0 0 1-2-2z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M8 7.5h7M8 11h7M8 14.5h4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/>'
+    scroll:  '<path d="M5 3h11a2.5 2.5 0 0 1 2.5 2.5V19a2 2 0 0 0 2 2H7a2 2 0 0 1-2-2z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M8 7.5h7M8 11h7M8 14.5h4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/>',
+    // Start mode: where you stand, the way, and the flag you are going to.
+    route:   '<circle cx="6" cy="18.5" r="2.6"/><path d="M17.5 3v10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/><path d="M18 3.4h4l-1.3 2 1.3 2h-4z"/><path d="M8.6 17.6c3-1 1.6-4.6 4.6-5.2 1.6-.3 3.2.2 4.3-.6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-dasharray="2.2 2.4"/>'
   };
   const icon = name =>
     `<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"
@@ -2259,6 +2261,12 @@ const EveryParkIso = (() => {
           ctx.strokeStyle = fill; ctx.lineWidth = 1; ctx.stroke();
         };
         if (kind === "road") { band(0.34, roadEdge); band(0.22, roadCol); }
+        // A guide trail carries its blaze. The dark edge is what lets a
+        // white or yellow blaze read on pale ground at all.
+        else if (pc[4]) {
+          band(pc[5] ? 0.2 : 0.3, "rgba(20,24,18,.62)");
+          band(pc[5] ? 0.11 : 0.19, pc[4]);
+        }
         else band(0.24, trailCol);
       }
     };
@@ -2932,16 +2940,12 @@ const EveryParkIso = (() => {
     ctx.imageSmoothingEnabled = q !== 1;
     ctx.drawImage(S._cache, 0, 0, cw, ch, 0, 0, W, Hh);
 
-    // The walker, painted fresh over the baked scene.
+    // The walker, painted fresh over the baked scene, on top of the
+    // chosen route if there is one.
     const P = S._proj, inv = P ? (W / S._cache.width) : 1;
+    if (P && (S.route || S.you)) drawRoute(ctx, S, P, inv);
     if (P && S.hikePath && S.hikePath.length > 3) {
-      const path = S.hikePath;
-      const tt = S.hikeT < 0.5 ? S.hikeT * 2 : (1 - S.hikeT) * 2;
-      const fi = tt * (path.length - 1);
-      const i0 = Math.min(path.length - 2, Math.floor(fi));
-      const fr = fi - i0;
-      const fgx = path[i0][0] + (path[i0 + 1][0] - path[i0][0]) * fr;
-      const fgy = path[i0][1] + (path[i0 + 1][1] - path[i0][1]) * fr;
+      const [fgx, fgy] = hikerAt(S);
       const gx2 = Math.min(GRID - 1, Math.max(0, Math.round(fgx)));
       const gy2 = Math.min(GRID - 1, Math.max(0, Math.round(fgy)));
       const [hx0, hy0] = P.project(fgx, fgy, S.H[gy2 * GRID + gx2]);
@@ -2951,6 +2955,368 @@ const EveryParkIso = (() => {
                   Math.min(9, Math.max(3.6, P.s * 1.2)) * inv, P.tod,
                   S.hikeT * 100, S.tod, S.pixel !== false);
     }
+  }
+
+  // ---- Park guides (2026-10-22) --------------------------------------
+  // A baked guide (makeguides.py) exists for each park in
+  // data/testset.json: the DEEP boundary, the trails as a routable graph
+  // with their blazes, the ways in, and named features. Every other
+  // place opens exactly as it did. Timothy, 2026-10-22: "start at the
+  // beginning of wherever you are in order to begin your route."
+  //
+  // Nothing here says more than the guide holds. A stretch DEEP does not
+  // map is called OpenStreetMap's, a road is called a road, and a blaze
+  // DEEP did not record is said to be unrecorded rather than guessed.
+  const guideBase = () => window.EP_GUIDE_BASE || "data/guides/";
+  let guideIndex = null;
+  async function loadGuide(id) {
+    if (!id) return null;
+    // One small index, fetched once, so the 24,000 places without a
+    // guide cost a single request between them rather than a 404 each.
+    if (!guideIndex)
+      guideIndex = withTimeout(fetch(guideBase() + "index.json"), 5000)
+        .then(r => (r.ok ? r.json() : []))
+        .catch(() => []);
+    const idx = await guideIndex;
+    if (!Array.isArray(idx) || !idx.some(e => e.id === id)) return null;
+    const r = await withTimeout(fetch(guideBase() + id + ".json"), 15000);
+    return r.ok ? r.json() : null;
+  }
+
+  // Warm the index shortly after the page loads, so the first viewer to
+  // open does not wait on it before it can even ask for a boundary. Two
+  // seconds in, to stay out of the way of the dataset's own load.
+  setTimeout(() => { loadGuide("-").catch(() => {}); }, 2000);
+
+  const guideStyle = () =>
+    (typeof CONFIG !== "undefined" && CONFIG.guide) || {};
+  // Used only where config.js is not loaded (the offline harness).
+  const BLAZE_FALLBACK = { blue: "#2f6fdc", white: "#f4f1e8", red: "#d6362f",
+    yellow: "#efc81f", orange: "#ee8324", green: "#2e9c4f",
+    violet: "#9a5fd1", purple: "#8a43b6" };
+  const blazeHex = name =>
+    (name && (guideStyle().blazes || BLAZE_FALLBACK)[name]) || null;
+
+  // Shortest ways through the junctions. Cost is metres, weighted so a
+  // route prefers what DEEP maps over what it does not and trails over
+  // roads, with each metre of climb counted as eight on the flat
+  // (Naismith's rule, near enough): the shortest way up a ridge is
+  // rarely the one anybody would choose to walk.
+  const ROUTE_WEIGHT = { deep: 1, osm: 1.25, road: 1.6 };
+  function makeRouter(g) {
+    const [w, s, e, n] = g.bbox;
+    const lat0 = (s + n) / 2, lng0 = (w + e) / 2;
+    const kx = 111320 * Math.cos(lat0 * Math.PI / 180), ky = 110574;
+    const xy = (lng, lat) => [(lng - lng0) * kx, (lat - lat0) * ky];
+    const N = g.nodes.length;
+    const adj = Array.from({ length: N }, () => []);
+    g.edges.forEach((ed, k) => {
+      if (ed.a !== ed.b) { adj[ed.a].push(k); adj[ed.b].push(k); }
+    });
+    const nodeXY = g.nodes.map(q => xy(q[0], q[1]));
+    const nearest = (lng, lat, maxM) => {
+      const [x, y] = xy(lng, lat);
+      let best = -1, bd = maxM;
+      for (let i = 0; i < N; i++) {
+        if (!adj[i].length) continue;
+        const d = Math.hypot(nodeXY[i][0] - x, nodeXY[i][1] - y);
+        if (d < bd) { bd = d; best = i; }
+      }
+      return best < 0 ? null : { node: best, m: bd };
+    };
+    const cost = (ed, fwd) => {
+      const t = g.trails[ed.t] || {};
+      const f = (ROUTE_WEIGHT[t.src] || 1.3) * (t.onRoad ? 1.2 : 1);
+      return ed.m * f + (fwd ? ed.up || 0 : ed.down || 0) * 8;
+    };
+    // Binary-heap Dijkstra. A few hundred nodes: nothing cleverer needed.
+    const run = (src, penalty) => {
+      const dist = new Float64Array(N).fill(Infinity);
+      const via = new Int32Array(N).fill(-1);
+      dist[src] = 0;
+      const heap = [[0, src]];
+      const swap = (i, j) => { const t = heap[i]; heap[i] = heap[j]; heap[j] = t; };
+      const push = it => {
+        heap.push(it);
+        for (let i = heap.length - 1; i > 0;) {
+          const up = (i - 1) >> 1;
+          if (heap[up][0] <= heap[i][0]) break;
+          swap(up, i); i = up;
+        }
+      };
+      const pop = () => {
+        const top = heap[0], last = heap.pop();
+        if (heap.length) {
+          heap[0] = last;
+          for (let i = 0; ;) {
+            const l = 2 * i + 1, r = l + 1;
+            let m = i;
+            if (l < heap.length && heap[l][0] < heap[m][0]) m = l;
+            if (r < heap.length && heap[r][0] < heap[m][0]) m = r;
+            if (m === i) break;
+            swap(m, i); i = m;
+          }
+        }
+        return top;
+      };
+      while (heap.length) {
+        const [d, u] = pop();
+        if (d > dist[u]) continue;
+        for (const k of adj[u]) {
+          const ed = g.edges[k];
+          const fwd = ed.a === u, v = fwd ? ed.b : ed.a;
+          const pen = penalty && penalty.has(k) ? penalty.get(k) : 1;
+          const nd = d + cost(ed, fwd) * pen;
+          if (nd < dist[v]) { dist[v] = nd; via[v] = k; push([nd, v]); }
+        }
+      }
+      return { src, dist, via };
+    };
+    // Steps are {k: edge, fwd: walked a->b}.
+    const pathTo = (res, dst) => {
+      if (dst == null || !isFinite(res.dist[dst])) return null;
+      const out = [];
+      for (let v = dst; v !== res.src;) {
+        const k = res.via[v], ed = g.edges[k];
+        const u = ed.a === v ? ed.b : ed.a;
+        out.push({ k, fwd: ed.a === u });
+        v = u;
+      }
+      return out.reverse();
+    };
+    const stats = steps => {
+      let m = 0, up = 0, down = 0, osm = 0, road = 0;
+      for (const { k, fwd } of steps) {
+        const ed = g.edges[k], t = g.trails[ed.t] || {};
+        m += ed.m;
+        up += fwd ? ed.up || 0 : ed.down || 0;
+        down += fwd ? ed.down || 0 : ed.up || 0;
+        if (t.src === "osm") osm += ed.m;
+        if (t.src === "road" || t.onRoad) road += ed.m;
+      }
+      return { m, up, down, osm, road };
+    };
+    // A loop of about `targetM`: out to a turnaround by the best way,
+    // back by the best way that avoids the outward one. Several
+    // turnarounds are tried and the one sharing least ground wins. When
+    // every candidate doubles back, the caller says "there and back"
+    // rather than dressing it up as a loop.
+    const loop = (src, targetM) => {
+      const out = run(src);
+      const cands = [];
+      for (let v = 0; v < N; v++) {
+        if (v === src || !adj[v].length || !isFinite(out.dist[v])) continue;
+        cands.push([Math.abs(stats(pathTo(out, v)).m - targetM / 2), v]);
+      }
+      cands.sort((a, b) => a[0] - b[0]);
+      let best = null;
+      for (const [, v] of cands.slice(0, 10)) {
+        const there = pathTo(out, v);
+        const usedOut = new Set(there.map(sv => sv.k));
+        const back = pathTo(run(v, new Map(there.map(sv => [sv.k, 6]))), src);
+        if (!back) continue;
+        const steps = there.concat(back);
+        const st = stats(steps);
+        const shared = back.reduce((a, sv) =>
+          a + (usedOut.has(sv.k) ? g.edges[sv.k].m : 0), 0);
+        const overlap = shared / Math.max(1, st.m / 2);
+        // A loop that is mostly tarmac is a walk round the car park.
+        const score = overlap * 2 + Math.abs(st.m - targetM) / targetM
+                    + 1.5 * st.road / Math.max(1, st.m);
+        if (!best || score < best.score) best = { steps, overlap, score };
+      }
+      return best;
+    };
+    return { xy, adj, nearest, run, pathTo, stats, loop };
+  }
+
+  // Distances the way Connecticut's own trail maps give them.
+  const fmtFt = m => `${Math.round(m * 3.281 / 10) * 10} ft`;
+  const fmtDist = m => {
+    const mi = m / 1609.34;
+    return mi < 0.1 ? fmtFt(m) : `${mi.toFixed(mi < 10 ? 1 : 0)} mi`;
+  };
+  // Walking time: 4.5 km/h on the flat plus a minute per 10 m of climb.
+  const fmtTime = (m, up) => {
+    const mins = Math.max(1, Math.round(m / 1000 / 4.5 * 60 + up / 10));
+    return mins < 60 ? `${mins} min`
+                     : `${Math.floor(mins / 60)} h ${String(mins % 60).padStart(2, "0")} min`;
+  };
+
+  // DEEP names most trails in a park "<Park> Park Trail"; the blaze is
+  // what tells them apart on the ground, so a generic name is not shown.
+  const GENERIC_TRAIL = /\b(park|forest) (trail|path)$/i;
+  // Pavement is a road to the person walking it, whichever source drew
+  // it: DEEP's trail layer includes park roads (t.onRoad), and calling
+  // one "the unblazed trail" and then warning about cars in the same
+  // breath is how Squantz Pond's first directions read.
+  const legKey = t => t.src === "road" ? "road|" + (t.name || "")
+                    : t.onRoad ? "road|"
+                    : t.src === "osm" ? "osm|" + (t.name || "")
+                    // The FIRST mark is the one you follow. "Yellow" and
+                    // "Yellow/White Tree" are one walk along yellow paint
+                    // that another trail joins for a while, not two legs.
+                    : "deep|" + (t.blaze ? t.blaze.split("/")[0] : "|" + (t.name || ""));
+  const legNoun = L => {
+    const t = L.t, nm = L.name && !GENERIC_TRAIL.test(L.name) ? L.name : null;
+    if (t.src === "road" || t.onRoad) return (t.src === "road" && nm) || "the park road";
+    if (t.src === "osm") return nm ? `the path called ${nm}` : "an unmarked path";
+    if (t.blaze) return `the ${t.blaze.split("/")[0].toUpperCase()} blazes` + (nm ? ` (${nm})` : "");
+    return nm ? `the ${nm}` : "the unblazed trail";
+  };
+
+  // Group the steps into legs a person would describe, and say which way
+  // to turn between them, from the geometry itself.
+  function routeLegs(g, R, steps) {
+    let legs = [];
+    for (const sv of steps) {
+      const ed = g.edges[sv.k], t = g.trails[ed.t] || {};
+      const pts = sv.fwd ? ed.g : ed.g.slice().reverse();
+      const up = sv.fwd ? ed.up || 0 : ed.down || 0;
+      const down = sv.fwd ? ed.down || 0 : ed.up || 0;
+      const key = legKey(t);
+      const last = legs[legs.length - 1];
+      if (last && last.key === key) {
+        last.m += ed.m; last.up += up; last.down += down;
+        last.pts.push(...pts.slice(1));
+        if (t.name && (!last.name || GENERIC_TRAIL.test(last.name))) last.name = t.name;
+      } else legs.push({ key, t, name: t.name, m: ed.m, up, down, pts: pts.slice() });
+    }
+    // A hop of a few metres across a junction is not a step anyone
+    // takes consciously; fold it into the leg before it.
+    for (let i = legs.length - 1; i > 0; i--)
+      if (legs[i].m < 30 && legs.length > 1) {
+        const a = legs[i - 1], b = legs[i];
+        a.m += b.m; a.up += b.up; a.down += b.down; a.pts.push(...b.pts.slice(1));
+        legs.splice(i, 1);
+        if (legs[i] && legs[i].key === a.key) {
+          const c = legs[i];
+          a.m += c.m; a.up += c.up; a.down += c.down; a.pts.push(...c.pts.slice(1));
+          legs.splice(i, 1);
+        }
+      }
+    const heading = (pts, atEnd) => {
+      const P2 = pts.map(q => R.xy(q[0], q[1]));
+      const seq = atEnd ? P2.slice().reverse() : P2;
+      let k = 1, d = 0;
+      while (k < seq.length - 1 && d < 25) {
+        d += Math.hypot(seq[k][0] - seq[k - 1][0], seq[k][1] - seq[k - 1][1]); k++;
+      }
+      const a = seq[0], b = seq[Math.min(k, seq.length - 1)];
+      return atEnd ? [a[0] - b[0], a[1] - b[1]] : [b[0] - a[0], b[1] - a[1]];
+    };
+    for (let i = 1; i < legs.length; i++) {
+      const a = heading(legs[i - 1].pts, true), b = heading(legs[i].pts, false);
+      // x east, y north: a positive cross product is a turn to the left.
+      const ang = Math.atan2(a[0] * b[1] - a[1] * b[0], a[0] * b[0] + a[1] * b[1]) * 180 / Math.PI;
+      const side = ang > 0 ? "left" : "right", mag = Math.abs(ang);
+      legs[i].turn = mag < 25 ? "Carry straight on onto"
+                   : mag < 60 ? `Bear ${side} onto`
+                   : mag < 140 ? `Turn ${side} onto`
+                   : `Turn sharply back to the ${side} onto`;
+    }
+    return legs;
+  }
+
+  function legSentence(L, i, n, start, dest) {
+    let s = i === 0 ? `From ${start}, take ${legNoun(L)}.` : `${L.turn} ${legNoun(L)}.`;
+    s += ` Follow it ${fmtDist(L.m)}`;
+    if (L.up >= 8 && L.up >= L.down) s += `, climbing ${fmtFt(L.up)}`;
+    else if (L.down >= 8) s += `, dropping ${fmtFt(L.down)}`;
+    s += ".";
+    if (L.t.src === "osm") s += " It is not on DEEP's trail map: someone mapped it on OpenStreetMap, and it may be informal.";
+    else if (L.t.src === "road" || L.t.onRoad) s += " This stretch is a road; watch for cars.";
+    else if (!L.t.blaze) s += " DEEP records no blaze for it.";
+    if (i === n - 1) s += ` ${dest}`;
+    return s;
+  }
+
+  // Uniform resample in grid units, so index speed is ground speed.
+  function resample(pts, stepG) {
+    if (pts.length < 2) return pts.slice();
+    const out = [pts[0]];
+    let carry = 0;
+    for (let i = 1; i < pts.length; i++) {
+      let [x0, y0] = out[out.length - 1];
+      const [x1, y1] = pts[i];
+      let seg = Math.hypot(x1 - x0, y1 - y0);
+      while (carry + seg >= stepG) {
+        const t = (stepG - carry) / seg;
+        const nx = x0 + (x1 - x0) * t, ny = y0 + (y1 - y0) * t;
+        out.push([nx, ny]);
+        seg -= stepG - carry; carry = 0; x0 = nx; y0 = ny;
+      }
+      carry += seg;
+    }
+    out.push(pts[pts.length - 1]);
+    return out;
+  }
+
+  // Where along its path the walker is, in grid units.
+  function hikerAt(S) {
+    const path = S.hikePath;
+    const tt = S.hikeOneWay ? Math.max(0, Math.min(1, S.hikeT))
+             : (S.hikeT < 0.5 ? S.hikeT * 2 : (1 - S.hikeT) * 2);
+    const fi = tt * (path.length - 1);
+    const i0 = Math.min(path.length - 2, Math.floor(fi));
+    const fr = fi - i0;
+    return [path[i0][0] + (path[i0 + 1][0] - path[i0][0]) * fr,
+            path[i0][1] + (path[i0 + 1][1] - path[i0][1]) * fr];
+  }
+
+  // The chosen way, painted fresh over the baked scene like the walker:
+  // it must never be hidden by a tree or a ridge, and redrawing it costs
+  // nothing next to rebaking the terrain.
+  function drawRoute(ctx, S, P, inv) {
+    const hAt = (gx, gy) => {
+      const cx2 = Math.min(GRID - 1, Math.max(0, Math.round(gx)));
+      const cy2 = Math.min(GRID - 1, Math.max(0, Math.round(gy)));
+      return S.H[cy2 * GRID + cx2];
+    };
+    const scr = q => {
+      const [x, y] = P.project(q[0], q[1], hAt(q[0], q[1]));
+      return [x * inv, (y - P.s * .15) * inv];
+    };
+    const base = Math.max(2, P.s * .42) * inv;
+    ctx.save();
+    ctx.lineJoin = ctx.lineCap = "round";
+    if (S.route && S.route.pts.length > 1) {
+      const pts = S.route.pts.map(scr);
+      const line = (wd, col) => {
+        ctx.beginPath();
+        pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+        ctx.lineWidth = wd; ctx.strokeStyle = col; ctx.stroke();
+      };
+      const gold = guideStyle().route || "#ffd24a";
+      line(base * 3.4, "rgba(16,12,6,.42)");
+      line(base * 2.1, "rgba(255,247,222,.92)");
+      line(base, gold);
+      // Start: a ring where you stand. End: a flag.
+      const [sx, sy] = pts[0];
+      ctx.beginPath(); ctx.arc(sx, sy, base * 2.6, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255,247,222,.95)"; ctx.fill();
+      ctx.lineWidth = base * .9; ctx.strokeStyle = "#1a140a"; ctx.stroke();
+      const [ex, ey] = pts[pts.length - 1];
+      const pole = base * 9;
+      ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(ex, ey - pole);
+      ctx.lineWidth = Math.max(1.5, base * .55); ctx.strokeStyle = "#1a140a"; ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(ex, ey - pole); ctx.lineTo(ex + pole * .62, ey - pole * .8);
+      ctx.lineTo(ex, ey - pole * .6); ctx.closePath();
+      ctx.fillStyle = gold; ctx.fill(); ctx.lineWidth = 1; ctx.stroke();
+    }
+    if (S.you) {
+      const [x, y] = scr([S.you.gx, S.you.gy]);
+      const acc = Math.min(base * 40, S.you.accG * P.s * 1.55 * inv);
+      const blue = guideStyle().you || "#4aa8ff";
+      if (acc > base * 3) {
+        ctx.beginPath(); ctx.arc(x, y, acc, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(74,168,255,.16)"; ctx.fill();
+      }
+      ctx.beginPath(); ctx.arc(x, y, base * 2.2, 0, Math.PI * 2);
+      ctx.fillStyle = blue; ctx.fill();
+      ctx.lineWidth = base; ctx.strokeStyle = "#fff"; ctx.stroke();
+    }
+    ctx.restore();
   }
 
   // ---- Open --------------------------------------------------------
@@ -2998,7 +3364,9 @@ const EveryParkIso = (() => {
           <button class="iso-part iso-part-next" title="Next piece" hidden>&#8250;</button>
           <div class="iso-part-lab" hidden></div>
           <div class="iso-corner iso-corner-br">
+            <div class="iso-menu iso-guide" id="isoGuide" hidden></div>
             <div class="iso-corner-row">
+              <button id="isoGuideBtn" title="Start a route" hidden></button>
               <button id="isoLoreBtn" title="Read about this place" hidden></button>
               <button id="isoSaveBtn" title="Save a picture"></button>
             </div>
@@ -3067,9 +3435,13 @@ const EveryParkIso = (() => {
     // The lore ribbon runs its own animation frame, so closing the
     // viewer has to stop that too or it keeps typing into a dead node.
     let loreCancel = null;
+    // Anything still running against this viewer when it closes: the
+    // location watch, at least, which would otherwise keep the GPS on.
+    const cleanups = [];
     const close = () => {
       cancelAnimationFrame(raf);
       if (loreCancel) loreCancel();
+      cleanups.forEach(f => { try { f(); } catch (e) { /* closing anyway */ } });
       ov.remove();
     };
     ov.querySelector("#isoClose").addEventListener("click", close);
@@ -3105,11 +3477,18 @@ const EveryParkIso = (() => {
       if (ov.classList.contains("iso-full")) { setFull(false); e.stopPropagation(); }
     });
 
+    // A park with a baked guide takes its boundary from the guide: the
+    // same DEEP polygon the guide's trails were clipped to and audited
+    // against, with no live lookup that could pick a different parcel.
+    const guide = await loadGuide(p.id).catch(() => null);
+
     let boundary = null;
     // Districts arrive WITH their boundary — it is the National Register
     // outline the map already drew. Re-deriving it from DEEP/OSM/PAD-US
     // would find nothing, because a town centre is not anybody's parcel.
     if (p.rings && p.rings.length) boundary = { rings: p.rings, label: p.boundaryLabel || "supplied" };
+    else if (guide && guide.boundary && guide.boundary.rings.length)
+      boundary = { rings: guide.boundary.rings, label: "CT DEEP" };
     else { try { boundary = await fetchBoundary(p); } catch (e) { /* fall through */ } }
 
     // Separate pieces get their own view, reachable with the arrows. The
@@ -3251,6 +3630,80 @@ const EveryParkIso = (() => {
                 panX: 0, panY: 0,
                 season: 0 };
     if (p.type === "cemetery") S.tod = 1;      // dusk suits them
+
+    // The guide's trails, in their blaze colours, in place of the generic
+    // OSM lines. Re-derived whenever the grid changes (the block-size
+    // slider) and after every dressing update, which would otherwise put
+    // the generic lines back. The route and the walker ride on the same
+    // conversion, because both are stored in lng/lat, not grid cells.
+    const G = guide ? { g: guide, R: makeRouter(guide), route: null } : null;
+    const toGrid = (lng, lat) =>
+      [(lng - bbox[0]) / (bbox[2] - bbox[0]) * (GRID - 1),
+       (bbox[3] - lat) / (bbox[3] - bbox[1]) * (GRID - 1)];
+    const applyGuide = () => {
+      if (!G) return;
+      const onIsland = (gx, gy) => {
+        const cx2 = Math.round(gx), cy2 = Math.round(gy);
+        return cx2 >= 0 && cy2 >= 0 && cx2 < GRID && cy2 < GRID
+            && S.inside[cy2 * GRID + cx2];
+      };
+      const lines = [], pieces = [];
+      for (const ed of G.g.edges) {
+        const t = G.g.trails[ed.t] || {};
+        if (t.src === "road") continue;          // the dressing draws roads
+        const blaze = t.src === "deep" ? blazeHex((t.colours || [])[0]) : null;
+        const col = blaze || guideStyle().unblazed || "#a8937a";
+        // Clipped to the island, as the generic trails are: a line hanging
+        // off the edge into the sky reads as a bug.
+        let run = [];
+        const flush = () => {
+          if (run.length > 1) {
+            lines.push(run);
+            for (const pc of pathPieces([run], t.src === "osm" ? [1.5, 1.1] : null)) {
+              pc.push(col, blaze ? 0 : 1);     // [4] paint, [5] narrow
+              pieces.push(pc);
+            }
+          }
+          run = [];
+        };
+        for (const q of ed.g) {
+          const [gx, gy] = toGrid(q[0], q[1]);
+          if (!onIsland(gx, gy)) { flush(); continue; }
+          const prev = run[run.length - 1];
+          run.push([gx, gy, prev ? prev[2] + Math.hypot(gx - prev[0], gy - prev[1]) : 0]);
+        }
+        flush();
+      }
+      S.trailLines = lines;
+      S.trailPieces = pieces;
+      if (G.route) {
+        // Keep whatever the dressing gave the walker, to hand back when
+        // the route is put away. A fresh dressing update replaces the
+        // path under us, which is how a stale one is told apart.
+        if (!S.hikeOneWay || S.hikePath !== S._routeHike) S._baseHike = S.hikePath;
+        const pts = G.route.lnglat.map(q => toGrid(q[0], q[1]));
+        S.route = { pts };
+        S.hikePath = S._routeHike = resample(pts, 0.5);
+        S.hikeOneWay = true;
+      } else {
+        if (S.hikeOneWay) S.hikePath = S._baseHike || null;
+        S.route = null;
+        S.hikeOneWay = false;
+      }
+      if (S.youLL) {
+        const [gx, gy] = toGrid(S.youLL[0], S.youLL[1]);
+        S.you = { gx, gy, accG: S.youLL[2] / (S.mPerBlock || spanM / GRID) };
+      }
+    };
+    applyGuide();
+    // Taking the camera yourself (a pan) ends the follow, the same way
+    // touching the island ends the turntable.
+    const unfollow = () => {
+      if (!S.follow) return;
+      S.follow = false;
+      const fb = ov.querySelector("#isoFollow");
+      if (fb) fb.classList.remove("active");
+    };
     const baseSub = boundary ? `boundary: ${boundary.label}`
                              : "no boundary found — square sample";
     sub.textContent = baseSub + " · fetching trails, roads, buildings…";
@@ -3313,6 +3766,10 @@ const EveryParkIso = (() => {
       && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     let pages = [], page = 0, shown = 0, typing = false;
+    // While a route is active the ribbon narrates it, and the lore that
+    // keeps arriving in the background waits in loreBase until the route
+    // is put away. It must not swap the page out from under a direction.
+    let loreBase = [], routeOn = false, routeOpenedLore = false;
     let lastT = 0, hold = 0, typeRaf = null;
 
     const paintPage = () => {
@@ -3385,6 +3842,25 @@ const EveryParkIso = (() => {
     });
     loreBtn.addEventListener("click", () => showLore(true));
 
+    // A route's directions go in the same dialogue box. It is already a
+    // game's text box, and directions read one step at a time are what a
+    // quest's are. Passing null hands the box back to the lore.
+    const narrate = arr => {
+      routeOn = !!arr;
+      pages = arr || loreBase;
+      page = 0;
+      if (arr) {
+        if (lore.hidden) routeOpenedLore = true;
+        loreSeen = true; lore.hidden = false; loreBtn.hidden = true;
+        startPage();
+      } else if (routeOpenedLore) {
+        // The route opened it, so the route closes it: ending a route
+        // should not leave the lore typing at you uninvited.
+        routeOpenedLore = false;
+        showLore(false);
+      } else if (!lore.hidden) startPage();
+    };
+
     // Facts the record does not hold, gathered from what the viewer has
     // already drawn. Read at compose time so whatever has streamed in by
     // then is included and nothing waits on anything else.
@@ -3400,7 +3876,7 @@ const EveryParkIso = (() => {
 
     // Local first, so there is text within a frame of the terrain
     // appearing. The network sources then replace it if they land.
-    pages = lorePages(p, null, null, loreExtra());
+    loreBase = pages = lorePages(p, null, null, loreExtra());
     page = 0;
     showLore(false);          // opens only when the corner button is pressed
     loading("about this place", true);
@@ -3430,8 +3906,9 @@ const EveryParkIso = (() => {
         rawNames = (rawNames || []).concat(marks);
         buildLabels();
       }
-      if (deep && !lore.hidden) {   // show the rules without waiting on the rest
-        pages = lorePages(p, null, null, loreExtra(), deep);
+      if (deep) loreBase = lorePages(p, null, null, loreExtra(), deep);
+      if (deep && !lore.hidden && !routeOn) {   // show the rules without waiting on the rest
+        pages = loreBase;
         page = Math.min(page, pages.length - 1);
         paintPage();
       }
@@ -3444,6 +3921,8 @@ const EveryParkIso = (() => {
       // Do not yank the page out from under someone mid-read: keep their
       // place if the new set still has it, and only retype if the text
       // they are looking at actually changed.
+      loreBase = fresh;
+      if (routeOn) return;
       const wasBody = pages[page] && pages[page].body;
       pages = fresh;
       page = Math.min(page, pages.length - 1);
@@ -3460,6 +3939,7 @@ const EveryParkIso = (() => {
       Object.assign(S, d);
       S.spriteAt = new Map();
       for (const sp of d.sprites) S.spriteAt.set(sp.gy * GRID + sp.gx, sp.kind);
+      applyGuide();
       const bits = [baseSub];
       if (d.trailM.some(v => v)) bits.push("trails");
       if (last) bits.push((d.roadPaths && d.roadPaths.length) ? "roads"
@@ -3623,6 +4103,8 @@ const EveryParkIso = (() => {
         S.spriteAt = new Map();
         for (const sp of d2.sprites) S.spriteAt.set(sp.gy * GRID + sp.gx, sp.kind);
       }
+      labelBlocks();          // mPerBlock first: the location halo reads it
+      applyGuide();
       S.tex = satSample ? satTexFrom(satSample, bbox) : null;
       setTreeMask();
       if (!S.tex) S.useSat = false;
@@ -3922,6 +4404,7 @@ const EveryParkIso = (() => {
           const q = canvas.width / canvas.getBoundingClientRect().width;
           S.panX = (S.panX || 0) + (m.x - pinchMid.x) * q;
           S.panY = (S.panY || 0) + (m.y - pinchMid.y) * q;
+          if (Math.hypot(m.x - pinchMid.x, m.y - pinchMid.y) > 2) unfollow();
         }
         pinchDist = d; pinchMid = m;
         stopSpin();
@@ -3935,6 +4418,7 @@ const EveryParkIso = (() => {
           const q = canvas.width / canvas.getBoundingClientRect().width;
           S.panX = (S.panX || 0) + (e.clientX - lastX) * q;
           S.panY = (S.panY || 0) + (e.clientY - lastY) * q;
+          unfollow();
         } else {
           // Touch drags the ISLAND; a mouse drags the CAMERA. With a
           // finger on the thing itself, pushing right should carry the
@@ -3963,18 +4447,341 @@ const EveryParkIso = (() => {
     canvas.addEventListener("contextmenu", e => e.preventDefault());
     canvas.style.touchAction = "none";
     canvas.style.cursor = "grab";
+    // ---- Start mode ------------------------------------------------
+    // Pick where you are starting, pick where you are going, and the
+    // viewer walks it: the route glows on the terrain, the walker sets
+    // off from your start, the camera follows, and the dialogue box reads
+    // the turns as the blazes you will see on the trees. Only for places
+    // with a baked guide; the button never appears otherwise.
+    const guideBtn = ov.querySelector("#isoGuideBtn");
+    const gpanel = ov.querySelector("#isoGuide");
+    if (G) {
+      const g = G.g, R = G.R;
+      guideBtn.hidden = false;
+      guideBtn.innerHTML = icon("route");
+      const el = (tag, cls, text) => {
+        const e = document.createElement(tag);
+        if (cls) e.className = cls;
+        if (text != null) e.textContent = text;
+        return e;
+      };
+      const setPanel = on => {
+        gpanel.hidden = !on;
+        guideBtn.classList.toggle("active", on);
+        if (on) setMenu(false);       // the two panels collide on a phone
+      };
+      guideBtn.addEventListener("click", e => { e.stopPropagation(); setPanel(gpanel.hidden); });
+      gpanel.addEventListener("click", e => e.stopPropagation());
+      terrainBtn.addEventListener("click", () => setPanel(false));
+
+      const frame = (title, back) => {
+        gpanel.innerHTML = "";
+        const head = el("div", "iso-guide-head");
+        head.append(el("span", "iso-guide-title", title));
+        if (back) {
+          const b = el("button", "iso-tool", "Back");
+          b.addEventListener("click", back);
+          head.append(b);
+        }
+        gpanel.append(head);
+        return gpanel;
+      };
+      const item = (label, sub, onClick) => {
+        const b = el("button", "iso-guide-item");
+        b.append(el("b", null, label));
+        if (sub) b.append(el("small", null, sub));
+        b.addEventListener("click", onClick);
+        return b;
+      };
+      const note = text => el("p", "iso-guide-note", text);
+      const [bw, bs, be, bn] = g.bbox;
+      const side = (lng, lat) => {
+        const [x, y] = R.xy(lng, lat), [x0, y0] = R.xy((bw + be) / 2, (bs + bn) / 2);
+        const a = (Math.atan2(x - x0, y - y0) * 180 / Math.PI + 360) % 360;
+        return ["north", "north-east", "east", "south-east", "south",
+                "south-west", "west", "north-west"][Math.round(a / 45) % 8] + " side";
+      };
+
+      // Where am I. Only trusted when you are actually at the park: from
+      // home, "the nearest trail to you" is a nonsense start.
+      let watchId = null;
+      cleanups.push(() => {
+        if (watchId != null) navigator.geolocation.clearWatch(watchId);
+      });
+      const setYou = pos => {
+        const c = pos.coords;
+        S.youLL = [c.longitude, c.latitude, c.accuracy || 30];
+        applyGuide();
+      };
+      const locate = () => {
+        frame("Finding you", () => showStarts());
+        navigator.geolocation.getCurrentPosition(pos => {
+          const { longitude: lng, latitude: lat } = pos.coords;
+          const near = R.nearest(lng, lat, 1500);
+          if (!near) {
+            const far = R.nearest(lng, lat, 1e9);
+            showStarts(`You are about ${fmtDist(far ? far.m : 0)} from the nearest trail here, so start from a way in instead.`);
+            return;
+          }
+          setYou(pos);
+          if (watchId == null)
+            watchId = navigator.geolocation.watchPosition(setYou, () => {},
+              { enableHighAccuracy: true, maximumAge: 5000 });
+          startAt(near.node, near.m < 40 ? "where you are"
+                                         : `the trail ${fmtDist(near.m)} from you`);
+        }, err => showStarts(err.code === 1
+              ? "Location is off for this page, so pick a way in."
+              : "No location fix came back, so pick a way in."),
+        { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 });
+      };
+
+      const showStarts = msg => {
+        const box = frame("Where are you starting?");
+        if (msg) box.append(note(msg));
+        const list = el("div", "iso-guide-list");
+        if (navigator.geolocation)
+          list.append(item("Where I am now", "uses your location, for when you are at the park", locate));
+        const rank = en => en.kind === "deep" ? 0 : en.name ? 1 : 2;
+        const ways = g.entrances.filter(en => en.node != null)
+                                .sort((a, b) => rank(a) - rank(b));
+        for (const en of ways) {
+          const label = en.kind === "deep" ? en.name : (en.name || "A park road");
+          // Which paint you meet first: it tells two points on the same
+          // road apart, and it is what you look for when you get there.
+          const marks = [...new Set(R.adj[en.node].map(k => g.trails[g.edges[k].t])
+                         .filter(t => t && t.src === "deep" && t.blaze)
+                         .map(t => t.blaze.toUpperCase()))];
+          const meets = marks.length ? ` · meets ${marks.slice(0, 3).join(", ")}` : "";
+          const sub = en.kind === "deep"
+            ? `${en.type === "Park" ? "Main entrance" : en.type || "Way in"} · CT DEEP${meets}`
+            : `trail reaches the road · ${side(en.lng, en.lat)}${meets}`;
+          list.append(item(label, sub, () => startAt(en.node, label)));
+        }
+        box.append(list);
+        const lost = g.entrances.filter(en => en.node == null).length;
+        box.append(note("Ways in are CT DEEP's own access points, plus every place a trail reaches a road. A road point says where the trail meets it, not that there is parking."
+          + (lost ? ` ${lost} DEEP access point${lost > 1 ? "s are" : " is"} too far from any trail to start from.` : "")));
+      };
+
+      const KIND_WORD = { summit: "Summit", tower: "Tower", falls: "Falls",
+        viewpoint: "Viewpoint", lake: "Water", beach: "Beach",
+        historic: "Historic site", attraction: "Attraction", camp: "Campground",
+        picnic: "Picnic area", spring: "Spring", shelter: "Shelter",
+        toilets: "Restrooms", info: "Map board" };
+      let lastStart = null;
+      const startAt = (node, label) => {
+        lastStart = { node, label };
+        const res = R.run(node);
+        const dests = [], views = [], seen = new Set();
+        for (const f of g.features) {
+          if (!KIND_WORD[f.kind]) continue;
+          // A lake's named point is mid-water; its shore trail is further.
+          const snap = R.nearest(f.lng, f.lat, f.kind === "lake" || f.kind === "beach" ? 500 : 250);
+          if (!snap || snap.node === node) continue;
+          const steps = R.pathTo(res, snap.node);
+          if (!steps || !steps.length) continue;
+          const key = (f.name || f.kind) + "|" + snap.node;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          const d = { name: f.name || KIND_WORD[f.kind], kind: f.kind, f,
+                      steps, st: R.stats(steps), offM: snap.m };
+          if (!f.name && f.kind === "viewpoint") views.push(d); else dests.push(d);
+        }
+        // Unnamed viewpoints: the highest few, not all fifteen.
+        views.sort((a, b) => (b.f.elev || 0) - (a.f.elev || 0));
+        for (const v of views.slice(0, 3)) {
+          if (v.f.elev != null) v.name = `Viewpoint, elevation ${fmtFt(v.f.elev)}`;
+          dests.push(v);
+        }
+        // Places worth walking to first, nearest first; the facilities
+        // after them, and only the nearest of each kind. Sorted by
+        // distance alone, Devil's Hopyard listed two restrooms, two
+        // picnic areas and a map board ahead of Chapman Falls.
+        const AMENITY = new Set(["toilets", "picnic", "info", "shelter", "camp"]);
+        dests.sort((a, b) => (AMENITY.has(a.kind) - AMENITY.has(b.kind)) || a.st.m - b.st.m);
+        const kindSeen = new Set();
+        for (let i = dests.length - 1; i >= 0; i--) if (AMENITY.has(dests[i].kind)) {
+          // walking backwards, so the survivor of each kind is the nearest
+          const later = dests.slice(0, i).some(d => d.kind === dests[i].kind);
+          if (later) dests.splice(i, 1);
+        }
+
+        const box = frame(`From ${label}`, () => showStarts());
+        const list = el("div", "iso-guide-list");
+        const netM = g.edges.reduce((a, e2) => a + e2.m, 0);
+        const loops = [];
+        for (const L of [2000, 5000]) {
+          if (netM < L * 0.8) continue;
+          const lp = R.loop(node, L);
+          if (!lp) continue;
+          const st = R.stats(lp.steps);
+          if (loops.some(o => Math.abs(o.st.m - st.m) < 300)) continue;
+          loops.push({ lp, st });
+        }
+        for (const { lp, st } of loops) {
+          // Mostly the same ground both ways is not a loop, and saying so
+          // is the difference between a guide and an advert.
+          const back = lp.overlap > 0.5;
+          list.append(item(back ? "There and back" : st.m < 3500 ? "Short loop" : "Long loop",
+            `${fmtDist(st.m)} · ${fmtTime(st.m, st.up)} · climbs ${fmtFt(st.up)}`
+              + (st.road > st.m * .4 ? ` · ${Math.round(100 * st.road / st.m)}% on roads` : ""),
+            () => go({ steps: lp.steps, start: label,
+                       title: back ? "There and back" : "The loop",
+                       arrive: "You are back where you started." })));
+        }
+        for (const d of dests.slice(0, 14))
+          list.append(item(d.name,
+            `${KIND_WORD[d.kind]} · ${fmtDist(d.st.m)} · ${fmtTime(d.st.m, d.st.up)} · climbs ${fmtFt(d.st.up)}`,
+            () => go({ steps: d.steps, start: label, title: `To ${d.name}`,
+                       arrive: d.offM > 60
+                         ? `The trail comes within ${fmtDist(d.offM)} of ${d.name}.`
+                         : `You reach ${d.name}.` })));
+        if (!list.children.length)
+          box.append(note("Nothing named is reachable from here on the trails this guide knows."));
+        box.append(list);
+      };
+
+      const routePages = () => {
+        const r = G.route, n = r.legs.length;
+        const blazed = r.legs.some(L => L.t.blaze);
+        const out = [{ head: r.title, src: "CT DEEP trails",
+          body: `${fmtDist(r.st.m)}, about ${fmtTime(r.st.m, r.st.up)}, climbing ${fmtFt(r.st.up)} in all. `
+              + (blazed ? "Each step is a blaze you will see painted on the trees."
+                        : "DEEP records no blazes along this way, so go by the turns.") }];
+        r.legs.forEach((L, i) => out.push({ head: `Step ${i + 1} of ${n}`,
+          src: L.t.src === "osm" ? "OpenStreetMap" : L.t.src === "road" ? "Road" : "CT DEEP",
+          body: legSentence(L, i, n, r.start, r.arrive) }));
+        return out;
+      };
+
+      const go = r => {
+        const legs = routeLegs(g, R, r.steps);
+        const lnglat = [];
+        for (const sv of r.steps) {
+          const pts = sv.fwd ? g.edges[sv.k].g : g.edges[sv.k].g.slice().reverse();
+          lnglat.push(...(lnglat.length ? pts.slice(1) : pts));
+        }
+        G.route = Object.assign({}, r, { legs, st: R.stats(r.steps), lnglat });
+        applyGuide();
+        // A beat at the start, so the camera arrives before the walker
+        // sets off, then the whole way in under a minute and a bit.
+        S.hikeT = -0.06;
+        S.hikeSecs = Math.min(70, Math.max(14, G.route.st.m / 1000 * 9));
+        S.zoom = Math.max(S.zoom || 1, 2.2);
+        S.follow = true;
+        stopSpin();
+        showRoute();
+        narrate(routePages());
+      };
+      const clearRoute = () => {
+        G.route = null; S.follow = false;
+        applyGuide();
+        narrate(null);
+      };
+
+      const showRoute = () => {
+        const r = G.route;
+        const box = frame(r.title, () => {
+          clearRoute();
+          if (lastStart) startAt(lastStart.node, lastStart.label); else showStarts();
+        });
+        box.append(el("div", "iso-guide-sum",
+          `${fmtDist(r.st.m)} · ${fmtTime(r.st.m, r.st.up)} · climbs ${fmtFt(r.st.up)}`));
+        const warn = [];
+        if (r.st.osm > 20) warn.push(`${fmtDist(r.st.osm)} of it is on paths DEEP does not map (from OpenStreetMap).`);
+        if (r.st.road > 20) warn.push(`${fmtDist(r.st.road)} of it is along a road.`);
+        if (warn.length) box.append(note(warn.join(" ")));
+        // On a phone the steps fold away: the panel would otherwise cover
+        // the island the camera is following, and the dialogue box is
+        // already reading the same steps one at a time.
+        const narrow = window.innerWidth <= 760;
+        const stepsBtn = el("button", "iso-tool" + (narrow ? "" : " active"), "Steps");
+        const list = el("div", "iso-guide-list");
+        list.hidden = narrow;
+        stepsBtn.addEventListener("click", () => {
+          list.hidden = !list.hidden;
+          stepsBtn.classList.toggle("active", !list.hidden);
+        });
+        r.legs.forEach((L, i) => {
+          const row = el("div", "iso-guide-leg");
+          const kind = L.t.src === "osm" ? " osm" : (L.t.src === "road" || L.t.onRoad) ? " road" : "";
+          const sw = el("span", "iso-guide-sw" + kind);
+          const hex = L.t.src === "deep" ? blazeHex((L.t.colours || [])[0]) : null;
+          if (hex) sw.style.background = hex;
+          row.append(sw, el("span", null, legSentence(L, i, r.legs.length, r.start, r.arrive)));
+          list.append(row);
+        });
+        const tools = el("div", "iso-guide-row");
+        const again = el("button", "iso-tool", "Walk it again");
+        const followBtn = el("button", "iso-tool" + (S.follow ? " active" : ""), "Follow");
+        followBtn.id = "isoFollow";
+        followBtn.title = "Keep the walker in the middle of the view";
+        again.addEventListener("click", () => {
+          S.hikeT = -0.06; S.follow = true; followBtn.classList.add("active");
+          narrate(routePages());
+        });
+        followBtn.addEventListener("click", () => {
+          S.follow = !S.follow;
+          followBtn.classList.toggle("active", S.follow);
+        });
+        const endBtn = el("button", "iso-tool", "End route");
+        endBtn.addEventListener("click", () => { clearRoute(); showStarts(); });
+        tools.append(stepsBtn, again, followBtn, endBtn);
+        box.append(tools, list);
+        box.append(note("Routes prefer CT DEEP's trail map, then OpenStreetMap paths, then roads. Check the posted map at the trailhead: trails close and blazes get repainted."));
+      };
+      showStarts();
+      // tools/isotest/guide.mjs drives the panel through the DOM and
+      // checks what it produced here.
+      window.__isoGuide = { G, startAt, go, showStarts };
+    }
+
     const loop = () => {
       if (!document.getElementById("isoOverlay")) return;
       if (!dragging && S.spin) target += 0.0012;
       const prev = yaw;
       yaw += (target - yaw) * .15;
-      S.moving = dragging || S.spin || Math.abs(yaw - prev) > 1e-4;
       // Walking pace: ~1.3 m/s of real ground, whatever the block size.
+      // A route is a preview instead: the whole way, once, then again.
       if (S.hikePath) {
-        const mPerBlock = S.mPerBlock || 10;
-        const step = (1.3 / 60) / (mPerBlock * 0.5) / S.hikePath.length;
-        S.hikeT = (S.hikeT + step) % 1;
+        if (S.hikeOneWay) {
+          S.hikeT += 1 / (60 * (S.hikeSecs || 30));
+          if (S.hikeT > 1.1) S.hikeT = -0.06;   // a pause at the flag
+        } else {
+          const mPerBlock = S.mPerBlock || 10;
+          const step = (1.3 / 60) / (mPerBlock * 0.5) / S.hikePath.length;
+          S.hikeT = (S.hikeT + step) % 1;
+        }
       }
+      // Follow the walker. A dead zone, so the camera moves in short
+      // glides rather than on every frame: each pan step rebakes the
+      // whole scene, which is the expensive part of a frame.
+      S._gliding = false;
+      if (S.follow && S.hikeOneWay && S.hikePath && S._proj && S._cache) {
+        const [fx, fy] = hikerAt(S);
+        const inv2 = canvas.width / S._cache.width;
+        const cx2 = Math.min(GRID - 1, Math.max(0, Math.round(fx)));
+        const cy2 = Math.min(GRID - 1, Math.max(0, Math.round(fy)));
+        const [hx, hy] = S._proj.project(fx, fy, S.H[cy2 * GRID + cx2]);
+        // The middle of what you can SEE: the panel covers the right of
+        // a desktop stage and the bottom of a phone's, and centring the
+        // walker under it is following them out of sight.
+        let tx = canvas.width / 2, ty = canvas.height * .56;
+        if (!gpanel.hidden) {
+          const cb = canvas.getBoundingClientRect(), pb = gpanel.getBoundingClientRect();
+          const q = canvas.width / cb.width;
+          if (pb.width > cb.width * .6) ty = Math.max(40, (pb.top - cb.top) * q * .56);
+          else if (pb.left - cb.left > cb.width * .35) tx = (pb.left - cb.left) * q / 2;
+        }
+        const dx = tx - hx * inv2, dy = ty - hy * inv2;
+        if (S._glide || Math.abs(dx) > canvas.width * .1 || Math.abs(dy) > canvas.height * .1) {
+          S._glide = Math.hypot(dx, dy) > 4;
+          S.panX = (S.panX || 0) + dx / inv2 * .12;
+          S.panY = (S.panY || 0) + dy / inv2 * .12;
+          S._gliding = S._glide;
+        }
+      }
+      S.moving = dragging || S.spin || S._gliding || Math.abs(yaw - prev) > 1e-4;
       draw(canvas, S, yaw);
       raf = requestAnimationFrame(loop);
     };
@@ -3983,6 +4790,9 @@ const EveryParkIso = (() => {
 
   // `_clip` is a test seam: tools/isotest/deepclip.mjs proves the trail
   // clip on known geometry, which a screenshot cannot show.
-  return { open, _clip: { pathTouchesRings, insideRings } };
+  // `_guide` likewise: tools/isotest/guide.mjs checks turn directions
+  // on geometry whose answer is known, which no screenshot can show.
+  return { open, _clip: { pathTouchesRings, insideRings },
+           _guide: { makeRouter, routeLegs, legSentence } };
 })();
 window.EveryParkIso = EveryParkIso;

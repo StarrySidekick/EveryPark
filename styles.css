@@ -851,6 +851,10 @@ header > .search-wrap { display: flex; align-items: center; }
 .iso-corner-br { bottom: 10px; right: 10px; }
 .iso-corner-row { display: flex; gap: 6px; }
 .iso-corner-row > button.active { background: var(--ep-brass); color: var(--ep-ink); }
+/* `display: grid` above beats the user agent's [hidden], the fifth time
+   in this file. Without it the start-mode button showed on every place,
+   guide or not, and the lore button never hid while the ribbon was open. */
+.iso-corner-row > button[hidden] { display: none; }
 .iso-corner-row > button.iso-bad { background: #7d2f2a; color: var(--ep-paper); }
 
 .iso-menu {
@@ -872,6 +876,49 @@ header > .search-wrap { display: flex; align-items: center; }
   text-transform: uppercase; opacity: .68; flex: 1 0 auto; min-width: 58px;
 }
 .iso-menu .iso-tool { padding: 5px 9px; }
+
+/* Start mode (2026-10-22): the guide panel, above the bottom-right
+   icons. It is the terrain menu's shape on the other side, so it shares
+   .iso-menu and only overrides where it sits and how tall it may grow. */
+.iso-guide {
+  left: auto; right: 0; width: 290px; max-width: calc(100vw - 40px);
+  max-height: min(62vh, 470px); overflow-y: auto; gap: 7px;
+}
+.iso-guide-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.iso-guide-title {
+  font-family: var(--ep-mono); font-size: .66rem; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--ep-brass);
+}
+.iso-guide-list { display: flex; flex-direction: column; gap: 4px; }
+.iso-guide-item {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  padding: 6px 8px; text-align: left; cursor: pointer; font: inherit;
+  background: var(--ep-ink-2); color: var(--ep-paper);
+  border: 1px solid rgba(245,242,230,.14); border-radius: var(--ep-radius);
+}
+.iso-guide-item:hover { border-color: var(--ep-brass); }
+.iso-guide-item b { font-size: .8rem; font-weight: 600; }
+.iso-guide-item small { font-family: var(--ep-mono); font-size: .6rem; opacity: .72; }
+.iso-guide-sum { font-family: var(--ep-mono); font-size: .72rem; color: var(--ep-paper); }
+.iso-guide-note { margin: 0; font-size: .68rem; line-height: 1.38; opacity: .74; }
+.iso-guide-leg {
+  display: grid; grid-template-columns: 12px 1fr; gap: 8px; align-items: start;
+  font-size: .75rem; line-height: 1.38; color: var(--ep-paper);
+}
+/* The swatch is the blaze: what you look for on the trees. Unblazed
+   trail is taupe (CONFIG.guide.unblazed), an OSM-only path is dashed,
+   a road is grey. */
+.iso-guide-sw {
+  width: 10px; height: 10px; margin-top: 3px; border-radius: 2px;
+  background: #a8937a; border: 1px solid rgba(0,0,0,.55);
+}
+.iso-guide-sw.osm { background: repeating-linear-gradient(90deg, #a8937a 0 3px, transparent 3px 5px); }
+.iso-guide-sw.road { background: #8d8a84; }
+.iso-guide-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.iso-guide-list[hidden] { display: none; }   /* .iso-guide-list sets display */
+@media (max-width: 760px) {
+  .iso-guide { max-height: 42vh; }
+}
 .iso-menu .iso-slider { flex-direction: column; align-items: stretch; gap: 4px; }
 .iso-menu .iso-slider input { width: 100%; }
 

@@ -16,8 +16,8 @@ Connecticut. Static site, no server, no database, free to host.
 
 - **Live:** https://everypark.starrysidekick.com
 - **Repo:** `StarrySidekick/EveryPark`, GitHub Pages from `main`
-- **Now:** `v0.50.0` · dataset 24,805 places (CT 8,016 + NY 16,789) since
-  the 2026-08-13 refresh
+- **Now:** `v0.57.0` · dataset 24,202 places at the 2026-10-01 refresh ·
+  baked guides and a 3D start mode for ten test parks (`docs/TESTSET.md`)
 - **8,908 places unverified — CT is 72% verified, NY 60%.** Those two
   percentages do not rest on the same kind of evidence: see
   `docs/SCOPE-AND-DATA.md` (2026-08-24) before trusting either.
@@ -131,9 +131,11 @@ correct.
 | `gestures.mjs` | Zoom anchoring, twist, and drag buttons — arithmetically |
 | `shotui.mjs` | Chrome layout, by screenshot |
 | `deepclip.mjs` | The DEEP trail clip, arithmetically — a name in a list looks plausible whether or not it belongs |
+| `guide.mjs` | Start mode: a real guide routed and walked; turn directions on known geometry; climb equals height gained |
 
-**`parts.mjs` is RED on `main`** as of 2026-09-05, and was red before the
-clip work — verified by stashing. It reports `rings lost in the split: 6
+**`parts.mjs` passes on `main` as of 2026-10-22** (checked with today's
+changes stashed). The note below is history: it was RED on 2026-09-05, and
+was red before the clip work — verified by stashing. It reports `rings lost in the split: 6
 of 5 survive` and cannot find the piece arrows (`got ""`). `splitParts()`
 itself conserves rings by inspection, so the likely single cause is that
 the arrows are not being found and the ring tally is therefore counting
@@ -302,6 +304,10 @@ picks up the 13,903 PAD-US NY units and ~8,200 NY OSM parks on top.
 ---
 
 ## What to do next, in order
+
+**As of 2026-10-22 the direction is the ten-park guide** (`INTENT.md`). The
+open items, with numbers, are at the end of `docs/TESTSET.md`; the list
+below predates it and is still true, just no longer first.
 
 ### 1. The ETL batch — the biggest blocked chunk
 

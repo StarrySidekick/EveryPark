@@ -1364,6 +1364,458 @@
     "https://boonvillefair.com/"
    ],
    "checked": "2026-08-25"
+  },
+  {
+   "match": {
+    "id": "c34517c27a",
+    "name": "Bluff Point State Park",
+    "town": "Groton",
+    "at": [
+     41.33625,
+     -72.03473
+    ]
+   },
+   "subtype": "State Park",
+   "why": "Classed 'Boat Launch / Water Access' because the DEEP boat launch record won the dedupe merge and kept its own subtype. DEEP's property layer records this land as 'State Park'. Found by the 2026-10-22 test-set audit (makeguides.py).",
+   "source": [
+    "https://services1.arcgis.com/FjPcSmEFuDYlIdKC/arcgis/rest/services/Connecticut_DEEP_Property/FeatureServer/0/query?where=PROPERTY+%3D+%27Bluff+Point+State+Park%27&outFields=PROPERTY%2CAV_LEGEND%2CACRE_GIS&returnGeometry=false&f=html",
+    "https://portal.ct.gov/deep/natural-resources/responsible-recreation",
+    "https://portal.ct.gov/DEEP/State-Parks/Recreation-Information/Recreational-Trail-Use-Information"
+   ],
+   "checked": "2026-10-22"
+  },
+  {
+   "match": {
+    "id": "5e4582ba29",
+    "name": "Burr Pond State Park",
+    "town": "Torrington",
+    "at": [
+     41.87436,
+     -73.09487
+    ]
+   },
+   "subtype": "State Park",
+   "why": "Classed 'Boat Launch / Water Access' because the DEEP boat launch record won the dedupe merge and kept its own subtype. DEEP's property layer records this land as 'State Park'. Found by the 2026-10-22 test-set audit (makeguides.py).",
+   "source": [
+    "https://services1.arcgis.com/FjPcSmEFuDYlIdKC/arcgis/rest/services/Connecticut_DEEP_Property/FeatureServer/0/query?where=PROPERTY+%3D+%27Burr+Pond+State+Park%27&outFields=PROPERTY%2CAV_LEGEND%2CACRE_GIS&returnGeometry=false&f=html",
+    "https://portal.ct.gov/deep/natural-resources/responsible-recreation",
+    "https://portal.ct.gov/DEEP/State-Parks/Recreation-Information/Recreational-Trail-Use-Information"
+   ],
+   "checked": "2026-10-22"
+  },
+  {
+   "match": {
+    "id": "686d8dd142",
+    "name": "Haddam Meadows State Park",
+    "town": "Haddam",
+    "at": [
+     41.48135,
+     -72.50657
+    ]
+   },
+   "subtype": "State Park",
+   "why": "Classed 'Boat Launch / Water Access' because the DEEP boat launch record won the dedupe merge and kept its own subtype. DEEP's property layer records this land as 'State Park'. Found by the 2026-10-22 test-set audit (makeguides.py).",
+   "source": [
+    "https://services1.arcgis.com/FjPcSmEFuDYlIdKC/arcgis/rest/services/Connecticut_DEEP_Property/FeatureServer/0/query?where=PROPERTY+%3D+%27Haddam+Meadows+State+Park%27&outFields=PROPERTY%2CAV_LEGEND%2CACRE_GIS&returnGeometry=false&f=html",
+    "https://portal.ct.gov/deep/natural-resources/responsible-recreation",
+    "https://portal.ct.gov/DEEP/State-Parks/Recreation-Information/Recreational-Trail-Use-Information"
+   ],
+   "checked": "2026-10-22"
+  },
+  {
+   "match": {
+    "id": "22f2fb020c",
+    "name": "Higganum Reservoir State Park",
+    "town": "Haddam",
+    "at": [
+     41.48328,
+     -72.56013
+    ]
+   },
+   "subtype": "State Park",
+   "why": "Classed 'Boat Launch / Water Access' because the DEEP boat launch record won the dedupe merge and kept its own subtype. DEEP's property layer records this land as 'State Park'. Found by the 2026-10-22 test-set audit (makeguides.py).",
+   "source": [
+    "https://services1.arcgis.com/FjPcSmEFuDYlIdKC/arcgis/rest/services/Connecticut_DEEP_Property/FeatureServer/0/query?where=PROPERTY+%3D+%27Higganum+Reservoir+State+Park%27&outFields=PROPERTY%2CAV_LEGEND%2CACRE_GIS&returnGeometry=false&f=html",
+    "https://portal.ct.gov/deep/natural-resources/responsible-recreation",
+    "https://portal.ct.gov/DEEP/State-Parks/Recreation-Information/Recreational-Trail-Use-Information"
+   ],
+   "checked": "2026-10-22"
+  },
+  {
+   "match": {
+    "id": "a0259f67b8",
+    "name": "Lake Waramaug State Park",
+    "town": "Kent",
+    "at": [
+     41.70869,
+     -73.38364
+    ]
+   },
+   "subtype": "State Park",
+   "why": "Classed 'Boat Launch / Water Access' because the DEEP boat launch record won the dedupe merge and kept its own subtype. DEEP's property layer records this land as 'State Park'. Found by the 2026-10-22 test-set audit (makeguides.py).",
+   "source": [
+    "https://services1.arcgis.com/FjPcSmEFuDYlIdKC/arcgis/rest/services/Connecticut_DEEP_Property/FeatureServer/0/query?where=PROPERTY+%3D+%27Lake+Waramaug+State+Park%27&outFields=PROPERTY%2CAV_LEGEND%2CACRE_GIS&returnGeometry=false&f=html",
+    "https://portal.ct.gov/deep/natural-resources/responsible-recreation",
+    "https://portal.ct.gov/DEEP/State-Parks/Recreation-Information/Recreational-Trail-Use-Information"
+   ],
+   "checked": "2026-10-22"
+  },
+  {
+   "match": {
+    "id": "c42091a1a0",
+    "name": "Mount Tom State Park",
+    "town": "Litchfield",
+    "at": [
+     41.69808,
+     -73.27974
+    ]
+   },
+   "subtype": "State Park",
+   "why": "Classed 'Boat Launch / Water Access' because the DEEP boat launch record won the dedupe merge and kept its own subtype. DEEP's property layer records this land as 'State Park'. Found by the 2026-10-22 test-set audit (makeguides.py).",
+   "source": [
+    "https://services1.arcgis.com/FjPcSmEFuDYlIdKC/arcgis/rest/services/Connecticut_DEEP_Property/FeatureServer/0/query?where=PROPERTY+%3D+%27Mount+Tom+State+Park%27&outFields=PROPERTY%2CAV_LEGEND%2CACRE_GIS&returnGeometry=false&f=html",
+    "https://portal.ct.gov/deep/natural-resources/responsible-recreation",
+    "https://portal.ct.gov/DEEP/State-Parks/Recreation-Information/Recreational-Trail-Use-Information"
+   ],
+   "checked": "2026-10-22"
+  },
+  {
+   "match": {
+    "id": "7ae1d0c717",
+    "name": "Squantz Pond State Park",
+    "town": "New Fairfield",
+    "at": [
+     41.50994,
+     -73.47221
+    ]
+   },
+   "subtype": "State Park",
+   "why": "Classed 'Boat Launch / Water Access' because the DEEP boat launch record won the dedupe merge and kept its own subtype. DEEP's property layer records this land as 'State Park'. Found by the 2026-10-22 test-set audit (makeguides.py). Per-park facts from DEEP's own page for this park, replacing the statewide defaults for fee and rules. Leash length is from the regulation (RCSA 23-4-1), which park pages do not repeat. Researched for the 2026-10-22 test set.",
+   "source": [
+    "https://services1.arcgis.com/FjPcSmEFuDYlIdKC/arcgis/rest/services/Connecticut_DEEP_Property/FeatureServer/0/query?where=PROPERTY+%3D+%27Squantz+Pond+State+Park%27&outFields=PROPERTY%2CAV_LEGEND%2CACRE_GIS&returnGeometry=false&f=html",
+    "https://ctparks.com/parks/squantz-pond-state-park",
+    "https://eregulations.ct.gov/eRegsPortal/Browse/RCSA/Title_23Subtitle_23-4Section_23-4-1/",
+    "https://ctparks.com/park-passes"
+   ],
+   "checked": "2026-10-22",
+   "fee": "Free for Connecticut-registered vehicles. Out-of-state vehicles pay $22 on weekends and holidays, $15 on weekdays and $7 after 4 p.m., for parking.",
+   "siteRules": [
+    "Open daily, 8 a.m. to sunset",
+    "No dogs from April 15 to September 30; from October 1 to April 14, dogs on a leash no longer than 7 ft in picnic areas and on hiking trails",
+    "In peak season parking is capped at 250 cars; once full the park closes for the day, walk-ins included",
+    "Off-peak the park is closed to vehicles: park at the boat launch and walk in",
+    "Swimming in Squantz Pond",
+    "Restrooms close after Labor Day",
+    "No alcohol",
+    "No motor vehicles off designated roads"
+   ]
+  },
+  {
+   "match": {
+    "id": "7e6bec3220",
+    "name": "Stillwater Pond State Park",
+    "town": "Torrington",
+    "at": [
+     41.83755,
+     -73.15184
+    ]
+   },
+   "subtype": "State Park",
+   "why": "Classed 'Boat Launch / Water Access' because the DEEP boat launch record won the dedupe merge and kept its own subtype. DEEP's property layer records this land as 'State Park'. Found by the 2026-10-22 test-set audit (makeguides.py).",
+   "source": [
+    "https://services1.arcgis.com/FjPcSmEFuDYlIdKC/arcgis/rest/services/Connecticut_DEEP_Property/FeatureServer/0/query?where=PROPERTY+%3D+%27Stillwater+Pond+State+Park%27&outFields=PROPERTY%2CAV_LEGEND%2CACRE_GIS&returnGeometry=false&f=html",
+    "https://portal.ct.gov/deep/natural-resources/responsible-recreation",
+    "https://portal.ct.gov/DEEP/State-Parks/Recreation-Information/Recreational-Trail-Use-Information"
+   ],
+   "checked": "2026-10-22"
+  },
+  {
+   "match": {
+    "id": "b82d6c45d4",
+    "name": "Ross Pond State Park",
+    "town": "Killingly",
+    "at": [
+     41.77471,
+     -71.86974
+    ]
+   },
+   "subtype": "State Park",
+   "why": "Classed 'Boat Launch / Water Access' because the DEEP boat launch record won the dedupe merge and kept its own subtype. DEEP's property layer records this land as 'State Park'. Found by the 2026-10-22 test-set audit (makeguides.py).",
+   "source": [
+    "https://services1.arcgis.com/FjPcSmEFuDYlIdKC/arcgis/rest/services/Connecticut_DEEP_Property/FeatureServer/0/query?where=PROPERTY+%3D+%27Ross+Pond+State+Park%27&outFields=PROPERTY%2CAV_LEGEND%2CACRE_GIS&returnGeometry=false&f=html",
+    "https://portal.ct.gov/deep/natural-resources/responsible-recreation",
+    "https://portal.ct.gov/DEEP/State-Parks/Recreation-Information/Recreational-Trail-Use-Information"
+   ],
+   "checked": "2026-10-22"
+  },
+  {
+   "match": {
+    "id": "89fbfba875",
+    "name": "Stoddard Hill State Park Scenic Reserve",
+    "town": "Ledyard",
+    "at": [
+     41.45943,
+     -72.06666
+    ]
+   },
+   "subtype": "Scenic Reserve",
+   "why": "Classed 'Boat Launch / Water Access' because the DEEP boat launch record won the dedupe merge and kept its own subtype. DEEP's property layer records this land as 'State Park Scenic Reserve'. Found by the 2026-10-22 test-set audit (makeguides.py).",
+   "source": [
+    "https://services1.arcgis.com/FjPcSmEFuDYlIdKC/arcgis/rest/services/Connecticut_DEEP_Property/FeatureServer/0/query?where=PROPERTY+%3D+%27Stoddard+Hill+State+Park+Scenic+Reserve%27&outFields=PROPERTY%2CAV_LEGEND%2CACRE_GIS&returnGeometry=false&f=html",
+    "https://portal.ct.gov/deep/natural-resources/responsible-recreation",
+    "https://portal.ct.gov/DEEP/State-Parks/Recreation-Information/Recreational-Trail-Use-Information"
+   ],
+   "checked": "2026-10-22"
+  },
+  {
+   "match": {
+    "id": "f999a0ef6c",
+    "name": "Hammonasset Natural Area Preserve",
+    "town": "Madison",
+    "at": [
+     41.26277,
+     -72.55359
+    ]
+   },
+   "rename": "Hammonasset Beach State Park",
+   "subtype": "State Park",
+   "acres": 581,
+   "why": "The curated Hammonasset Beach State Park record carried no acreage, so dedupe's tie-break fell to the longer name and the park was renamed after the Natural Area Preserve beside it. DEEP records them as two properties: Hammonasset Beach State Park, State Park, 581 acres, and Hammonasset Natural Area Preserve, 416 acres. The park is what people mean; the preserve name stays in aka so its polygon still resolves. Per-park facts from DEEP's own page for this park, replacing the statewide defaults for fee and rules. Leash length is from the regulation (RCSA 23-4-1), which park pages do not repeat. Researched for the 2026-10-22 test set.",
+   "source": [
+    "https://services1.arcgis.com/FjPcSmEFuDYlIdKC/arcgis/rest/services/Connecticut_DEEP_Property/FeatureServer/0/query?where=PROPERTY+%3D+%27Hammonasset+Beach+State+Park%27&outFields=PROPERTY%2CAV_LEGEND%2CACRE_GIS&returnGeometry=false&f=html",
+    "https://services1.arcgis.com/FjPcSmEFuDYlIdKC/arcgis/rest/services/Connecticut_DEEP_Property/FeatureServer/0/query?where=PROPERTY+%3D+%27Hammonasset+Natural+Area+Preserve%27&outFields=PROPERTY%2CAV_LEGEND%2CACRE_GIS&returnGeometry=false&f=html",
+    "https://ctparks.com/parks/hammonasset-beach-state-park",
+    "https://eregulations.ct.gov/eRegsPortal/Browse/RCSA/Title_23Subtitle_23-4Section_23-4-1/",
+    "https://ctparks.com/park-passes"
+   ],
+   "checked": "2026-10-22",
+   "fee": "Free for Connecticut-registered vehicles. Out-of-state vehicles pay $22 on weekends and holidays, $15 on weekdays and $7 after 4 p.m., for parking.",
+   "siteRules": [
+    "Open daily, 8 a.m. to sunset; open 24 hours for camping and fishing from Memorial Day to Columbus Day",
+    "Dogs on a leash no longer than 7 ft. DEEP's page lists dogs for the picnic areas year-round, the beach September 30 to April 1, and the campground Columbus Day to May 1",
+    "Swimming along the two-mile shoreline",
+    "Campground (558 sites) open May 22 to October 12 in 2026",
+    "No motor vehicles off designated roads"
+   ]
+  },
+  {
+   "match": {
+    "id": "bc69dafa2a",
+    "name": "Sleeping Giant State Park",
+    "town": "Hamden",
+    "at": [
+     41.43314,
+     -72.88433
+    ]
+   },
+   "fee": "Free for Connecticut-registered vehicles. Out-of-state vehicles pay $15 on weekends and holidays, $10 on weekdays and $6 after 4 p.m. on weekends, for parking.",
+   "siteRules": [
+    "Open daily, 8 a.m. to sunset",
+    "Dogs on a leash no longer than 7 ft, in picnic areas and on hiking trails",
+    "Often fills to capacity; once full, the lot closes",
+    "No motor vehicles off designated roads"
+   ],
+   "why": "Per-park facts from DEEP's own page for this park, replacing the statewide defaults for fee and rules. Leash length is from the regulation (RCSA 23-4-1), which park pages do not repeat. Researched for the 2026-10-22 test set.",
+   "source": [
+    "https://ctparks.com/parks/sleeping-giant-state-park",
+    "https://eregulations.ct.gov/eRegsPortal/Browse/RCSA/Title_23Subtitle_23-4Section_23-4-1/",
+    "https://ctparks.com/park-passes",
+    "https://portal.ct.gov/deep/natural-resources/responsible-recreation",
+    "https://portal.ct.gov/DEEP/State-Parks/Recreation-Information/Recreational-Trail-Use-Information"
+   ],
+   "checked": "2026-10-22"
+  },
+  {
+   "match": {
+    "id": "82e4ff3014",
+    "name": "Kent Falls State Park",
+    "town": "Kent",
+    "at": [
+     41.77598,
+     -73.41174
+    ]
+   },
+   "fee": "Free for Connecticut-registered vehicles. Out-of-state vehicles pay $15 on weekends and holidays, $10 on weekdays, for parking.",
+   "siteRules": [
+    "Open daily, 8 a.m. to sunset",
+    "Dogs on a leash no longer than 7 ft, in picnic areas and on hiking trails",
+    "No entry into the water and no swimming",
+    "Stay on the hiking trails",
+    "No alcohol",
+    "No motor vehicles off designated roads"
+   ],
+   "why": "Per-park facts from DEEP's own page for this park, replacing the statewide defaults for fee and rules. Leash length is from the regulation (RCSA 23-4-1), which park pages do not repeat. Researched for the 2026-10-22 test set.",
+   "source": [
+    "https://ctparks.com/parks/kent-falls-state-park",
+    "https://eregulations.ct.gov/eRegsPortal/Browse/RCSA/Title_23Subtitle_23-4Section_23-4-1/",
+    "https://ctparks.com/park-passes",
+    "https://portal.ct.gov/deep/natural-resources/responsible-recreation",
+    "https://portal.ct.gov/DEEP/State-Parks/Recreation-Information/Recreational-Trail-Use-Information"
+   ],
+   "checked": "2026-10-22"
+  },
+  {
+   "match": {
+    "id": "dd765cc2fe",
+    "name": "Gillette Castle State Park",
+    "town": "East Haddam",
+    "at": [
+     41.42696,
+     -72.42904
+    ]
+   },
+   "fee": "Free to enter and park, whatever state the car is registered in.",
+   "siteRules": [
+    "Grounds open daily, 8 a.m. to sunset",
+    "The castle opens for scheduled tours only: daily from Memorial Day weekend to Labor Day, weekends and holidays to Columbus Day, then closed until the holiday tours (Fridays to Sundays, Thanksgiving to Christmas)",
+    "Castle tours: $6 ages 13 and up, $2 ages 6 to 12, free under 5",
+    "Dogs on a leash no longer than 7 ft, in picnic areas and on trails; not in buildings, on decks or at the river campsite",
+    "No motor vehicles off designated roads"
+   ],
+   "why": "Per-park facts from DEEP's own page for this park, replacing the statewide defaults for fee and rules. Leash length is from the regulation (RCSA 23-4-1), which park pages do not repeat. Researched for the 2026-10-22 test set.",
+   "source": [
+    "https://ctparks.com/parks/gillette-castle-state-park",
+    "https://eregulations.ct.gov/eRegsPortal/Browse/RCSA/Title_23Subtitle_23-4Section_23-4-1/",
+    "https://portal.ct.gov/deep/natural-resources/responsible-recreation",
+    "https://portal.ct.gov/DEEP/State-Parks/Recreation-Information/Recreational-Trail-Use-Information"
+   ],
+   "checked": "2026-10-22"
+  },
+  {
+   "match": {
+    "id": "717a4836f5",
+    "name": "Devil's Hopyard State Park",
+    "town": "East Haddam",
+    "at": [
+     41.4748,
+     -72.34199
+    ]
+   },
+   "fee": "Free to enter and park, whatever state the car is registered in.",
+   "siteRules": [
+    "Open daily, 8 a.m. to sunset",
+    "Dogs on a leash no longer than 7 ft, in picnic areas and on hiking trails; not in the campground",
+    "No running water: water on site is unsafe to drink, so bring your own",
+    "Campground (21 sites) open April 10 to October 12 in 2026",
+    "No motor vehicles off designated roads"
+   ],
+   "why": "Per-park facts from DEEP's own page for this park, replacing the statewide defaults for fee and rules. Leash length is from the regulation (RCSA 23-4-1), which park pages do not repeat. Researched for the 2026-10-22 test set.",
+   "source": [
+    "https://ctparks.com/parks/devils-hopyard-state-park",
+    "https://eregulations.ct.gov/eRegsPortal/Browse/RCSA/Title_23Subtitle_23-4Section_23-4-1/",
+    "https://portal.ct.gov/deep/natural-resources/responsible-recreation",
+    "https://portal.ct.gov/DEEP/State-Parks/Recreation-Information/Recreational-Trail-Use-Information"
+   ],
+   "checked": "2026-10-22"
+  },
+  {
+   "match": {
+    "id": "7978e39d7e",
+    "name": "Talcott Mountain State Park",
+    "town": "Simsbury",
+    "at": [
+     41.83233,
+     -72.79239
+    ]
+   },
+   "fee": "Free for Connecticut-registered vehicles. Out-of-state vehicles pay $15 on weekends and holidays, $10 on weekdays, for parking.",
+   "siteRules": [
+    "Open daily, 8 a.m. to sunset",
+    "Heublein Tower museum: Memorial Day weekend to October 31, Fridays to Mondays, 10 a.m. to 4 p.m.; reached by walking trail only",
+    "Dogs on a leash no longer than 7 ft; not in the museum",
+    "No motor vehicles off designated roads"
+   ],
+   "why": "Per-park facts from DEEP's own page for this park, replacing the statewide defaults for fee and rules. Leash length is from the regulation (RCSA 23-4-1), which park pages do not repeat. Researched for the 2026-10-22 test set.",
+   "source": [
+    "https://ctparks.com/parks/talcott-mountain-state-park",
+    "https://eregulations.ct.gov/eRegsPortal/Browse/RCSA/Title_23Subtitle_23-4Section_23-4-1/",
+    "https://ctparks.com/park-passes",
+    "https://portal.ct.gov/deep/natural-resources/responsible-recreation",
+    "https://portal.ct.gov/DEEP/State-Parks/Recreation-Information/Recreational-Trail-Use-Information"
+   ],
+   "checked": "2026-10-22"
+  },
+  {
+   "match": {
+    "id": "2247836a8f",
+    "name": "Macedonia Brook State Park",
+    "town": "Kent",
+    "at": [
+     41.77195,
+     -73.49243
+    ]
+   },
+   "fee": "Free to enter and park, whatever state the car is registered in.",
+   "siteRules": [
+    "Open daily, 8 a.m. to sunset",
+    "Dogs on a leash no longer than 7 ft, in the picnic area and on hiking trails; not in the campground",
+    "Little or no cell phone service in the park",
+    "No alcohol",
+    "Campground (51 sites) by advance reservation only, opening May 22 in 2026",
+    "No motor vehicles off designated roads"
+   ],
+   "why": "Per-park facts from DEEP's own page for this park, replacing the statewide defaults for fee and rules. Leash length is from the regulation (RCSA 23-4-1), which park pages do not repeat. Researched for the 2026-10-22 test set.",
+   "source": [
+    "https://ctparks.com/parks/macedonia-brook-state-park",
+    "https://eregulations.ct.gov/eRegsPortal/Browse/RCSA/Title_23Subtitle_23-4Section_23-4-1/",
+    "https://portal.ct.gov/deep/natural-resources/responsible-recreation",
+    "https://portal.ct.gov/DEEP/State-Parks/Recreation-Information/Recreational-Trail-Use-Information"
+   ],
+   "checked": "2026-10-22"
+  },
+  {
+   "match": {
+    "id": "6630d117e7",
+    "name": "Chatfield Hollow State Park",
+    "town": "Killingworth",
+    "at": [
+     41.37061,
+     -72.59298
+    ]
+   },
+   "fee": "Free for Connecticut-registered vehicles. Out-of-state vehicles pay $15 on weekends and holidays, $10 on weekdays, for parking.",
+   "siteRules": [
+    "Open daily, 8 a.m. to sunset; open year-round, with parking limited to the Route 80 lots",
+    "Dogs on a leash no longer than 7 ft, on trails and park grounds; not on the beach or in the pond",
+    "Swimming from the sandy beach on Schreeder Pond",
+    "No motor vehicles off designated roads"
+   ],
+   "why": "Per-park facts from DEEP's own page for this park, replacing the statewide defaults for fee and rules. Leash length is from the regulation (RCSA 23-4-1), which park pages do not repeat. Researched for the 2026-10-22 test set.",
+   "source": [
+    "https://ctparks.com/parks/chatfield-hollow-state-park",
+    "https://eregulations.ct.gov/eRegsPortal/Browse/RCSA/Title_23Subtitle_23-4Section_23-4-1/",
+    "https://ctparks.com/park-passes",
+    "https://portal.ct.gov/deep/natural-resources/responsible-recreation",
+    "https://portal.ct.gov/DEEP/State-Parks/Recreation-Information/Recreational-Trail-Use-Information"
+   ],
+   "checked": "2026-10-22"
+  },
+  {
+   "match": {
+    "id": "f04bf83bd3",
+    "name": "Mashamoquet Brook State Park",
+    "town": "Pomfret",
+    "at": [
+     41.84971,
+     -71.98003
+    ]
+   },
+   "fee": "Free to enter and park, whatever state the car is registered in.",
+   "siteRules": [
+    "Open daily, 8 a.m. to sunset",
+    "Dogs on a leash no longer than 7 ft, in picnic areas and on trails; not in the campgrounds, on the beach or in the picnic shelter",
+    "Nothing may be attached to or hung from trees or structures, hammocks included",
+    "Two campgrounds; Mashamoquet Brook open May 1 to October 12 in 2026",
+    "No motor vehicles off designated roads"
+   ],
+   "why": "Per-park facts from DEEP's own page for this park, replacing the statewide defaults for fee and rules. Leash length is from the regulation (RCSA 23-4-1), which park pages do not repeat. Researched for the 2026-10-22 test set.",
+   "source": [
+    "https://ctparks.com/parks/mashamoquet-brook-state-park",
+    "https://eregulations.ct.gov/eRegsPortal/Browse/RCSA/Title_23Subtitle_23-4Section_23-4-1/",
+    "https://portal.ct.gov/deep/natural-resources/responsible-recreation",
+    "https://portal.ct.gov/DEEP/State-Parks/Recreation-Information/Recreational-Trail-Use-Information"
+   ],
+   "checked": "2026-10-22"
   }
  ],
  "rules": [
