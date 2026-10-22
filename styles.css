@@ -1329,3 +1329,96 @@ header { flex-wrap: nowrap; }
 .g-go-yes   { color: #2e7d32; }
 .g-go-maybe { color: #a9722a; }
 .g-go-no    { color: #b03a30; }
+
+/* ============================================================
+   Parks page and view switch (2026-10-22)
+   The vetted parks are the front page; the map is the second view.
+   ============================================================ */
+#viewSwitch {
+  display: inline-flex; align-self: center; overflow: hidden;
+  border: 1px solid rgba(245,242,230,.22); border-radius: var(--ep-radius);
+}
+#viewSwitch button {
+  background: var(--ep-ink-2); color: var(--ep-paper); border: 0;
+  font-family: var(--ep-mono); font-size: .74rem; letter-spacing: .04em;
+  text-transform: uppercase; padding: 0 14px; height: 34px; cursor: pointer;
+}
+#viewSwitch button + button { border-left: 1px solid rgba(245,242,230,.22); }
+#viewSwitch button:hover { background: var(--ep-ink-3); }
+#viewSwitch button.active { background: var(--ep-brass); color: var(--ep-ink); }
+
+/* The map's own controls mean nothing on the list, so the list's header
+   is the title, the switch and the build badge. */
+body.view-parks .search-wrap, body.view-parks .filters-wrap,
+body.view-parks .layers-wrap, body.view-parks #nearBtn,
+body.view-parks #randomBtn, body.view-parks #guideBtn { display: none; }
+
+/* Over the map, not instead of it: the map stays laid out underneath,
+   so switching views never makes Leaflet measure a hidden container. */
+#parksView {
+  position: absolute; inset: 0; z-index: 1100; overflow-y: auto;
+  background: var(--ep-paper-2); color: var(--ep-text);
+}
+#parksView[hidden] { display: none; }
+.pv-inner { max-width: 1120px; margin: 0 auto; padding: 22px 18px 40px; }
+.pv-title {
+  margin: 0 0 6px; color: var(--ep-ink); font-family: var(--ep-mono);
+  font-size: .9rem; letter-spacing: .12em; text-transform: uppercase;
+}
+.pv-lede { max-width: 720px; margin: 0 0 18px; font-size: .92rem; line-height: 1.5; color: var(--ep-muted); }
+.pv-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+.pv-card {
+  display: flex; flex-direction: column; gap: 8px; padding: 14px 14px 12px;
+  background: var(--ep-paper); border: var(--ep-hair); border-top: 3px solid var(--ep-moss);
+  border-radius: var(--ep-radius-lg); box-shadow: var(--ep-shadow);
+}
+.pv-name { margin: 0; font-size: 1.02rem; color: var(--ep-ink); }
+.pv-sub { font-family: var(--ep-mono); font-size: .7rem; letter-spacing: .03em; color: var(--ep-muted); }
+.pv-facts { margin: 0; display: grid; gap: 4px; }
+.pv-fact { display: grid; grid-template-columns: 78px 1fr; gap: 8px; font-size: .82rem; line-height: 1.35; }
+.pv-fact dt {
+  padding-top: 2px; color: var(--ep-muted); font-family: var(--ep-mono);
+  font-size: .64rem; letter-spacing: .08em; text-transform: uppercase;
+}
+.pv-fact dd { margin: 0; }
+/* A blaze is a tall painted rectangle on a tree, so the swatch is too. */
+.pv-blazes { display: inline-flex; gap: 3px; margin-left: 6px; vertical-align: middle; }
+.pv-blaze { display: inline-block; width: 7px; height: 13px; border-radius: 1px; border: 1px solid rgba(0,0,0,.35); }
+.pv-dim { color: var(--ep-muted); }
+.pv-rules { font-size: .8rem; }
+.pv-rules summary {
+  cursor: pointer; color: var(--ep-moss); font-family: var(--ep-mono);
+  font-size: .66rem; letter-spacing: .08em; text-transform: uppercase;
+}
+.pv-rules ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.4; }
+.pv-actions { display: flex; gap: 8px; margin-top: auto; padding-top: 4px; }
+.pv-btn {
+  flex: 1; height: 34px; cursor: pointer; background: transparent; color: var(--ep-ink);
+  border: 1px solid var(--ep-ink); border-radius: var(--ep-radius);
+  font-family: var(--ep-mono); font-size: .72rem; letter-spacing: .05em; text-transform: uppercase;
+}
+.pv-btn:hover { background: var(--ep-paper-2); }
+.pv-primary { background: var(--ep-ink); color: var(--ep-paper); }
+.pv-primary:hover { background: var(--ep-ink-3); }
+.pv-checked { font-size: .68rem; color: var(--ep-muted); }
+.pv-empty, .pv-foot { color: var(--ep-muted); font-size: .85rem; }
+.pv-foot { max-width: 720px; margin-top: 20px; line-height: 1.5; }
+
+/* On the map: why it looks empty, and the way back to everything. */
+#vettedNote {
+  position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 1000;
+  display: flex; align-items: center; gap: 10px; white-space: nowrap;
+  padding: 6px 8px 6px 12px; font-size: .78rem; box-shadow: var(--ep-shadow);
+  background: var(--ep-ink); color: var(--ep-paper);
+  border: 1px solid var(--ep-brass); border-radius: var(--ep-radius);
+}
+#vettedNote[hidden] { display: none; }
+#vettedNote button {
+  padding: 4px 8px; cursor: pointer; border: 0; border-radius: var(--ep-radius);
+  background: var(--ep-brass); color: var(--ep-ink); font-family: var(--ep-mono);
+  font-size: .66rem; letter-spacing: .05em; text-transform: uppercase;
+}
+@media (max-width: 600px) {
+  .pv-list { grid-template-columns: 1fr; }
+  #vettedNote { top: auto; bottom: 34px; }
+}

@@ -29,7 +29,7 @@
    instead of `blob()` would, on every single tile.
    ============================================================ */
 
-const VERSION = "v0.57.0";          // keep in step with CONFIG.siteVersion
+const VERSION = "v0.58.0";          // keep in step with CONFIG.siteVersion
 const SHELL = `ep-shell-${VERSION}`;
 const DATA = "ep-data-v1";
 const ARCHIVES = "ep-archives-v1";

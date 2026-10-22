@@ -10,7 +10,16 @@ import { chromium } from "playwright";
 import crypto from "node:crypto";
 
 const EXEC = process.env.CHROMIUM || "/opt/pw-browsers/chromium";
-const SITE = process.env.SITE || "http://127.0.0.1:8125/index.html";
+// #map: the parks list is the front page since 2026-10-22, and this
+// check is about the map.
+const SITE = process.env.SITE || "http://127.0.0.1:8125/index.html#map";
+// The map shows vetted parks only by default. This check measures the
+// archive and the layers, not that filter (tools/isotest/parkspage.mjs
+// does), so it asks for everything after every load.
+const showAll = () => page.evaluate(() => {
+  const note = document.getElementById("vettedNote");
+  if (note && !note.hidden) document.getElementById("vettedShowAll").click();
+});
 const fails = [];
 
 const browser = await chromium.launch({ executablePath: EXEC });
@@ -39,6 +48,7 @@ const shot = async () => crypto.createHash("sha1")
   .update(await page.locator("#map").screenshot()).digest("hex");
 
 await page.goto(SITE);
+await showAll();
 await settle(4000);
 // Hartford at zoom 12: dense enough that every layer has something to
 // draw inside one screen.
@@ -87,6 +97,7 @@ else console.log(`ground: ${baseBefore} -> ${baseAfter}`);
 // What was switched must survive a reload, or the panel is a toy.
 const wanted = await state();
 await page.reload();
+await showAll();
 await settle(5000);
 const got = await state();
 for (const k of Object.keys(wanted)) {

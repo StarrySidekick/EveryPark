@@ -3320,7 +3320,9 @@ const EveryParkIso = (() => {
   }
 
   // ---- Open --------------------------------------------------------
-  async function open(p) {
+  // opts.start: open with the start-mode panel already showing, which is
+  // what the parks page's "Explore in 3D" means.
+  async function open(p, opts) {
     if (document.getElementById("isoOverlay")) return;
     const ov = document.createElement("div");
     ov.id = "isoOverlay";
@@ -4731,6 +4733,7 @@ const EveryParkIso = (() => {
         box.append(note("Routes prefer CT DEEP's trail map, then OpenStreetMap paths, then roads. Check the posted map at the trailhead: trails close and blazes get repainted."));
       };
       showStarts();
+      if (opts && opts.start) setPanel(true);
       // tools/isotest/guide.mjs drives the panel through the DOM and
       // checks what it produced here.
       window.__isoGuide = { G, startAt, go, showStarts };
