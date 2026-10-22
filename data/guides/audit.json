@@ -1,0 +1,934 @@
+{
+ "built": "2026-10-22",
+ "parks": [
+  {
+   "id": "bc69dafa2a",
+   "name": "Sleeping Giant State Park",
+   "record": {
+    "name": "Sleeping Giant State Park",
+    "type": "state",
+    "subtype": "State Park",
+    "acres": 1576,
+    "status": "park",
+    "feeState": "parking",
+    "siteRules": [
+     "Open daily, 8 a.m. to sunset",
+     "Dogs on a leash no longer than 7 ft, in picnic areas and on hiking trails",
+     "Often fills to capacity; once full, the lot closes",
+     "No motor vehicles off designated roads"
+    ],
+    "sources": [
+     "https://ctparks.com/parks/sleeping-giant-state-park",
+     "https://eregulations.ct.gov/eRegsPortal/Browse/RCSA/Title_23Subtitle_23-4Section_23-4-1/",
+     "https://ctparks.com/park-passes",
+     "https://portal.ct.gov/deep/natural-resources/responsible-recreation",
+     "https://portal.ct.gov/DEEP/State-Parks/Recreation-Information/Recreational-Trail-Use-Information"
+    ]
+   },
+   "deep": {
+    "property": "Sleeping Giant State Park",
+    "legend": [
+     "State Park"
+    ],
+    "acres": 1575,
+    "ringAcres": 1566,
+    "rings": 2
+   },
+   "trails": {
+    "deepSegments": 313,
+    "deepKmInside": 52.42,
+    "deepKmSeenByOsm": 48.02,
+    "osmKmInside": 52.21,
+    "osmKmSeenByDeep": 46.31,
+    "osmOnlyRunsAdded": 22,
+    "roadRunsAdded": 16,
+    "deepKmOnRoads": 0.58,
+    "blazesKm": {
+     "(none)": 9.15,
+     "Blue": 8.21,
+     "Violet": 4.91,
+     "White Horseshoe": 4.55,
+     "White": 4.38,
+     "Orange": 3.31,
+     "Green": 3.01,
+     "Yellow": 2.95,
+     "Red Circle": 2.75,
+     "Red Square": 2.42,
+     "Red Triangle": 1.69,
+     "White Tree": 1.19,
+     "Green/Yellow": 1.16,
+     "Red Diamond": 1.01,
+     "Red Hexagon": 0.89,
+     "Orange/White Tree": 0.53,
+     "Yellow/White Tree": 0.51,
+     "White Ski": 0.51,
+     "Blue/White": 0.3,
+     "Blue/Violet": 0.13,
+     "Red Hexagon/White Tree": 0.12,
+     "Blue/Green": 0.02
+    }
+   },
+   "graph": {
+    "nodes": 267,
+    "edges": 376,
+    "km": 65.47,
+    "pieces": 6,
+    "largestPiecePct": 94.0,
+    "connectorsAdded": 0,
+    "gaps": [
+     {
+      "km": 3.27,
+      "nearestM": 269,
+      "at": [
+       41.44412,
+       -72.89347
+      ]
+     },
+     {
+      "km": 0.38,
+      "nearestM": 31,
+      "at": [
+       41.4226,
+       -72.89141
+      ]
+     },
+     {
+      "km": 0.23,
+      "nearestM": 45,
+      "at": [
+       41.42971,
+       -72.90401
+      ]
+     }
+    ]
+   },
+   "entrances": {
+    "deep": 1,
+    "road": 21,
+    "deepUnreached": []
+   },
+   "features": {
+    "viewpoint": 13,
+    "info": 3,
+    "lake": 2,
+    "falls": 2,
+    "toilets": 2,
+    "summit": 1,
+    "historic": 1,
+    "picnic": 1,
+    "water": 1
+   },
+   "othersInside": [],
+   "flags": []
+  },
+  {
+   "id": "f999a0ef6c",
+   "name": "Hammonasset Beach State Park",
+   "record": {
+    "name": "Hammonasset Beach State Park",
+    "type": "state",
+    "subtype": "State Park",
+    "acres": 581,
+    "status": "park",
+    "feeState": "parking",
+    "siteRules": [
+     "Open daily, 8 a.m. to sunset; open 24 hours for camping and fishing from Memorial Day to Columbus Day",
+     "Dogs on a leash no longer than 7 ft. DEEP's page lists dogs for the picnic areas year-round, the beach September 30 to April 1, and the campground Columbus Day to May 1",
+     "Swimming along the two-mile shoreline",
+     "Campground (558 sites) open May 22 to October 12 in 2026",
+     "No motor vehicles off designated roads"
+    ],
+    "sources": [
+     "https://services1.arcgis.com/FjPcSmEFuDYlIdKC/arcgis/rest/services/Connecticut_DEEP_Property/FeatureServer/0/query?where=PROPERTY+%3D+%27Hammonasset+Beach+State+Park%27&outFields=PROPERTY%2CAV_LEGEND%2CACRE_GIS&returnGeometry=false&f=html",
+     "https://services1.arcgis.com/FjPcSmEFuDYlIdKC/arcgis/rest/services/Connecticut_DEEP_Property/FeatureServer/0/query?where=PROPERTY+%3D+%27Hammonasset+Natural+Area+Preserve%27&outFields=PROPERTY%2CAV_LEGEND%2CACRE_GIS&returnGeometry=false&f=html",
+     "https://ctparks.com/parks/hammonasset-beach-state-park",
+     "https://eregulations.ct.gov/eRegsPortal/Browse/RCSA/Title_23Subtitle_23-4Section_23-4-1/",
+     "https://ctparks.com/park-passes"
+    ]
+   },
+   "deep": {
+    "property": "Hammonasset Beach State Park",
+    "legend": [
+     "State Park"
+    ],
+    "acres": 581,
+    "ringAcres": 578,
+    "rings": 2
+   },
+   "trails": {
+    "deepSegments": 320,
+    "deepKmInside": 29.39,
+    "deepKmSeenByOsm": 8.63,
+    "osmKmInside": 8.43,
+    "osmKmSeenByDeep": 6.52,
+    "osmOnlyRunsAdded": 26,
+    "roadRunsAdded": 17,
+    "deepKmOnRoads": 22.08,
+    "blazesKm": {
+     "(none)": 29.87
+    }
+   },
+   "graph": {
+    "nodes": 303,
+    "edges": 411,
+    "km": 36.0,
+    "pieces": 6,
+    "largestPiecePct": 91.7,
+    "connectorsAdded": 5,
+    "gaps": [
+     {
+      "km": 1.23,
+      "nearestM": 60,
+      "at": [
+       41.27365,
+       -72.56357
+      ]
+     },
+     {
+      "km": 0.92,
+      "nearestM": 129,
+      "at": [
+       41.27499,
+       -72.56078
+      ]
+     },
+     {
+      "km": 0.4,
+      "nearestM": 126,
+      "at": [
+       41.27302,
+       -72.56704
+      ]
+     },
+     {
+      "km": 0.38,
+      "nearestM": 215,
+      "at": [
+       41.27144,
+       -72.55191
+      ]
+     }
+    ]
+   },
+   "entrances": {
+    "deep": 3,
+    "road": 37,
+    "deepUnreached": []
+   },
+   "features": {
+    "info": 6,
+    "toilets": 5,
+    "summit": 1,
+    "viewpoint": 1,
+    "historic": 1,
+    "water": 1
+   },
+   "othersInside": [
+    {
+     "id": "a232849d45",
+     "name": "Hammonasset Beach Boat Launch",
+     "type": "state",
+     "subtype": "Boat Launch / Water Access",
+     "acres": 577
+    }
+   ],
+   "flags": [
+    "1 other place record(s) inside the boundary",
+    "100% of DEEP trail length has no recorded blaze",
+    "22.1 km of DEEP 'trail' inside lies on a road",
+    "20.8 km of DEEP trail inside has no OSM path beside it"
+   ]
+  },
+  {
+   "id": "82e4ff3014",
+   "name": "Kent Falls State Park",
+   "record": {
+    "name": "Kent Falls State Park",
+    "type": "state",
+    "subtype": "State Park",
+    "acres": 227,
+    "status": "park",
+    "feeState": "parking",
+    "siteRules": [
+     "Open daily, 8 a.m. to sunset",
+     "Dogs on a leash no longer than 7 ft, in picnic areas and on hiking trails",
+     "No entry into the water and no swimming",
+     "Stay on the hiking trails",
+     "No alcohol",
+     "No motor vehicles off designated roads"
+    ],
+    "sources": [
+     "https://ctparks.com/parks/kent-falls-state-park",
+     "https://eregulations.ct.gov/eRegsPortal/Browse/RCSA/Title_23Subtitle_23-4Section_23-4-1/",
+     "https://ctparks.com/park-passes",
+     "https://portal.ct.gov/deep/natural-resources/responsible-recreation",
+     "https://portal.ct.gov/DEEP/State-Parks/Recreation-Information/Recreational-Trail-Use-Information"
+    ]
+   },
+   "deep": {
+    "property": "Kent Falls State Park",
+    "legend": [
+     "State Park"
+    ],
+    "acres": 227,
+    "ringAcres": 226,
+    "rings": 1
+   },
+   "trails": {
+    "deepSegments": 40,
+    "deepKmInside": 3.64,
+    "deepKmSeenByOsm": 3.16,
+    "osmKmInside": 2.97,
+    "osmKmSeenByDeep": 2.78,
+    "osmOnlyRunsAdded": 1,
+    "roadRunsAdded": 8,
+    "deepKmOnRoads": 0.03,
+    "blazesKm": {
+     "(none)": 1.96,
+     "Yellow": 1.07,
+     "Red": 0.67
+    }
+   },
+   "graph": {
+    "nodes": 46,
+    "edges": 56,
+    "km": 6.81,
+    "pieces": 2,
+    "largestPiecePct": 96.8,
+    "connectorsAdded": 0,
+    "gaps": [
+     {
+      "km": 0.22,
+      "nearestM": 113,
+      "at": [
+       41.7778,
+       -73.41535
+      ]
+     }
+    ]
+   },
+   "entrances": {
+    "deep": 1,
+    "road": 2,
+    "deepUnreached": []
+   },
+   "features": {
+    "falls": 2,
+    "viewpoint": 2,
+    "info": 1,
+    "picnic": 1
+   },
+   "othersInside": [],
+   "flags": [
+    "53% of DEEP trail length has no recorded blaze"
+   ]
+  },
+  {
+   "id": "dd765cc2fe",
+   "name": "Gillette Castle State Park",
+   "record": {
+    "name": "Gillette Castle State Park",
+    "type": "state",
+    "subtype": "State Park",
+    "acres": 190,
+    "status": "park",
+    "feeState": "free",
+    "siteRules": [
+     "Grounds open daily, 8 a.m. to sunset",
+     "The castle opens for scheduled tours only: daily from Memorial Day weekend to Labor Day, weekends and holidays to Columbus Day, then closed until the holiday tours (Fridays to Sundays, Thanksgiving to Christmas)",
+     "Castle tours: $6 ages 13 and up, $2 ages 6 to 12, free under 5",
+     "Dogs on a leash no longer than 7 ft, in picnic areas and on trails; not in buildings, on decks or at the river campsite",
+     "No motor vehicles off designated roads"
+    ],
+    "sources": [
+     "https://ctparks.com/parks/gillette-castle-state-park",
+     "https://eregulations.ct.gov/eRegsPortal/Browse/RCSA/Title_23Subtitle_23-4Section_23-4-1/",
+     "https://portal.ct.gov/deep/natural-resources/responsible-recreation",
+     "https://portal.ct.gov/DEEP/State-Parks/Recreation-Information/Recreational-Trail-Use-Information"
+    ]
+   },
+   "deep": {
+    "property": "Gillette Castle State Park",
+    "legend": [
+     "State Park"
+    ],
+    "acres": 190,
+    "ringAcres": 188,
+    "rings": 14
+   },
+   "trails": {
+    "deepSegments": 125,
+    "deepKmInside": 10.05,
+    "deepKmSeenByOsm": 8.32,
+    "osmKmInside": 7.3,
+    "osmKmSeenByDeep": 6.9,
+    "osmOnlyRunsAdded": 6,
+    "roadRunsAdded": 0,
+    "deepKmOnRoads": 2.13,
+    "blazesKm": {
+     "(none)": 10.11
+    }
+   },
+   "graph": {
+    "nodes": 115,
+    "edges": 148,
+    "km": 10.66,
+    "pieces": 2,
+    "largestPiecePct": 98.8,
+    "connectorsAdded": 1,
+    "gaps": []
+   },
+   "entrances": {
+    "deep": 2,
+    "road": 6,
+    "deepUnreached": []
+   },
+   "features": {
+    "picnic": 4,
+    "shelter": 2,
+    "water": 1
+   },
+   "othersInside": [
+    {
+     "id": "6b5667fe76",
+     "name": "Hadlyme Ferry Boat Launch (Connecticut River)",
+     "type": "state",
+     "subtype": "Boat Launch / Water Access",
+     "acres": 20
+    }
+   ],
+   "flags": [
+    "1 other place record(s) inside the boundary",
+    "100% of DEEP trail length has no recorded blaze",
+    "2.1 km of DEEP 'trail' inside lies on a road"
+   ]
+  },
+  {
+   "id": "717a4836f5",
+   "name": "Devil's Hopyard State Park",
+   "record": {
+    "name": "Devil's Hopyard State Park",
+    "type": "state",
+    "subtype": "State Park",
+    "acres": 893,
+    "status": "park",
+    "feeState": "free",
+    "siteRules": [
+     "Open daily, 8 a.m. to sunset",
+     "Dogs on a leash no longer than 7 ft, in picnic areas and on hiking trails; not in the campground",
+     "No running water: water on site is unsafe to drink, so bring your own",
+     "Campground (21 sites) open April 10 to October 12 in 2026",
+     "No motor vehicles off designated roads"
+    ],
+    "sources": [
+     "https://ctparks.com/parks/devils-hopyard-state-park",
+     "https://eregulations.ct.gov/eRegsPortal/Browse/RCSA/Title_23Subtitle_23-4Section_23-4-1/",
+     "https://portal.ct.gov/deep/natural-resources/responsible-recreation",
+     "https://portal.ct.gov/DEEP/State-Parks/Recreation-Information/Recreational-Trail-Use-Information"
+    ]
+   },
+   "deep": {
+    "property": "Devils Hopyard State Park",
+    "legend": [
+     "State Park"
+    ],
+    "acres": 891,
+    "ringAcres": 886,
+    "rings": 2
+   },
+   "trails": {
+    "deepSegments": 107,
+    "deepKmInside": 18.31,
+    "deepKmSeenByOsm": 16.83,
+    "osmKmInside": 21.36,
+    "osmKmSeenByDeep": 16.83,
+    "osmOnlyRunsAdded": 20,
+    "roadRunsAdded": 6,
+    "deepKmOnRoads": 0.85,
+    "blazesKm": {
+     "(none)": 4.69,
+     "Orange": 4.11,
+     "Yellow": 2.9,
+     "Red": 2.61,
+     "Green": 2.26,
+     "White": 0.89,
+     "Blue": 0.74,
+     "Red/White": 0.22,
+     "Yellow/Red": 0.16
+    }
+   },
+   "graph": {
+    "nodes": 126,
+    "edges": 167,
+    "km": 25.97,
+    "pieces": 1,
+    "largestPiecePct": 100.0,
+    "connectorsAdded": 2,
+    "gaps": []
+   },
+   "entrances": {
+    "deep": 1,
+    "road": 9,
+    "deepUnreached": []
+   },
+   "features": {
+    "picnic": 7,
+    "toilets": 6,
+    "falls": 4,
+    "shelter": 2,
+    "camp": 2,
+    "viewpoint": 2,
+    "info": 2,
+    "parking": 2,
+    "attraction": 1
+   },
+   "othersInside": [],
+   "flags": [
+    "25% of DEEP trail length has no recorded blaze"
+   ]
+  },
+  {
+   "id": "7978e39d7e",
+   "name": "Talcott Mountain State Park",
+   "record": {
+    "name": "Talcott Mountain State Park",
+    "type": "state",
+    "subtype": "State Park",
+    "acres": 561,
+    "status": "park",
+    "feeState": "parking",
+    "siteRules": [
+     "Open daily, 8 a.m. to sunset",
+     "Heublein Tower museum: Memorial Day weekend to October 31, Fridays to Mondays, 10 a.m. to 4 p.m.; reached by walking trail only",
+     "Dogs on a leash no longer than 7 ft; not in the museum",
+     "No motor vehicles off designated roads"
+    ],
+    "sources": [
+     "https://ctparks.com/parks/talcott-mountain-state-park",
+     "https://eregulations.ct.gov/eRegsPortal/Browse/RCSA/Title_23Subtitle_23-4Section_23-4-1/",
+     "https://ctparks.com/park-passes",
+     "https://portal.ct.gov/deep/natural-resources/responsible-recreation",
+     "https://portal.ct.gov/DEEP/State-Parks/Recreation-Information/Recreational-Trail-Use-Information"
+    ]
+   },
+   "deep": {
+    "property": "Talcott Mountain State Park",
+    "legend": [
+     "State Park"
+    ],
+    "acres": 552,
+    "ringAcres": 549,
+    "rings": 5
+   },
+   "trails": {
+    "deepSegments": 139,
+    "deepKmInside": 7.04,
+    "deepKmSeenByOsm": 5.9,
+    "osmKmInside": 10.46,
+    "osmKmSeenByDeep": 5.59,
+    "osmOnlyRunsAdded": 27,
+    "roadRunsAdded": 3,
+    "deepKmOnRoads": 0.0,
+    "blazesKm": {
+     "Blue": 4.18,
+     "Yellow": 2.34,
+     "(none)": 1.4,
+     "Blue/Yellow": 0.2
+    }
+   },
+   "graph": {
+    "nodes": 70,
+    "edges": 84,
+    "km": 17.42,
+    "pieces": 4,
+    "largestPiecePct": 61.4,
+    "connectorsAdded": 1,
+    "gaps": [
+     {
+      "km": 3.03,
+      "nearestM": null,
+      "at": null
+     },
+     {
+      "km": 2.47,
+      "nearestM": 803,
+      "at": [
+       41.8134,
+       -72.8035
+      ]
+     },
+     {
+      "km": 1.23,
+      "nearestM": null,
+      "at": null
+     }
+    ]
+   },
+   "entrances": {
+    "deep": 1,
+    "road": 5,
+    "deepUnreached": []
+   },
+   "features": {
+    "toilets": 4,
+    "summit": 3,
+    "viewpoint": 3,
+    "picnic": 2,
+    "historic": 2,
+    "parking": 2,
+    "info": 2,
+    "water": 1,
+    "tower": 1,
+    "attraction": 1
+   },
+   "othersInside": [],
+   "flags": [
+    "network in 4 pieces; the largest is 61% of the length",
+    "4.9 km of OSM path inside has no DEEP trail beside it"
+   ]
+  },
+  {
+   "id": "2247836a8f",
+   "name": "Macedonia Brook State Park",
+   "record": {
+    "name": "Macedonia Brook State Park",
+    "type": "state",
+    "subtype": "State Park",
+    "acres": 1830,
+    "status": "park",
+    "feeState": "free",
+    "siteRules": [
+     "Open daily, 8 a.m. to sunset",
+     "Dogs on a leash no longer than 7 ft, in the picnic area and on hiking trails; not in the campground",
+     "Little or no cell phone service in the park",
+     "No alcohol",
+     "Campground (51 sites) by advance reservation only, opening May 22 in 2026",
+     "No motor vehicles off designated roads"
+    ],
+    "sources": [
+     "https://ctparks.com/parks/macedonia-brook-state-park",
+     "https://eregulations.ct.gov/eRegsPortal/Browse/RCSA/Title_23Subtitle_23-4Section_23-4-1/",
+     "https://portal.ct.gov/deep/natural-resources/responsible-recreation",
+     "https://portal.ct.gov/DEEP/State-Parks/Recreation-Information/Recreational-Trail-Use-Information"
+    ]
+   },
+   "deep": {
+    "property": "Macedonia Brook State Park",
+    "legend": [
+     "State Park"
+    ],
+    "acres": 1829,
+    "ringAcres": 1818,
+    "rings": 2
+   },
+   "trails": {
+    "deepSegments": 42,
+    "deepKmInside": 24.43,
+    "deepKmSeenByOsm": 16.71,
+    "osmKmInside": 16.7,
+    "osmKmSeenByDeep": 15.54,
+    "osmOnlyRunsAdded": 4,
+    "roadRunsAdded": 18,
+    "deepKmOnRoads": 6.67,
+    "blazesKm": {
+     "Blue": 10.17,
+     "(none)": 7.09,
+     "Orange": 4.14,
+     "Green": 1.55,
+     "White": 0.97,
+     "Green/Orange": 0.91,
+     "Yellow": 0.82,
+     "White/Orange": 0.31,
+     "Blue/Orange": 0.07
+    }
+   },
+   "graph": {
+    "nodes": 75,
+    "edges": 97,
+    "km": 33.29,
+    "pieces": 2,
+    "largestPiecePct": 97.1,
+    "connectorsAdded": 0,
+    "gaps": [
+     {
+      "km": 0.97,
+      "nearestM": 1005,
+      "at": [
+       41.75949,
+       -73.51092
+      ]
+     }
+    ]
+   },
+   "entrances": {
+    "deep": 1,
+    "road": 23,
+    "deepUnreached": []
+   },
+   "features": {
+    "picnic": 14,
+    "viewpoint": 3,
+    "info": 2,
+    "summit": 1,
+    "toilets": 1,
+    "camp": 1
+   },
+   "othersInside": [],
+   "flags": [
+    "27% of DEEP trail length has no recorded blaze",
+    "6.7 km of DEEP 'trail' inside lies on a road",
+    "7.7 km of DEEP trail inside has no OSM path beside it"
+   ]
+  },
+  {
+   "id": "6630d117e7",
+   "name": "Chatfield Hollow State Park",
+   "record": {
+    "name": "Chatfield Hollow State Park",
+    "type": "state",
+    "subtype": "State Park",
+    "acres": 399,
+    "status": "park",
+    "feeState": "parking",
+    "siteRules": [
+     "Open daily, 8 a.m. to sunset; open year-round, with parking limited to the Route 80 lots",
+     "Dogs on a leash no longer than 7 ft, on trails and park grounds; not on the beach or in the pond",
+     "Swimming from the sandy beach on Schreeder Pond",
+     "No motor vehicles off designated roads"
+    ],
+    "sources": [
+     "https://ctparks.com/parks/chatfield-hollow-state-park",
+     "https://eregulations.ct.gov/eRegsPortal/Browse/RCSA/Title_23Subtitle_23-4Section_23-4-1/",
+     "https://ctparks.com/park-passes",
+     "https://portal.ct.gov/deep/natural-resources/responsible-recreation",
+     "https://portal.ct.gov/DEEP/State-Parks/Recreation-Information/Recreational-Trail-Use-Information"
+    ]
+   },
+   "deep": {
+    "property": "Chatfield Hollow State Park",
+    "legend": [
+     "State Park"
+    ],
+    "acres": 399,
+    "ringAcres": 397,
+    "rings": 1
+   },
+   "trails": {
+    "deepSegments": 150,
+    "deepKmInside": 14.64,
+    "deepKmSeenByOsm": 11.01,
+    "osmKmInside": 10.95,
+    "osmKmSeenByDeep": 9.8,
+    "osmOnlyRunsAdded": 9,
+    "roadRunsAdded": 0,
+    "deepKmOnRoads": 3.8,
+    "blazesKm": {
+     "(none)": 5.89,
+     "Orange": 2.76,
+     "Red": 2.04,
+     "White": 1.63,
+     "Blue": 1.63,
+     "Orange/White": 1.2,
+     "Purple": 0.94,
+     "Green": 0.7,
+     "Purple/Red": 0.05,
+     "Orange/Blue": 0.03
+    }
+   },
+   "graph": {
+    "nodes": 99,
+    "edges": 125,
+    "km": 18.42,
+    "pieces": 2,
+    "largestPiecePct": 99.6,
+    "connectorsAdded": 0,
+    "gaps": []
+   },
+   "entrances": {
+    "deep": 1,
+    "road": 8,
+    "deepUnreached": []
+   },
+   "features": {
+    "picnic": 17,
+    "interest": 10,
+    "water": 5,
+    "toilets": 4,
+    "info": 3,
+    "lake": 2,
+    "parking": 1
+   },
+   "othersInside": [],
+   "flags": [
+    "35% of DEEP trail length has no recorded blaze",
+    "3.8 km of DEEP 'trail' inside lies on a road"
+   ]
+  },
+  {
+   "id": "f04bf83bd3",
+   "name": "Mashamoquet Brook State Park",
+   "record": {
+    "name": "Mashamoquet Brook State Park",
+    "type": "state",
+    "subtype": "State Park",
+    "acres": 1007,
+    "status": "park",
+    "feeState": "free",
+    "siteRules": [
+     "Open daily, 8 a.m. to sunset",
+     "Dogs on a leash no longer than 7 ft, in picnic areas and on trails; not in the campgrounds, on the beach or in the picnic shelter",
+     "Nothing may be attached to or hung from trees or structures, hammocks included",
+     "Two campgrounds; Mashamoquet Brook open May 1 to October 12 in 2026",
+     "No motor vehicles off designated roads"
+    ],
+    "sources": [
+     "https://ctparks.com/parks/mashamoquet-brook-state-park",
+     "https://eregulations.ct.gov/eRegsPortal/Browse/RCSA/Title_23Subtitle_23-4Section_23-4-1/",
+     "https://portal.ct.gov/deep/natural-resources/responsible-recreation",
+     "https://portal.ct.gov/DEEP/State-Parks/Recreation-Information/Recreational-Trail-Use-Information"
+    ]
+   },
+   "deep": {
+    "property": "Mashamoquet Brook State Park",
+    "legend": [
+     "State Park"
+    ],
+    "acres": 1006,
+    "ringAcres": 1000,
+    "rings": 1
+   },
+   "trails": {
+    "deepSegments": 19,
+    "deepKmInside": 11.73,
+    "deepKmSeenByOsm": 9.56,
+    "osmKmInside": 10.21,
+    "osmKmSeenByDeep": 9.35,
+    "osmOnlyRunsAdded": 5,
+    "roadRunsAdded": 8,
+    "deepKmOnRoads": 0.79,
+    "blazesKm": {
+     "Blue": 4.99,
+     "Red": 3.16,
+     "(none)": 1.54,
+     "Blue/Red": 1.29,
+     "Yellow": 0.9
+    }
+   },
+   "graph": {
+    "nodes": 39,
+    "edges": 47,
+    "km": 16.87,
+    "pieces": 1,
+    "largestPiecePct": 100.0,
+    "connectorsAdded": 1,
+    "gaps": []
+   },
+   "entrances": {
+    "deep": 1,
+    "road": 10,
+    "deepUnreached": []
+   },
+   "features": {
+    "historic": 1,
+    "attraction": 1
+   },
+   "othersInside": [],
+   "flags": []
+  },
+  {
+   "id": "7ae1d0c717",
+   "name": "Squantz Pond State Park",
+   "record": {
+    "name": "Squantz Pond State Park",
+    "type": "state",
+    "subtype": "State Park",
+    "acres": 170,
+    "status": "park",
+    "feeState": "parking",
+    "siteRules": [
+     "Open daily, 8 a.m. to sunset",
+     "No dogs from April 15 to September 30; from October 1 to April 14, dogs on a leash no longer than 7 ft in picnic areas and on hiking trails",
+     "In peak season parking is capped at 250 cars; once full the park closes for the day, walk-ins included",
+     "Off-peak the park is closed to vehicles: park at the boat launch and walk in",
+     "Swimming in Squantz Pond",
+     "Restrooms close after Labor Day",
+     "No alcohol",
+     "No motor vehicles off designated roads"
+    ],
+    "sources": [
+     "https://services1.arcgis.com/FjPcSmEFuDYlIdKC/arcgis/rest/services/Connecticut_DEEP_Property/FeatureServer/0/query?where=PROPERTY+%3D+%27Squantz+Pond+State+Park%27&outFields=PROPERTY%2CAV_LEGEND%2CACRE_GIS&returnGeometry=false&f=html",
+     "https://ctparks.com/parks/squantz-pond-state-park",
+     "https://eregulations.ct.gov/eRegsPortal/Browse/RCSA/Title_23Subtitle_23-4Section_23-4-1/",
+     "https://ctparks.com/park-passes"
+    ]
+   },
+   "deep": {
+    "property": "Squantz Pond State Park",
+    "legend": [
+     "State Park"
+    ],
+    "acres": 170,
+    "ringAcres": 169,
+    "rings": 1
+   },
+   "trails": {
+    "deepSegments": 80,
+    "deepKmInside": 6.53,
+    "deepKmSeenByOsm": 3.53,
+    "osmKmInside": 3.42,
+    "osmKmSeenByDeep": 2.97,
+    "osmOnlyRunsAdded": 5,
+    "roadRunsAdded": 9,
+    "deepKmOnRoads": 2.12,
+    "blazesKm": {
+     "(none)": 4.13,
+     "Green": 1.52,
+     "Red": 1.01,
+     "Blue": 0.58
+    }
+   },
+   "graph": {
+    "nodes": 69,
+    "edges": 86,
+    "km": 9.31,
+    "pieces": 2,
+    "largestPiecePct": 95.3,
+    "connectorsAdded": 0,
+    "gaps": [
+     {
+      "km": 0.44,
+      "nearestM": 70,
+      "at": [
+       41.50877,
+       -73.4703
+      ]
+     }
+    ]
+   },
+   "entrances": {
+    "deep": 3,
+    "road": 6,
+    "deepUnreached": []
+   },
+   "features": {
+    "toilets": 1,
+    "water": 1
+   },
+   "othersInside": [
+    {
+     "id": "da8ddb3f1e",
+     "name": "Candlewood Lake (Squantz Cove) Boat Launch",
+     "type": "state",
+     "subtype": "Boat Launch / Water Access",
+     "acres": 163
+    }
+   ],
+   "flags": [
+    "1 other place record(s) inside the boundary",
+    "57% of DEEP trail length has no recorded blaze",
+    "2.1 km of DEEP 'trail' inside lies on a road",
+    "3.0 km of DEEP trail inside has no OSM path beside it"
+   ]
+  }
+ ]
+}

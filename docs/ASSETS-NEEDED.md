@@ -93,6 +93,22 @@ and a consistent light direction across the set. Season and time of day change
 the scene's palette around them, so a sprite that fights the palette will fight
 it four ways.
 
+## 4b. Start mode: 4 marks, added 2026-10-22
+
+The guide's route mode draws four things of its own, all in code today and
+all hand-replaceable. The walker itself is the existing hiker sprite.
+
+| Glyph | Where | Size it must survive | Drawn now as |
+|---|---|---|---|
+| `route` | corner button that opens the guide | 20px in a 38px button | `SVG.route` in `iso.js`: dot, dashed way, flag; filled, `currentColor` |
+| start | where the route begins, on the terrain | ~10-24px, scales with zoom | a cream ring with a dark edge (`drawRoute`) |
+| finish | the destination, on the terrain | ~20-50px tall | a pole and a pennant in the route gold |
+| you are here | the phone's position, on the terrain | ~8-20px plus an accuracy halo | a blue dot with a white edge |
+
+The start and finish are canvas drawings over the scene, so they can be
+raster. They should read against every season and time of day, and the
+finish has to stay distinct from the summit and tower labels around it.
+
 ## 5. Not drawn at all — the buildings around a park
 
 The viewer already fetches sixteen kinds of public building near a park and has

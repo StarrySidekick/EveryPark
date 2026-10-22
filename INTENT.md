@@ -17,6 +17,32 @@ intent file is worse than no intent file.
 **A public tool.** Timothy intends to release this, which raises the bar on
 every claim the map makes.
 
+## 2026-10-22: a guide to each park, proven on ten
+
+Timothy, 2026-10-22: *"a comprehensive guide to each verified state park or
+local park ... it relies on the efficacy of the data that this park is real
+and can actually be visited ... navigate everything in a way that it feels
+fun and interactive and mysterious without having to like take a picture of
+the park map."*
+
+Three things follow, in this order:
+
+1. **Accuracy first.** A guide that sends someone down a trail that is not
+   there is worse than the map with no guide. *"making sure all the data is
+   as accurate as it possibly can be."*
+2. **A start mode in the 3D view.** *"start at the beginning of wherever you
+   are in order to begin your route."* You arrive at a lot or a trailhead,
+   the viewer puts you there, and the route reads as the blazes you will
+   actually see on the trees.
+3. **The 3D view is the guide.** Not a picture beside a list of facts.
+
+**Proven on a test set of ten Connecticut state parks before it goes wide**
+(`data/testset.json`, audit in `docs/TESTSET.md`). Whatever has to be true
+for those ten is the template for the rest.
+
+**Offline is deferred.** It already works for the map; offline *guides*
+come when this becomes an installable app. Not a goal for the test set.
+
 ## What is next
 
 **1. Depth over breadth, on land that can actually be verified.**

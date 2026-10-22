@@ -300,7 +300,7 @@ const CONFIG = {
   // Shown in the top-right corner. Bumped by hand on every code change,
   // so there's visible proof of which build is actually loaded rather
   // than guessing whether a cached copy is being served.
-  siteVersion: "v0.56.0",
+  siteVersion: "v0.57.0",
 
   // ---- VECTOR TILES --------------------------------------------------
   // Every boundary and trail, pre-cut into map tiles and packed into one
@@ -513,6 +513,29 @@ const CONFIG = {
     weight: 2,
     opacity: 0.9,
     dashArray: "5,4"
+  },
+
+  // ---- PARK GUIDES (the 3D viewer's start mode) ---------------------
+  // Paint for blazes, keyed by the colour words makeguides.py pulls out
+  // of DEEP's TRAILMARK. These stand for paint on a tree, not a style:
+  // a trail drawn in a colour you will not see in the woods is a wrong
+  // turn waiting to happen, so keep them close to the real thing.
+  guide: {
+    blazes: {
+      blue: "#2f6fdc", "light blue": "#7fb6ef", white: "#f4f1e8",
+      red: "#d6362f", yellow: "#efc81f", orange: "#ee8324",
+      green: "#2e9c4f", purple: "#8a43b6", violet: "#9a5fd1",
+      pink: "#ef84b6", black: "#222222", brown: "#86532a",
+      teal: "#1f9a9a", aqua: "#2fc7d9", grey: "#9a9a9a",
+      silver: "#c4c6cc", gold: "#d4a52c", tan: "#cdb08a"
+    },
+    // Trail with no recorded blaze. Deliberately unlike every paint
+    // colour above: the viewer's ordinary trail yellow is within a few
+    // points of the Yellow blaze, and drawing an unblazed trail in it
+    // sends someone looking for paint that is not there.
+    unblazed: "#a8937a",
+    route: "#ffd24a",     // the way you chose, over everything
+    you: "#4aa8ff"        // where the phone says you are
   },
 
   // ---- MUNICIPAL PARKS LIVE DATA -----------------------------------

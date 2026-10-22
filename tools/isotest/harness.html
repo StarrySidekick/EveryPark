@@ -12,7 +12,13 @@
   // renderer without any network, which is exactly what a regression
   // check wants — the same scene every run. The one exception: GNIS
   // name queries get a canned answer, so the label pass renders too.
+  // Baked park guides are local files in this repo, so letting them
+  // through keeps the harness offline: tools/isotest/guide.mjs opens a
+  // guide park, and nothing else here has an id that has a guide.
+  const realFetch = window.fetch.bind(window);
+  window.EP_GUIDE_BASE = "../../data/guides/";
   window.fetch = (url) => {
+    if (String(url).includes("/data/guides/")) return realFetch(url);
     if (String(url).includes("geonames")) return Promise.resolve({
       ok: true,
       json: () => Promise.resolve({ features: [
@@ -42,6 +48,7 @@
     return Promise.reject(new Error("offline harness"));
   };
 </script>
+<script src="../../config.js"></script>
 <script src="../../iso.js"></script>
 <script>
   window.openTest = (over) => EveryParkIso.open(Object.assign({

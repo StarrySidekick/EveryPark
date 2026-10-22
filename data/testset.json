@@ -1,0 +1,43 @@
+{
+  "_README": [
+    "The ten Connecticut state parks the guide is proven on before it goes wide.",
+    "Hand-written. makeguides.py reads it and writes data/guides/<id>.json for each.",
+    "id binds to the record in places.json; deep is the PROPERTY name in CT DEEP's",
+    "property layer, which is the boundary of record; at is a coordinate anchor in",
+    "case an id ever changes. why says what this park tests that the others do not.",
+    "Chosen 2026-10-22 for spread: north-west hills, central ridges, the lower river,",
+    "the shoreline, the quiet corner, and the western lakes. Swapping one is cheap."
+  ],
+  "parks": [
+    { "id": "bc69dafa2a", "name": "Sleeping Giant State Park", "town": "Hamden",
+      "deep": "Sleeping Giant State Park", "at": [41.43314, -72.88433],
+      "why": "The densest blazed network in the state and the park every existing harness already uses. If routing by blaze works anywhere it has to work here." },
+    { "id": "f999a0ef6c", "name": "Hammonasset Beach State Park", "town": "Madison",
+      "deep": "Hammonasset Beach State Park", "at": [41.26277, -72.55359],
+      "why": "The most visited park in Connecticut, and the dataset had it named after the preserve beside it while its boat launch carried its acreage. Flat, paved, a beach rather than a hike: a guide that only knows trails fails it." },
+    { "id": "82e4ff3014", "name": "Kent Falls State Park", "town": "Kent",
+      "deep": "Kent Falls State Park", "at": [41.77598, -73.41174],
+      "why": "Small, steep, one trail, one waterfall. Also carries a second record for the Sloane-Stanley lease, which tests that a guide is about one place." },
+    { "id": "dd765cc2fe", "name": "Gillette Castle State Park", "town": "East Haddam",
+      "deep": "Gillette Castle State Park", "at": [41.42696, -72.42904],
+      "why": "A building is the destination. Railroad-bed trails, a river, and a castle with its own season and fee separate from the grounds." },
+    { "id": "717a4836f5", "name": "Devil's Hopyard State Park", "town": "East Haddam",
+      "deep": "Devils Hopyard State Park", "at": [41.4748, -72.34199],
+      "why": "Falls, a campground, and colour-blazed loops. DEEP spells it without the apostrophe, which tests that names are joined by more than string equality." },
+    { "id": "7978e39d7e", "name": "Talcott Mountain State Park", "town": "Simsbury",
+      "deep": "Talcott Mountain State Park", "at": [41.83233, -72.79239],
+      "why": "One famous route to one famous tower, on a ridge shared with the Metacomet Trail. Tests a park whose best trail is not the park's own." },
+    { "id": "2247836a8f", "name": "Macedonia Brook State Park", "town": "Kent",
+      "deep": "Macedonia Brook State Park", "at": [41.77195, -73.49243],
+      "why": "The largest of the ten, real elevation, a long ridge loop and a campground. Tests the viewer at the top of its size range." },
+    { "id": "6630d117e7", "name": "Chatfield Hollow State Park", "town": "Killingworth",
+      "deep": "Chatfield Hollow State Park", "at": [41.37061, -72.59298],
+      "why": "Many short blazed trails around a pond, caves and a covered bridge. Tests a network where the choice of route matters more than its length." },
+    { "id": "f04bf83bd3", "name": "Mashamoquet Brook State Park", "town": "Pomfret",
+      "deep": "Mashamoquet Brook State Park", "at": [41.84971, -71.98003],
+      "why": "The quiet corner. Three parks merged into one (Mashamoquet, Wolf Den, Saptree Run), with the Wolf Den as the destination." },
+    { "id": "7ae1d0c717", "name": "Squantz Pond State Park", "town": "New Fairfield",
+      "deep": "Squantz Pond State Park", "at": [41.50994, -73.47221],
+      "why": "Also classed as a boat launch. A lake beach with a shore trail that runs straight into Pootatuck State Forest, which tests where a park ends." }
+  ]
+}
