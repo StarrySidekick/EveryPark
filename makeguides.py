@@ -1104,6 +1104,38 @@ def bake(entry, places, terrain):
         "flags": flags,
     }
 
+    # What the parks page shows before anyone opens the 3D view: enough
+    # to choose a park by, from this guide alone. Fees and hours are NOT
+    # here; they live on the place record, because verified.json changes
+    # them and a publish does not rebuild guides.
+    paint = Counter()
+    for ed in edges:
+        t = tprops[ed["t"]]
+        if t["src"] == "deep" and t["colours"]:
+            paint[t["colours"][0]] += ed["m"] / 1000
+    SHOW = ("tower", "summit", "falls", "attraction", "historic", "beach", "lake")
+    highlights = []
+    for kind in SHOW:
+        for ft in feats:
+            if ft["kind"] == kind and ft.get("name") and ft["name"] not in highlights:
+                highlights.append(ft["name"])
+    audit["summary"] = {
+        "id": entry["id"], "name": entry["name"], "town": entry.get("town"),
+        # DEEP's own spelling too: the map matches outlines by name, and
+        # DEEP writes "Devils Hopyard" where the record has an apostrophe.
+        "deep": entry["deep"], "at": entry["at"], "bbox": [round(v, 5) for v in raw["bbox"]],
+        # Trail, not pavement: DEEP's layer includes park roads and lot
+        # aisles, and counting them put "18.3 mi" of trail on Hammonasset,
+        # most of it tarmac.
+        "acres": round(deep_acres),
+        "deepMi": round(max(0.0, deep_km - on_road_km) / 1.609344, 1),
+        # Only colours that cover a real stretch: a few metres of a
+        # neighbouring trail's paint is not a blaze you will follow here.
+        "blazes": [c for c, km in paint.most_common() if km >= 0.2],
+        "highlights": highlights[:5],
+        "waysIn": len([x for x in entrances if x.get("node") is not None]),
+        "built": date.today().isoformat()}
+
     def ll6(x, y):
         lng, lat = P.ll(x, y)
         return [round(lng, 6), round(lat, 6)]
@@ -1171,7 +1203,9 @@ def main():
     audits.sort(key=lambda a: order.get(a["id"], 99))
     with open(apath, "w") as fh:
         json.dump({"built": date.today().isoformat(), "parks": audits}, fh, indent=1)
-    index = [{"id": a["id"], "name": a["name"]} for a in audits]
+    # The parks page reads this, so it carries each park's summary; the
+    # viewer only needs the ids.
+    index = [a.get("summary") or {"id": a["id"], "name": a["name"]} for a in audits]
     with open(os.path.join(args.out, "index.json"), "w") as fh:
         json.dump(index, fh, indent=1)
 

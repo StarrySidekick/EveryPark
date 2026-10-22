@@ -8,7 +8,8 @@
 import { chromium } from "playwright";
 
 const EXEC = process.env.CHROMIUM || "/opt/pw-browsers/chromium";
-const SITE = process.env.SITE || "http://127.0.0.1:8125/index.html";
+// #map: the parks list is the front page since 2026-10-22.
+const SITE = process.env.SITE || "http://127.0.0.1:8125/index.html#map";
 const fails = [];
 
 const browser = await chromium.launch({ executablePath: EXEC });

@@ -11,7 +11,7 @@ const ctx = await browser.newContext({
 const page = await ctx.newPage();
 page.on("pageerror", e => errs.push("PAGEERROR " + e));
 page.on("console", m => { if (m.type() === "error" && !/layers.png|favicon|ERR_/.test(m.text())) errs.push("CONSOLE " + m.text()); });
-await page.goto("http://127.0.0.1:8125/index.html");
+await page.goto("http://127.0.0.1:8125/index.html#map");   // the list is the front page since 2026-10-22
 await page.waitForTimeout(4000);
 
 const btn = await page.$eval("#nearBtn", e => {
@@ -36,7 +36,7 @@ await page.screenshot({ path: "/tmp/site-4-near.png" });
 const m = await browser.newContext({ viewport: { width: 390, height: 780 } });
 const mp = await m.newPage();
 mp.on("pageerror", e => errs.push("MOBILE PAGEERROR " + e));
-await mp.goto("http://127.0.0.1:8125/index.html");
+await mp.goto("http://127.0.0.1:8125/index.html#map");
 await mp.waitForTimeout(3500);
 await mp.screenshot({ path: "/tmp/site-5-mobile.png" });
 const overflow = await mp.evaluate(() =>

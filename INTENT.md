@@ -43,6 +43,15 @@ for those ten is the template for the rest.
 **Offline is deferred.** It already works for the map; offline *guides*
 come when this becomes an installable app. Not a goal for the test set.
 
+**Later the same day, the app narrowed to match.** Timothy: *"add a page
+that is what's on by default that just lists all our current state parks
+we've begun to vet. the map view is no longer default and should also not
+by default have anything unvetted present on it."* So the front page is the
+list of vetted parks, the map is the second view, and the map shows only
+vetted parks until Filters says otherwise. "Vetted" means a park with a
+baked guide, not merely a green verdict. Both defaults are one line each in
+`CONFIG.start`.
+
 ## What is next
 
 **1. Depth over breadth, on land that can actually be verified.**

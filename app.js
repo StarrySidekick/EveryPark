@@ -76,7 +76,7 @@
       roads: b.roadsUrl ? L.tileLayer(b.roadsUrl, {
         maxZoom: 19, pane: "epRoads" }) : null,
       labels: b.labelsUrl ? L.tileLayer(b.labelsUrl, {
-        maxZoom: 19, pane: "epRoads" }) : null
+        maxZoom: 19, maxNativeZoom: b.labelsMaxNativeZoom || 19, pane: "epRoads" }) : null
     };
   });
 
@@ -131,7 +131,12 @@
   // and a denied prompt just leaves the statewide view alone.
   let userMovedMap = false;
   map.once("movestart", () => { userMovedMap = true; });
-  if (navigator.geolocation) {
+  // Not when the front page is the parks list, or the map shows vetted
+  // parks only: a location prompt for a map nobody has opened is noise,
+  // and zoom 13 around you is empty ground when ten parks are all there
+  // is. The map fits itself to those ten instead (fitVetted, below).
+  const startSt = CONFIG.start || {};
+  if (navigator.geolocation && startSt.view === "map" && startSt.vettedOnly === false) {
     navigator.geolocation.getCurrentPosition(pos => {
       if (userMovedMap) return;
       const { latitude: lat, longitude: lng } = pos.coords;
@@ -399,6 +404,15 @@
   markCanvas.style.pointerEvents = "none";
   markCanvas.style.position = "absolute";
   map.getPanes().overlayPane.appendChild(markCanvas);
+  // The vetted parks' names, on a canvas of their own ABOVE the place-name
+  // tiles (epRoads, 440). Drawn on the marks canvas they sat under the
+  // town names, and "Sleeping Giant" came out as "eeping Giant".
+  map.createPane("epVetted").style.zIndex = 450;
+  map.getPane("epVetted").style.pointerEvents = "none";
+  const labelCanvas = L.DomUtil.create("canvas", "ep-mark-canvas");
+  labelCanvas.style.pointerEvents = "none";
+  labelCanvas.style.position = "absolute";
+  map.getPane("epVetted").appendChild(labelCanvas);
 
   // ------------------------------------------------------------------
   // State
@@ -409,6 +423,28 @@
   let deferredWork = Promise.resolve();   // trail + PAD-US passes, filled in later
   let searchTerm = "";
   let townIndex = null;         // for point-in-polygon town lookup
+
+  // Vetted parks: the ones with a baked guide (data/guides/index.json).
+  // While vettedOnly is on, visible() admits nothing else, and every way
+  // a place reaches the screen (pins, map clicks, search, Random, Near me,
+  // the 3D viewer's dice) already asks visible(). Timothy, 2026-10-22:
+  // the map "should also not by default have anything unvetted present".
+  let vettedOnly = !CONFIG.start || CONFIG.start.vettedOnly !== false;
+  const VETTED = new Map();          // id -> the guide index's summary
+  const vettedNames = new Set();     // canonical names, for the tile outlines
+  // Apostrophes vanish rather than becoming a space: DEEP writes
+  // "Devils Hopyard", the record says "Devil's Hopyard", and the usual
+  // punctuation-to-space rule turns those into two different names.
+  const canonName = s => String(s || "").toLowerCase().replace(/['\u2019]/g, "")
+    .replace(/[^a-z0-9]+/g, " ").trim();
+  // The parks page's state lives up here, not beside its code further
+  // down: refresh() calls syncParks(), and a `let` it reaches before its
+  // own line has run throws (the markCanvas trap in CLAUDE.md).
+  const parksView = document.getElementById("parksView");
+  const pvList = document.getElementById("pvList");
+  const pvFoot = document.getElementById("pvFoot");
+  let byIdCache = null, byIdLen = -1, pvFound = -1;
+  let vettedLoadFailed = false, fitted = false;
 
   const statusEl = document.getElementById("status");
   const metaEl = document.getElementById("listMeta");   // may be absent
@@ -765,6 +801,7 @@
   function visible(p) {
     if (!p.access) classify(p);
     if (p.access === "closed") return false;              // never show closed land
+    if (vettedOnly && !VETTED.has(p.id)) return false;
     if (!activeAccess.has(p.access)) return false;
     if (!activeTypes.has(p.type)) return false;
     // Evidence chips subdivide the CONFIRMED pins only. An amber place is
@@ -801,6 +838,7 @@
   }
 
   function paintMarks() {
+    labelCanvas.style.display = layerOn("pins") && vettedOnly ? "" : "none";
     // Switched off in the Layers panel: the canvas is hidden, so
     // everything below would be drawing into something nobody sees.
     if (!layerOn("pins")) return;
@@ -820,10 +858,22 @@
     const ctx = markCanvas.getContext("2d");
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
-    if (map.getZoom() < MARK_ZOOM) return;
+    L.DomUtil.setPosition(labelCanvas, topLeft);
+    if (labelCanvas.width !== w * dpr || labelCanvas.height !== h * dpr) {
+      labelCanvas.width = w * dpr; labelCanvas.height = h * dpr;
+      labelCanvas.style.width = w + "px"; labelCanvas.style.height = h + "px";
+    }
+    const lctx = labelCanvas.getContext("2d");
+    lctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    lctx.clearRect(0, 0, w, h);
+    // The zoom floor exists because 24,000 marks at state scale are a
+    // smear. Ten vetted parks are not, and hiding them until zoom 12 would
+    // leave the default map looking empty.
+    if (map.getZoom() < MARK_ZOOM && !vettedOnly) return;
 
     const b = map.getBounds().pad(MARK_PAD / Math.max(size.x, size.y));
     const scale = MARK_PX / 64;
+    const labels = [];                 // vetted names, drawn after every disc
     let n = 0;
     for (const p of placesIn(b)) {
       if (n >= MARK_CAP) break;
@@ -834,6 +884,18 @@
       const m = markFor(p);
       const d = pathFor(m);
       const outline = OUTLINE[m];
+      // Ten vetted parks on a statewide map are ten cream glyphs lost in
+      // the road weave: measured, they were on the canvas and nobody could
+      // find them. With so few, each can afford a disc, a brass ring and
+      // its own name.
+      if (vettedOnly) {
+        ctx.save();
+        ctx.beginPath(); ctx.arc(x, y, 18, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(13,42,30,.92)"; ctx.fill();
+        ctx.lineWidth = 2.5; ctx.strokeStyle = "#d9a441"; ctx.stroke();
+        ctx.restore();
+        labels.push({ x, y, text: p.name.replace(/\s+State Park$/, "") });
+      }
       ctx.save();
       ctx.translate(x - MARK_PX / 2, y - MARK_PX / 2);
       ctx.scale(scale, scale);
@@ -851,10 +913,39 @@
       ctx.restore();
       n++;
     }
+    // Names last, so no neighbour's disc lands on one: Kent Falls and
+    // Macedonia Brook are 30 px apart at the statewide zoom. Right of the
+    // pin, else left, below, above, else not at all; the card has it.
+    if (labels.length) {
+      const c2 = lctx;
+      c2.save();
+      c2.font = "700 12px system-ui, sans-serif";
+      c2.textBaseline = "middle";
+      c2.lineJoin = "round"; c2.lineWidth = 4;
+      const taken = labels.map(l => [l.x - 19, l.y - 19, l.x + 19, l.y + 19]);
+      const clash = r => taken.some(t => r[0] < t[2] && r[2] > t[0] && r[1] < t[3] && r[3] > t[1]);
+      for (const l of labels) {
+        const tw = c2.measureText(l.text).width;
+        const spots = [[l.x + 22, l.y - 8, l.x + 26 + tw, l.y + 8],          // right
+                       [l.x - 26 - tw, l.y - 8, l.x - 22, l.y + 8],          // left
+                       [l.x - tw / 2 - 2, l.y + 21, l.x + tw / 2 + 2, l.y + 37],   // below
+                       [l.x - tw / 2 - 2, l.y - 37, l.x + tw / 2 + 2, l.y - 21]];  // above
+        const r = spots.find(q => !clash(q));
+        if (!r) continue;
+        taken.push(r);
+        const ty = (r[1] + r[3]) / 2;
+        c2.strokeStyle = "rgba(245,242,230,.95)";
+        c2.strokeText(l.text, r[0] + 2, ty);
+        c2.fillStyle = "#0d2a1e";
+        c2.fillText(l.text, r[0] + 2, ty);
+      }
+      c2.restore();
+    }
   }
 
   function refresh() {
     if (!placeGrid.size && allParks.length) indexPlaces();
+    syncParks();
     if (tilesActive) EveryParkTiles.refresh(activeTypes);
     let shown = 0;
     for (const p of allParks) if (visible(p)) shown++;
@@ -879,8 +970,10 @@
   // intermediate state to redraw FROM) or not drawing marks mid-flight.
   // A ~250 ms fade is a great deal less distracting than icons sliding
   // off the thing they label.
-  map.on("zoomstart", () => markCanvas.classList.add("ep-mark-zooming"));
-  map.on("zoomend", () => markCanvas.classList.remove("ep-mark-zooming"));
+  map.on("zoomstart", () => {
+    markCanvas.classList.add("ep-mark-zooming"); labelCanvas.classList.add("ep-mark-zooming"); });
+  map.on("zoomend", () => {
+    markCanvas.classList.remove("ep-mark-zooming"); labelCanvas.classList.remove("ep-mark-zooming"); });
 
   // A place with no mapped boundary has no polygon to click, so fall
   // back to the nearest one when a click hits bare ground.
@@ -888,7 +981,7 @@
     setTimeout(() => {
       if (document.querySelector(".leaflet-popup")) return;
       const z = map.getZoom();
-      if (z < MARK_ZOOM) return;
+      if (z < MARK_ZOOM && !vettedOnly) return;
       if (!layerOn("pins")) return;      // nothing visible to have hit
       let best = null, bestD = 40;                 // pixels
       const cp = map.latLngToContainerPoint(e.latlng);
@@ -2773,6 +2866,224 @@
     });
   });
 
+  // ------------------------------------------------------------------
+  // The parks page: the front page since 2026-10-22
+  // ------------------------------------------------------------------
+  // Timothy: "add a page that is what's on by default that just lists all
+  // our current state parks we've begun to vet." It sits OVER the map
+  // rather than replacing it, so the map underneath stays laid out and
+  // warm: switching views is a class change, and Leaflet never has to
+  // measure a container that was display:none.
+  // Declarations, not arrows: syncParks() reaches these from refresh().
+  function elt(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function recordOf(id) {
+    if (byIdLen !== allParks.length) {
+      byIdCache = new Map();
+      for (const p of allParks) if (p.id) byIdCache.set(p.id, p);
+      byIdLen = allParks.length;
+    }
+    return byIdCache.get(id) || null;
+  }
+  // Stated, never inferred: these read only what the record holds, which
+  // for the vetted parks is DEEP's own page by way of verified.json.
+  const hoursOf = p => (((p && p.attrs) || {}).siteRules || [])
+    .find(r => /^open\b|^grounds open|8 a\.m\./i.test(r)) || null;
+  const feeOf = p => !p ? null
+    : p.feeState === "free" ? "Free to enter and park" : (p.fee || null);
+  const longDate = iso => {
+    const d = new Date(iso + "T12:00:00");
+    return isNaN(d) ? iso : d.toLocaleDateString(undefined,
+      { year: "numeric", month: "long", day: "numeric" });
+  };
+  const stubOf = s => ({ id: s.id, name: s.name, type: "state", town: s.town,
+                         lat: s.at[0], lng: s.at[1], acres: s.acres, attrs: {} });
+
+  function parkCard(s) {
+    const p = recordOf(s.id);
+    const card = elt("article", "pv-card");
+    card.append(elt("h3", "pv-name", s.name),
+                elt("div", "pv-sub", [s.town, s.acres ? s.acres.toLocaleString() + " acres" : null]
+                                     .filter(Boolean).join(" · ")));
+    const facts = elt("dl", "pv-facts");
+    const fact = (label, value) => {
+      if (!value) return;
+      const row = elt("div", "pv-fact");
+      const dd = elt("dd");
+      if (typeof value === "string") dd.textContent = value; else dd.append(value);
+      row.append(elt("dt", null, label), dd);
+      facts.append(row);
+    };
+    fact("Hours", hoursOf(p));
+    fact("Fee", feeOf(p));
+    // The swatches are the blazes you will see on the trees here, in the
+    // colours the 3D view paints them.
+    const trails = elt("span", "pv-trails");
+    trails.append(elt("span", null, s.deepMi + " mi on CT DEEP's trail map"));
+    const hex = (CONFIG.guide && CONFIG.guide.blazes) || {};
+    if (s.blazes && s.blazes.length) {
+      const sw = elt("span", "pv-blazes");
+      for (const c of s.blazes) {
+        const b = elt("span", "pv-blaze");
+        b.style.background = hex[c] || "#999";
+        b.title = c + " blaze";
+        sw.append(b);
+      }
+      trails.append(sw);
+    } else trails.append(elt("span", "pv-dim", " · no blazes recorded"));
+    fact("Trails", trails);
+    fact("Highlights", (s.highlights || []).join(" · ") || null);
+    fact("Ways in", s.waysIn ? `${s.waysIn} places to start` : null);
+    card.append(facts);
+
+    const rules = ((p && p.attrs) || {}).siteRules || [];
+    if (rules.length) {
+      const det = elt("details", "pv-rules");
+      det.append(elt("summary", null, "Park rules"));
+      const ul = elt("ul");
+      for (const r of rules) ul.append(elt("li", null, r));
+      det.append(ul);
+      card.append(det);
+    }
+
+    const row = elt("div", "pv-actions");
+    const go3d = elt("button", "pv-btn pv-primary", "Explore in 3D");
+    go3d.addEventListener("click", () => {
+      if (window.EveryParkIso) EveryParkIso.open(recordOf(s.id) || stubOf(s), { start: true });
+    });
+    const onMap = elt("button", "pv-btn", "Show on map");
+    onMap.addEventListener("click", () => {
+      fitted = true;                    // this park, not all ten
+      setView("map");
+      const [w, so, e, n] = s.bbox;
+      map.fitBounds([[so, w], [n, e]], { padding: [24, 24] });
+      const rec = recordOf(s.id);
+      if (rec) setTimeout(() => openPlace(rec), 500);
+    });
+    row.append(go3d, onMap);
+    card.append(row, elt("div", "pv-checked", "Checked against CT DEEP, " + longDate(s.built)));
+    return card;
+  }
+
+  function renderParks() {
+    if (!pvList) return;
+    pvList.innerHTML = "";
+    if (!VETTED.size) {
+      pvList.append(elt("p", "pv-empty", vettedLoadFailed
+        ? "The list of vetted parks could not be loaded. The map still works: press Map."
+        : "Loading the vetted parks..."));
+      return;
+    }
+    for (const s of VETTED.values()) pvList.append(parkCard(s));
+    if (pvFoot) pvFoot.textContent = `${VETTED.size} parks so far. A park joins this list once `
+      + "its boundary, trails, ways in, hours and fees have been checked. Everything else is "
+      + "still on the map: press Map, open Filters, and switch off Vetted parks only.";
+  }
+
+  // Re-render as the place records arrive (they load in state shards
+  // after the page), and learn every name a vetted park's outline might
+  // carry in the tiles: its aliases are names other sources gave it.
+  function syncParks() {
+    let n = 0;
+    for (const id of VETTED.keys()) {
+      const p = recordOf(id);
+      if (!p) continue;
+      n++;
+      vettedNames.add(canonName(p.name));
+      for (const a of (p.aka || [])) vettedNames.add(canonName(a));
+    }
+    if (n !== pvFound) { pvFound = n; renderParks(); }
+  }
+
+  // Views. #map in the address opens the map; anything else is the list.
+  const viewBtns = { parks: document.getElementById("viewParks"),
+                     map: document.getElementById("viewMap") };
+  function fitVetted() {
+    if (fitted || !vettedOnly || !VETTED.size) return;
+    let w = 180, so = 90, e = -180, n = -90;
+    for (const s of VETTED.values()) {
+      w = Math.min(w, s.bbox[0]); so = Math.min(so, s.bbox[1]);
+      e = Math.max(e, s.bbox[2]); n = Math.max(n, s.bbox[3]);
+    }
+    fitted = true;
+    // The legend covers the map's left edge on a wide screen, and a park
+    // fitted under it (Macedonia Brook, the westernmost) loses its label.
+    const leg = document.getElementById("legend");
+    const lw = leg && leg.offsetParent ? leg.offsetWidth + 20 : 40;
+    map.fitBounds([[so, w], [n, e]], { paddingTopLeft: [lw, 60], paddingBottomRight: [40, 40] });
+  }
+  function setView(v) {
+    const parks = v !== "map";
+    document.body.classList.toggle("view-parks", parks);
+    if (parksView) parksView.hidden = !parks;
+    for (const [k, b] of Object.entries(viewBtns)) {
+      if (!b) continue;
+      const on = (k === "parks") === parks;
+      b.classList.toggle("active", on);
+      b.setAttribute("aria-pressed", String(on));
+    }
+    const want = parks ? "" : "#map";
+    if (location.hash !== want)
+      history.replaceState(null, "", location.pathname + location.search + want);
+    if (!parks) { map.invalidateSize(); fitVetted(); }
+  }
+  for (const [k, b] of Object.entries(viewBtns))
+    if (b) b.addEventListener("click", () => setView(k));
+  window.addEventListener("hashchange", () => setView(location.hash === "#map" ? "map" : "parks"));
+  setView(location.hash === "#map" || startSt.view === "map" ? "map" : "parks");
+  renderParks();
+
+  // The list itself. Fetched once; the service worker keeps a copy.
+  fetch("data/guides/index.json")
+    .then(r => r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status)))
+    .then(list => {
+      for (const s of list) {
+        if (!s || !s.id || !s.bbox) continue;
+        VETTED.set(s.id, s);
+        vettedNames.add(canonName(s.name));
+        if (s.deep) vettedNames.add(canonName(s.deep));
+      }
+    })
+    .catch(() => { vettedLoadFailed = true; })
+    .finally(() => {
+      pvFound = -1;
+      refresh();
+      renderParks();
+      syncVettedChip();
+      if (!document.body.classList.contains("view-parks")) fitVetted();
+    });
+  // Test seam: what the parks page and the vetted filter believe.
+  window.__epVetted = () => ({ ids: [...VETTED.keys()], names: [...vettedNames],
+                               vettedOnly, cards: pvList ? pvList.children.length : 0 });
+
+  const vettedChip = document.getElementById("vettedChip");
+  function syncVettedChip() {
+    if (vettedChip) vettedChip.classList.toggle("active", vettedOnly);
+    // Say so on the map itself: an empty-looking map with ten pins on it
+    // should explain why, and offer the way back to everything.
+    const note = document.getElementById("vettedNote");
+    if (note) {
+      note.hidden = !vettedOnly;
+      const t = note.querySelector(".vn-text");
+      if (t) t.textContent = VETTED.size
+        ? `Showing the ${VETTED.size} vetted parks only.` : "Showing vetted parks only.";
+    }
+  }
+  const toggleVetted = () => {
+    vettedOnly = !vettedOnly;
+    syncVettedChip();
+    refresh();
+    paintMarks();
+  };
+  if (vettedChip) vettedChip.addEventListener("click", toggleVetted);
+  const showAllBtn = document.getElementById("vettedShowAll");
+  if (showAllBtn) showAllBtn.addEventListener("click", toggleVetted);
+  syncVettedChip();
+
   document.querySelectorAll(".chip[data-access]").forEach(chip => {
     chip.addEventListener("click", () => {
       const a = chip.dataset.access;
@@ -3486,6 +3797,10 @@
 
   if (CONFIG.vectorTiles && CONFIG.vectorTiles.enabled)
     tilesActive = EveryParkTiles.init(map, activeTypes);
+    if (tilesActive && EveryParkTiles.setShapeFilter)
+      EveryParkTiles.setShapeFilter(name => !vettedOnly || vettedNames.has(canonName(name)));
+    // Test seam: the same question the tiles ask, answerable from a harness.
+    window.__epShapeOk = name => !vettedOnly || vettedNames.has(canonName(name));
 
   // Everything the Layers panel switches now exists, so the remembered
   // state can be applied and the chips can be wired.

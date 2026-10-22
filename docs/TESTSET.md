@@ -57,6 +57,11 @@ recorded paint colour.
 | Mashamoquet Brook | 1,006 | 11.73 | 87% | 10.21 | 9.56 | 9.35 | 0.79 | 16.87 | 1 (100.0%) | 1+10 | 2 |
 | Squantz Pond | 170 | 6.53 | 43% | 3.42 | 3.53 | 2.97 | 2.12 | 9.31 | 2 (95.3%) | 3+6 | 2 |
 
+The parks page shows a different, smaller figure: DEEP trail inside the
+park **minus** the stretches that lie on a road, because DEEP's layer
+includes park roads and lot aisles. Hammonasset is 18.3 mi by the column
+above and 4.5 mi of actual trail.
+
 Graph km is larger than DEEP km inside because trails are kept to 150 m
 outside the line (so a trailhead just over it still connects), and because
 OSM and road stretches are added where DEEP has nothing.
@@ -126,8 +131,9 @@ exactly the 19 intended records and no others.
   all (plausibly true of a beach and of railroad-bed paths, but unverified);
   Squantz 43%, Kent Falls 47%. A route over unblazed trail says so.
 - **Two parks have almost no named features**: Mashamoquet (2) and Squantz (2).
-  The Wolf Den, Mashamoquet's destination, is not in any source this reads.
-  That is the clearest case for hand-added features.
+  Mashamoquet's destination, the Wolf Den, exists only as an OSM-mapped
+  plaque ("Wolf Den Plaque"), not as the den itself. That is the clearest
+  case for hand-added features.
 - **Talcott Mountain is four separate networks.** Two are other parcels 800 m
   and further away; that is the land, not a fault. The Heublein Tower route is
   on the main piece and works.

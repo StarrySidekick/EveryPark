@@ -16,8 +16,9 @@ Connecticut. Static site, no server, no database, free to host.
 
 - **Live:** https://everypark.starrysidekick.com
 - **Repo:** `StarrySidekick/EveryPark`, GitHub Pages from `main`
-- **Now:** `v0.57.0` · dataset 24,202 places at the 2026-10-01 refresh ·
-  baked guides and a 3D start mode for ten test parks (`docs/TESTSET.md`)
+- **Now:** `v0.58.0` · the front page is the list of ten vetted parks, and
+  the map shows only those by default · baked guides and a 3D start mode
+  for each (`docs/TESTSET.md`)
 - **8,908 places unverified — CT is 72% verified, NY 60%.** Those two
   percentages do not rest on the same kind of evidence: see
   `docs/SCOPE-AND-DATA.md` (2026-08-24) before trusting either.
@@ -132,6 +133,7 @@ correct.
 | `shotui.mjs` | Chrome layout, by screenshot |
 | `deepclip.mjs` | The DEEP trail clip, arithmetically — a name in a list looks plausible whether or not it belongs |
 | `guide.mjs` | Start mode: a real guide routed and walked; turn directions on known geometry; climb equals height gained |
+| `parkspage.mjs` | The parks list is the front page; the map admits only vetted places, pins and outlines; Show everything brings the rest back (full site on :8125) |
 
 **`parts.mjs` passes on `main` as of 2026-10-22** (checked with today's
 changes stashed). The note below is history: it was RED on 2026-09-05, and

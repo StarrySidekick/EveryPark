@@ -119,7 +119,43 @@
     "water": 1
    },
    "othersInside": [],
-   "flags": []
+   "flags": [],
+   "summary": {
+    "id": "bc69dafa2a",
+    "name": "Sleeping Giant State Park",
+    "town": "Hamden",
+    "deep": "Sleeping Giant State Park",
+    "at": [
+     41.43314,
+     -72.88433
+    ],
+    "bbox": [
+     -72.90977,
+     41.41765,
+     -72.8478,
+     41.45405
+    ],
+    "acres": 1575,
+    "deepMi": 32.2,
+    "blazes": [
+     "white",
+     "red",
+     "blue",
+     "violet",
+     "green",
+     "orange",
+     "yellow"
+    ],
+    "highlights": [
+     "Mount Carmel",
+     "Intermittent Cascade",
+     "Edgar Laing Heermance",
+     "Butterworth Brook Reservoir",
+     "Axle Shop Pond"
+    ],
+    "waysIn": 22,
+    "built": "2026-10-22"
+   }
   },
   {
    "id": "f999a0ef6c",
@@ -237,7 +273,31 @@
     "100% of DEEP trail length has no recorded blaze",
     "22.1 km of DEEP 'trail' inside lies on a road",
     "20.8 km of DEEP trail inside has no OSM path beside it"
-   ]
+   ],
+   "summary": {
+    "id": "f999a0ef6c",
+    "name": "Hammonasset Beach State Park",
+    "town": "Madison",
+    "deep": "Hammonasset Beach State Park",
+    "at": [
+     41.26277,
+     -72.55359
+    ],
+    "bbox": [
+     -72.57658,
+     41.24596,
+     -72.53768,
+     41.27823
+    ],
+    "acres": 581,
+    "deepMi": 4.5,
+    "blazes": [],
+    "highlights": [
+     "Cedar Knoll"
+    ],
+    "waysIn": 40,
+    "built": "2026-10-22"
+   }
   },
   {
    "id": "82e4ff3014",
@@ -321,7 +381,34 @@
    "othersInside": [],
    "flags": [
     "53% of DEEP trail length has no recorded blaze"
-   ]
+   ],
+   "summary": {
+    "id": "82e4ff3014",
+    "name": "Kent Falls State Park",
+    "town": "Kent",
+    "deep": "Kent Falls State Park",
+    "at": [
+     41.77598,
+     -73.41174
+    ],
+    "bbox": [
+     -73.42368,
+     41.76843,
+     -73.39899,
+     41.78246
+    ],
+    "acres": 227,
+    "deepMi": 2.2,
+    "blazes": [
+     "yellow",
+     "red"
+    ],
+    "highlights": [
+     "Kent Falls"
+    ],
+    "waysIn": 3,
+    "built": "2026-10-22"
+   }
   },
   {
    "id": "dd765cc2fe",
@@ -401,7 +488,29 @@
     "1 other place record(s) inside the boundary",
     "100% of DEEP trail length has no recorded blaze",
     "2.1 km of DEEP 'trail' inside lies on a road"
-   ]
+   ],
+   "summary": {
+    "id": "dd765cc2fe",
+    "name": "Gillette Castle State Park",
+    "town": "East Haddam",
+    "deep": "Gillette Castle State Park",
+    "at": [
+     41.42696,
+     -72.42904
+    ],
+    "bbox": [
+     -72.44022,
+     41.41736,
+     -72.41977,
+     41.43512
+    ],
+    "acres": 190,
+    "deepMi": 4.9,
+    "blazes": [],
+    "highlights": [],
+    "waysIn": 8,
+    "built": "2026-10-22"
+   }
   },
   {
    "id": "717a4836f5",
@@ -485,7 +594,40 @@
    "othersInside": [],
    "flags": [
     "25% of DEEP trail length has no recorded blaze"
-   ]
+   ],
+   "summary": {
+    "id": "717a4836f5",
+    "name": "Devil's Hopyard State Park",
+    "town": "East Haddam",
+    "deep": "Devils Hopyard State Park",
+    "at": [
+     41.4748,
+     -72.34199
+    ],
+    "bbox": [
+     -72.3632,
+     41.45322,
+     -72.32431,
+     41.49098
+    ],
+    "acres": 891,
+    "deepMi": 10.8,
+    "blazes": [
+     "orange",
+     "yellow",
+     "red",
+     "green",
+     "white",
+     "blue"
+    ],
+    "highlights": [
+     "Chapman Falls",
+     "Cascade",
+     "Devil's Oven"
+    ],
+    "waysIn": 10,
+    "built": "2026-10-22"
+   }
   },
   {
    "id": "7978e39d7e",
@@ -585,7 +727,37 @@
    "flags": [
     "network in 4 pieces; the largest is 61% of the length",
     "4.9 km of OSM path inside has no DEEP trail beside it"
-   ]
+   ],
+   "summary": {
+    "id": "7978e39d7e",
+    "name": "Talcott Mountain State Park",
+    "town": "Simsbury",
+    "deep": "Talcott Mountain State Park",
+    "at": [
+     41.83233,
+     -72.79239
+    ],
+    "bbox": [
+     -72.80895,
+     41.80186,
+     -72.75655,
+     41.9079
+    ],
+    "acres": 552,
+    "deepMi": 4.4,
+    "blazes": [
+     "blue",
+     "yellow"
+    ],
+    "highlights": [
+     "Heublein Tower",
+     "Metacomet Ridge",
+     "King Phillip Mountain",
+     "Talcott Mountain"
+    ],
+    "waysIn": 6,
+    "built": "2026-10-22"
+   }
   },
   {
    "id": "2247836a8f",
@@ -678,7 +850,37 @@
     "27% of DEEP trail length has no recorded blaze",
     "6.7 km of DEEP 'trail' inside lies on a road",
     "7.7 km of DEEP trail inside has no OSM path beside it"
-   ]
+   ],
+   "summary": {
+    "id": "2247836a8f",
+    "name": "Macedonia Brook State Park",
+    "town": "Kent",
+    "deep": "Macedonia Brook State Park",
+    "at": [
+     41.77195,
+     -73.49243
+    ],
+    "bbox": [
+     -73.51423,
+     41.74755,
+     -73.47186,
+     41.79357
+    ],
+    "acres": 1829,
+    "deepMi": 11.0,
+    "blazes": [
+     "blue",
+     "orange",
+     "green",
+     "white",
+     "yellow"
+    ],
+    "highlights": [
+     "Cobble Mountain"
+    ],
+    "waysIn": 24,
+    "built": "2026-10-22"
+   }
   },
   {
    "id": "6630d117e7",
@@ -762,7 +964,39 @@
    "flags": [
     "35% of DEEP trail length has no recorded blaze",
     "3.8 km of DEEP 'trail' inside lies on a road"
-   ]
+   ],
+   "summary": {
+    "id": "6630d117e7",
+    "name": "Chatfield Hollow State Park",
+    "town": "Killingworth",
+    "deep": "Chatfield Hollow State Park",
+    "at": [
+     41.37061,
+     -72.59298
+    ],
+    "bbox": [
+     -72.60452,
+     41.3596,
+     -72.57899,
+     41.38207
+    ],
+    "acres": 399,
+    "deepMi": 6.7,
+    "blazes": [
+     "orange",
+     "red",
+     "white",
+     "blue",
+     "purple",
+     "green"
+    ],
+    "highlights": [
+     "Old Mill Pond",
+     "Schreeder Pond"
+    ],
+    "waysIn": 9,
+    "built": "2026-10-22"
+   }
   },
   {
    "id": "f04bf83bd3",
@@ -833,7 +1067,36 @@
     "attraction": 1
    },
    "othersInside": [],
-   "flags": []
+   "flags": [],
+   "summary": {
+    "id": "f04bf83bd3",
+    "name": "Mashamoquet Brook State Park",
+    "town": "Pomfret",
+    "deep": "Mashamoquet Brook State Park",
+    "at": [
+     41.84971,
+     -71.98003
+    ],
+    "bbox": [
+     -71.99863,
+     41.83481,
+     -71.95942,
+     41.86416
+    ],
+    "acres": 1006,
+    "deepMi": 6.8,
+    "blazes": [
+     "blue",
+     "red",
+     "yellow"
+    ],
+    "highlights": [
+     "Soldier's grave",
+     "Wolf Den Plaque"
+    ],
+    "waysIn": 11,
+    "built": "2026-10-22"
+   }
   },
   {
    "id": "7ae1d0c717",
@@ -928,7 +1191,33 @@
     "57% of DEEP trail length has no recorded blaze",
     "2.1 km of DEEP 'trail' inside lies on a road",
     "3.0 km of DEEP trail inside has no OSM path beside it"
-   ]
+   ],
+   "summary": {
+    "id": "7ae1d0c717",
+    "name": "Squantz Pond State Park",
+    "town": "New Fairfield",
+    "deep": "Squantz Pond State Park",
+    "at": [
+     41.50994,
+     -73.47221
+    ],
+    "bbox": [
+     -73.49039,
+     41.50255,
+     -73.46478,
+     41.52198
+    ],
+    "acres": 170,
+    "deepMi": 2.7,
+    "blazes": [
+     "green",
+     "red",
+     "blue"
+    ],
+    "highlights": [],
+    "waysIn": 9,
+    "built": "2026-10-22"
+   }
   }
  ]
 }

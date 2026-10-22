@@ -114,12 +114,18 @@ const CONFIG = {
       // as you pull back, it carries no rank we can restyle, and it
       // would draw a second set of roads over CONFIG.roads. See there.
       //
-      // Names come from CARTO's labels-only raster rather than the Esri
-      // reference layer the imagery basemaps use: that one carries
-      // administrative BOUNDARIES as well as names, and a second set of
-      // grey town lines over the ones this map already draws is noise.
-      // Dark text, so it is the light-ground variant.
-      labelsUrl: "https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png",
+      // Names come from Esri's light-gray canvas REFERENCE layer: names
+      // only, dark text, no administrative boundaries. Not the reference
+      // layer the imagery basemaps use, which carries boundaries too, and
+      // a second set of grey town lines over the ones this map already
+      // draws is noise.
+      //
+      // It was CARTO's labels-only raster until 2026-10-22, when CARTO
+      // began requiring an API key: every tile came back 200 with "API
+      // KEY REQUIRED" painted across it and no names at all. A 200 is not
+      // a working layer, and nothing in the app could tell the difference.
+      labelsUrl: "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}",
+      labelsMaxNativeZoom: 16,
       attribution: "Relief and hydrography: USGS · Boundaries: CT DEEP, OpenStreetMap, USGS PAD-US"
     },
     {
@@ -161,8 +167,11 @@ const CONFIG = {
       // so the Names toggle has nothing to switch off here. That is the
       // one place in the panel where a toggle does nothing, and it is a
       // property of the tiles rather than something worth code.
-      url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>'
+      // Esri World Street Map, keyless. It was CARTO Voyager until
+      // 2026-10-22, when that went behind an API key and every tile became
+      // a watermark: the whole basemap was blank on the live site.
+      url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
+      attribution: "Tiles &copy; Esri, HERE, Garmin, OpenStreetMap contributors and the GIS user community"
     }
   ],
 
@@ -300,7 +309,7 @@ const CONFIG = {
   // Shown in the top-right corner. Bumped by hand on every code change,
   // so there's visible proof of which build is actually loaded rather
   // than guessing whether a cached copy is being served.
-  siteVersion: "v0.57.0",
+  siteVersion: "v0.58.0",
 
   // ---- VECTOR TILES --------------------------------------------------
   // Every boundary and trail, pre-cut into map tiles and packed into one
@@ -677,6 +686,17 @@ const CONFIG = {
   },
 
   // Map start position (Connecticut)
+  // ---- THE FRONT PAGE (2026-10-22) -----------------------------------
+  // Timothy: "add a page that is what's on by default that just lists all
+  // our current state parks we've begun to vet. the map view is no longer
+  // default and should also not by default have anything unvetted present
+  // on it." Vetted means a park with a baked guide (data/guides/index.json,
+  // from data/testset.json), not merely a green verdict.
+  start: {
+    view: "parks",        // "parks" or "map"; #map in the URL opens the map
+    vettedOnly: true      // the map shows only vetted parks until Filters says otherwise
+  },
+
   mapCenter: [41.55, -72.7],
   mapZoom: 9
 };

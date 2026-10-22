@@ -90,10 +90,16 @@ const EveryParkTiles = (() => {
     } catch (e) { return "open"; }
   };
 
+  // Set by app.js. While the map shows vetted parks only, an outline is
+  // drawn, hovered and clicked only if its name is one of theirs. One
+  // test here covers all three, because pick() asks visible() too.
+  let shapeFilter = null;
+
   const visible = (dataLayer, f) => {
     const chip = CHIP[dataLayer];
     if (chip && active && !active.has(chip)) return false;
     const nm = nameOf(f);
+    if (shapeFilter && !shapeFilter(nm, dataLayer)) return false;
     if (nm && (EXCLUDE.test(nm) || TRIBAL.test(nm))) return false;
     return true;
   };
@@ -370,6 +376,7 @@ const EveryParkTiles = (() => {
 
     // Lets a clicked polygon show the same popup as its pin.
     setPlaceResolver(fn) { resolvePlace = fn; },
+    setShapeFilter(fn) { shapeFilter = fn; },
 
     // Hand in the verified/unverified verdict per place name.
     setStatus(lookup) {

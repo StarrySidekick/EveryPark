@@ -5,7 +5,7 @@ const errs = [];
 page.on("pageerror", e => errs.push("PAGEERROR " + e));
 page.on("console", m => { if (m.type() === "error" && !/favicon|ERR_(NAME|INTERNET|TUNNEL|CONNECTION)/.test(m.text())) errs.push("CONSOLE " + m.text()); });
 
-await page.goto("http://127.0.0.1:8125/index.html");
+await page.goto("http://127.0.0.1:8125/index.html#map");   // the list is the front page since 2026-10-22
 await page.waitForTimeout(4500);
 await page.screenshot({ path: "/tmp/site-1-map.png" });
 

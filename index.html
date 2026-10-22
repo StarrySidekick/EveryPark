@@ -13,14 +13,20 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Every Park">
 
-  <link rel="stylesheet" href="vendor/leaflet.css?v=124">
+  <link rel="stylesheet" href="vendor/leaflet.css?v=125">
   <!-- ?v= is a cache-buster: bump it on every deploy so visitors get fresh code -->
-  <link rel="stylesheet" href="styles.css?v=124">
+  <link rel="stylesheet" href="styles.css?v=125">
 </head>
 <body>
 
   <header>
     <h1 id="siteTitle">Every Park</h1>
+    <!-- Parks is the front page (2026-10-22): the parks we have vetted,
+         one at a time. The map is the second view, not the first. -->
+    <nav id="viewSwitch" aria-label="View">
+      <button id="viewParks" class="active" aria-pressed="true">Parks</button>
+      <button id="viewMap" aria-pressed="false">Map</button>
+    </nav>
     <div class="search-wrap">
       <input id="search" type="search" placeholder="Search a place, town or steward…" autocomplete="off">
       <div id="searchResults" hidden></div>
@@ -28,6 +34,13 @@
     <div class="filters-wrap">
       <button id="filtersBtn">Filters</button>
         <div id="filtersPanel" hidden>
+          <div class="group" title="Which places the map shows at all">
+        <span class="glabel">Show</span>
+        <div class="chips">
+          <button class="chip active" id="vettedChip">Vetted parks only</button>
+        </div>
+      </div>
+
           <div class="group" title="Can you go there?">
         <span class="glabel">Can I go?</span>
         <div class="chips">
@@ -150,7 +163,20 @@
   </div>
 
   <main>
+    <section id="parksView" aria-label="Vetted parks">
+      <div class="pv-inner">
+        <h2 class="pv-title">Vetted parks</h2>
+        <p class="pv-lede">State parks we have checked against CT DEEP's own records,
+          trail by trail: the boundary, the trails and their blazes, the ways in,
+          the hours and the fees. Open one in 3D to pick where you start and walk a
+          route. More parks join this list as each one is checked.</p>
+        <div id="pvList" class="pv-list"></div>
+        <p class="pv-foot" id="pvFoot"></p>
+      </div>
+    </section>
     <div id="map"></div>
+    <div id="vettedNote" hidden><span class="vn-text">Showing vetted parks only.</span>
+      <button id="vettedShowAll">Show everything</button></div>
     <div id="status"></div>
 
     <div id="legend">
@@ -184,14 +210,14 @@
 
   <!-- Served from this repo, not a CDN. An offline park guide cannot
        start by asking unpkg for the code that draws the map. -->
-  <script src="vendor/leaflet.js?v=124"></script>
-  <script src="vendor/protomaps-leaflet.js?v=124"></script>
-  <script src="config.js?v=124"></script>
-  <script src="prefs.js?v=124"></script>
-  <script src="vectorlayers.js?v=124"></script>
-  <script src="roadlayers.js?v=124"></script>
-  <script src="iso.js?v=124"></script>
-  <script src="app.js?v=124"></script>
-  <script src="offline.js?v=124"></script>
+  <script src="vendor/leaflet.js?v=125"></script>
+  <script src="vendor/protomaps-leaflet.js?v=125"></script>
+  <script src="config.js?v=125"></script>
+  <script src="prefs.js?v=125"></script>
+  <script src="vectorlayers.js?v=125"></script>
+  <script src="roadlayers.js?v=125"></script>
+  <script src="iso.js?v=125"></script>
+  <script src="app.js?v=125"></script>
+  <script src="offline.js?v=125"></script>
 </body>
 </html>

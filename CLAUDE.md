@@ -750,10 +750,12 @@ header is for things you reach for often, and a basemap swap is not
 one") and this supersedes it rather than forgetting it: the panel
 answers one question and the ground is the bottom layer of that answer.
 
-**Names on the drawn basemap come from CARTO's labels-only raster**, not
-the Esri reference layer the imagery basemaps use. That one carries
-administrative boundaries as well as names, and a second set of grey
-town lines over the ones this map already draws is noise. The Street map
+**Names on the drawn basemap come from Esri's light-gray canvas reference
+layer**, not the reference layer the imagery basemaps use. That one
+carries administrative boundaries as well as names, and a second set of
+grey town lines over the ones this map already draws is noise. (It was
+CARTO's labels-only raster until CARTO began requiring an API key; see
+the parks-page traps below.) The Street map
 basemap draws its own names, so the toggle does nothing there — a
 property of those tiles, not a bug.
 
@@ -949,4 +951,55 @@ plus `note` with regexes. A dollar amount not followed somewhere by the word
 "charge" or "$" stops counting as free; "out-of-state" anywhere means a
 parking charge. Prices that are not parking (a castle tour) go in
 `siteRules`, which the card shows and `fee_state()` never reads.
+
+---
+
+## The parks page and the vetted map (v0.58.0)
+
+Timothy, 2026-10-22: *"add a page that is what's on by default that just
+lists all our current state parks we've begun to vet. the map view is no
+longer default and should also not by default have anything unvetted
+present on it."* "Vetted" means a park with a baked guide
+(`data/guides/index.json`), not merely a green verdict.
+
+- **The list is the front page.** `#parksView` sits OVER the map in
+  `<main>`, so the map stays laid out underneath and switching views never
+  makes Leaflet measure a `display: none` container. `#map` in the address
+  opens the map; anything else opens the list. The header's map controls
+  hide on the list (`body.view-parks`).
+- **The cards read the guide index for what the guide knows** (trail miles,
+  blazes, highlights, ways in) **and the place record for what
+  `verified.json` knows** (hours, fee, rules). Fees and hours are not baked
+  into the index on purpose: a publish changes them and does not rebuild
+  guides.
+- **The map shows vetted parks only, by default.** One gate in `visible()`
+  covers pins, map clicks, search, Random, Near me and the 3D viewer's
+  dice, because all of them already ask it. Outlines come from the tile
+  archive and carry no ids, so `EveryParkTiles.setShapeFilter` matches them
+  by name, apostrophes removed (DEEP writes "Devils Hopyard"), from the
+  record's name, its aka list and DEEP's own spelling in the index. The
+  tile hit test asks the same `visible()`, so a hidden outline cannot be
+  hovered or clicked either.
+- **Filters → Show → Vetted parks only** turns everything back on, as does
+  the note across the top of the map. Not remembered between visits: the
+  default is the point.
+- **The geolocation jump on load is off** unless `CONFIG.start` is the old
+  setup (map first, everything shown): a location prompt for a map nobody
+  opened is noise, and zoom 13 around you is empty when ten parks are all
+  there is. The map fits itself to the ten instead.
+
+`tools/isotest/parkspage.mjs` is the check. `layers.mjs`, `offline.mjs`
+and `roadsview.mjs` now open `#map`, and the first two press "Show
+everything", because they measure the archive and the layers, not the
+filter.
+
+### Traps
+
+| What happened | Root cause | Guard |
+|---|---|---|
+| "API KEY REQUIRED" stamped across the whole map; the Street map basemap blank | CARTO put its free basemaps behind an API key; every tile still answers **200**, with the watermark as the image | names from Esri's light-gray reference, Street map from Esri World Street Map. A 200 is not a working layer: look at a tile |
+| The ten pins were on the canvas (1,658 inked pixels) and nobody could find them | 26 px cream glyphs in the road weave, hidden below zoom 12 by `MARK_ZOOM` | in vetted mode: every zoom, a disc with a brass ring, and the name |
+| "Sleeping Giant" drawn as "eeping Giant" | the marks canvas is in `overlayPane` (400); the place-name tiles are in `epRoads` (440), above it | names on their own canvas in pane `epVetted` (450); discs first, names second, so no disc covers a neighbour's name |
+| Hammonasset listed with 18.3 mi of trail | DEEP's trail layer includes park roads and lot aisles | the card's miles exclude DEEP lines that lie on an OSM road; 4.5 mi |
+| A `let` reached from `refresh()` before its line ran would throw | `syncParks()` is called from `refresh()`; its state was declared far below | the state is declared with the other vetted state near the top, and the helpers it reaches are function declarations |
 

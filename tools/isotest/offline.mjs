@@ -13,7 +13,16 @@
 import { chromium } from "playwright";
 
 const EXEC = process.env.CHROMIUM || "/opt/pw-browsers/chromium";
-const SITE = process.env.SITE || "http://127.0.0.1:8125/index.html";
+// #map: the parks list is the front page since 2026-10-22, and this
+// check is about the map.
+const SITE = process.env.SITE || "http://127.0.0.1:8125/index.html#map";
+// The map shows vetted parks only by default. This check measures the
+// archive and the layers, not that filter (tools/isotest/parkspage.mjs
+// does), so it asks for everything after every load.
+const showAll = () => page.evaluate(() => {
+  const note = document.getElementById("vettedNote");
+  if (note && !note.hidden) document.getElementById("vettedShowAll").click();
+});
 const fails = [];
 
 const browser = await chromium.launch({ executablePath: EXEC });
@@ -47,6 +56,7 @@ const parkInk = () => page.evaluate(() => {
 });
 
 await page.goto(SITE);
+await showAll();
 await settle(4000);
 
 // 1. The worker must take control, or nothing below can work.
@@ -84,6 +94,7 @@ if (!status.complete) fails.push("worker does not report a complete save");
 // 3. Cut the network and reload. This is the whole test.
 await context.setOffline(true);
 await page.reload();
+await showAll();
 await settle(5000);
 await page.evaluate(() => window.__map.setView([41.7637, -72.6851], 12));
 await settle(5000);
