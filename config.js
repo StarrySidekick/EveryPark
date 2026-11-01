@@ -304,7 +304,7 @@ const CONFIG = {
   //
   // Bump dataVersion whenever you regenerate it, otherwise browsers will
   // keep serving the copy they already have.
-  dataVersion: "20261022",
+  dataVersion: "20261101",
 
   // Shown in the top-right corner. Bumped by hand on every code change,
   // so there's visible proof of which build is actually loaded rather
